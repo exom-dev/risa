@@ -2,7 +2,7 @@
 
 **Risa** is an embeddable and modular scripting language.
 
-# License <a href="https://github.com/exom-dev/risa/blob/master/LICENSE"><img align="right" src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
+# License <a href="https://github.com/exom-dev/risa/blob/master/LICENSE"><img align="right" src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 
 This project was created by [The Exom Developers](https://github.com/exom-dev).
 
