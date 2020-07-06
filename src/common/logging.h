@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#define PRINT(fmt, ...) \
+    fprintf(stdout, fmt, ##__VA_ARGS__)
 #define WARNING(fmt, ...) \
     fprintf(stdout, "[warning] " fmt "\n", ##__VA_ARGS__)
 #define ERROR(fmt, ...) \

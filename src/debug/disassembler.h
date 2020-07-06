@@ -3,6 +3,7 @@
 
 #include "../chunk/chunk.h"
 
-void risa_disassemble_chunk(Chunk* chunk);
+void debug_disassemble_chunk(Chunk* chunk);
+size_t debug_disassemble_instruction(Chunk* chunk, size_t offset);
 
 #endif

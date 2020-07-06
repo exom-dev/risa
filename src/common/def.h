@@ -1,0 +1,6 @@
+#ifndef RISA_DEFS_H_GUARD
+#define RISA_DEFS_H_GUARD
+
+#define DEBUG_TRACE_EXECUTION
+
+#endif

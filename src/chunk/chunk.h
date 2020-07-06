@@ -5,10 +5,10 @@
 #include "../value/value.h"
 
 typedef struct {
-    uint32_t size;
-    uint32_t capacity;
+    size_t size;
+    size_t capacity;
 
-    uint32_t* lines;
+    size_t* lines;
 
     uint8_t* bytecode;
 
