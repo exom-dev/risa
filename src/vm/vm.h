@@ -16,16 +16,16 @@ typedef struct {
 } VM;
 
 typedef enum {
-    INTERPRET_OK,
-    INTERPRET_RUNTIME_ERROR
-} InterpretResult;
+    VM_OK,
+    VM_ERROR
+} VMStatus;
 
 VM*  vm_create();
 void vm_init(VM* vm);
-void vm_free(VM* vm);
+void vm_delete(VM* vm);
 
-InterpretResult vm_execute(VM* vm, Chunk* chunk);
-InterpretResult vm_run(VM* vm);
+VMStatus vm_execute(VM* vm, Chunk* chunk);
+VMStatus vm_run(VM* vm);
 
 void  vm_stack_reset(VM* vm);
 void  vm_stack_push(VM* vm, Value value);

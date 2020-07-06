@@ -19,18 +19,18 @@ void vm_init(VM* vm) {
     vm_stack_reset(vm);
 }
 
-void vm_free(VM* vm) {
+void vm_delete(VM* vm) {
 
 }
 
-InterpretResult vm_execute(VM* vm, Chunk* chunk) {
+VMStatus vm_execute(VM* vm, Chunk* chunk) {
     vm->chunk = chunk;
     vm->ip = vm->chunk->bytecode;
 
     return vm_run(vm);
 }
 
-InterpretResult vm_run(VM* vm) {
+VMStatus vm_run(VM* vm) {
     #define NEXT_BYTE() (*vm->ip++)
     #define NEXT_CONSTANT() (vm->chunk->constants.values[NEXT_BYTE()])
 
@@ -91,7 +91,7 @@ InterpretResult vm_run(VM* vm) {
             case OP_RET: {
                 value_print(vm_stack_pop(vm));
                 PRINT("\n");
-                return INTERPRET_OK;
+                return VM_OK;
             }
             default: {
 
