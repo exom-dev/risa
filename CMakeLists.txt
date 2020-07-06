@@ -22,4 +22,4 @@ file(GLOB SOURCE_FILES
         src/**/*.h
         src/**/*.c)
 
-add_executable(risa ${SOURCE_FILES} src/debug/disassembler.h src/debug/disassembler.c src/value/value.h src/value/value.c src/value/value_array.c src/vm/vm.h src/vm/vm.c src/common/def.h src/vm/vm_stack.c)
+add_executable(risa ${SOURCE_FILES})
