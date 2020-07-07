@@ -1,13 +1,24 @@
 #ifndef RISA_COMPILER_H
 #define RISA_COMPILER_H
 
+#include "parser.h"
+
 #include "../chunk/chunk.h"
+#include "../lexer/lexer.h"
+
+typedef struct {
+    Chunk chunk;
+    Parser parser;
+} Compiler;
 
 typedef enum {
     COMPILER_OK,
     COMPILER_ERROR
 } CompilerStatus;
 
-CompilerStatus compiler_compile(const char* str, Chunk* chunk);
+void compiler_init(Compiler* compiler);
+void compiler_delete(Compiler* compiler);
+
+CompilerStatus compiler_compile(Compiler* compiler, const char* str);
 
 #endif

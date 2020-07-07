@@ -3,6 +3,7 @@
 
 typedef enum {
     OP_CNST,
+    OP_CNSTW,
     OP_NEG,
     OP_ADD,
     OP_SUB,

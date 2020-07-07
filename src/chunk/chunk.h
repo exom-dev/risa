@@ -8,7 +8,7 @@ typedef struct {
     size_t size;
     size_t capacity;
 
-    size_t* lines;
+    size_t* indices;
 
     uint8_t* bytecode;
 
@@ -17,7 +17,7 @@ typedef struct {
 
 Chunk* chunk_create();
 void   chunk_init(Chunk* chunk);
-void   chunk_write(Chunk* chunk, uint8_t byte, uint32_t line);
+void   chunk_write(Chunk* chunk, uint8_t byte, uint32_t index);
 size_t chunk_write_constant(Chunk* chunk, Value constant);
 void   chunk_delete(Chunk* chunk);
 

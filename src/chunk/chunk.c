@@ -13,19 +13,19 @@ void chunk_init(Chunk* chunk) {
     chunk->size = 0;
     chunk->capacity = 0;
     chunk->bytecode = NULL;
-    chunk->lines = NULL;
+    chunk->indices = NULL;
 
     value_array_init(&chunk->constants);
 }
 
-void chunk_write(Chunk* chunk, uint8_t byte, uint32_t line) {
+void chunk_write(Chunk* chunk, uint8_t byte, uint32_t index) {
     if(chunk->capacity <= chunk->size) {
         chunk->bytecode = mem_expand(chunk->bytecode, &chunk->capacity);
-        chunk->lines = mem_realloc(chunk->lines, chunk->capacity * sizeof(uint32_t));
+        chunk->indices = mem_realloc(chunk->indices, chunk->capacity * sizeof(uint32_t));
     }
 
     chunk->bytecode[chunk->size] = byte;
-    chunk->lines[chunk->size] = line;
+    chunk->indices[chunk->size] = index;
     ++chunk->size;
 }
 

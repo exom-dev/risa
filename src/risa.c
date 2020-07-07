@@ -15,6 +15,7 @@ RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk* chunk) {
 
 RisaInterpretStatus risa_interpret_string(const char* str) {
     Chunk compiled;
+    chunk_init(&compiled);
 
     if(risa_compile_string(str, &compiled) == RISA_COMPILE_ERROR) {
         chunk_delete(&compiled);
@@ -23,6 +24,9 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
 
     VM vm;
     vm_init(&vm);
+
+    vm.chunk = &compiled;
+    vm.ip = vm.chunk->bytecode;
 
     if(risa_execute_chunk(&vm, &compiled) == RISA_EXECUTE_ERROR) {
         vm_delete(&vm);

@@ -5,12 +5,12 @@
 #include <string.h>
 
 #define PEEK(i) lexer->current[i]
-#define ADVANCE(i) (lexer->current += i)
-#define NEXT() *(lexer->current++)
+#define ADVANCE(i) (++lexer->index, lexer->current += i)
+#define NEXT() (++lexer->index, *(lexer->current++))
 
 #define AT_END(i) (lexer->current[i] == '\0')
 #define MATCH(c) \
-        ((AT_END(0) || *lexer->current != c) ? false : (++lexer->current, true)) \
+        ((AT_END(0) || *lexer->current != c) ? false : (ADVANCE(1), true)) \
 
 bool is_digit(char c);
 bool is_alpha(char c);
@@ -19,20 +19,15 @@ Token next_identifier(Lexer* lexer);
 Token next_number(Lexer* lexer);
 Token next_string(Lexer* lexer);
 
-Lexer* lexer_create() {
-    Lexer* lexer = mem_alloc(sizeof(Lexer));
-    lexer_init(lexer);
-
-    return lexer;
-}
-
 void lexer_init(Lexer* lexer) {
+    lexer->source = NULL;
     lexer->start = NULL;
     lexer->current = NULL;
-    lexer->line = 1;
+    lexer->index = 0;
 }
 
 void lexer_source(Lexer* lexer, const char* src) {
+    lexer->source = src;
     lexer->start = src;
     lexer->current = src;
 }
@@ -49,10 +44,7 @@ Token lexer_next(Lexer* lexer) {
             case ' ':
             case '\t':
             case '\r':
-                ADVANCE(1);
-                break;
             case '\n':
-                ++lexer->line;
                 ADVANCE(1);
                 break;
             case '/':
@@ -95,43 +87,34 @@ Token lexer_next(Lexer* lexer) {
         return next_number(lexer);
 
     switch(c) {
-        case '(':
-            return lexer_emit(lexer, TOKEN_LEFT_PAREN);
-        case ')':
-            return lexer_emit(lexer, TOKEN_RIGHT_PAREN);
-        case '{':
-            return lexer_emit(lexer, TOKEN_LEFT_BRACE);
-        case '}':
-            return lexer_emit(lexer, TOKEN_RIGHT_BRACE);
-        case ':':
-            return lexer_emit(lexer, TOKEN_COLON);
-        case ';':
-            return lexer_emit(lexer, TOKEN_SEMICOLON);
-        case ',':
-            return lexer_emit(lexer, TOKEN_COMMA);
-        case '.':
-            return lexer_emit(lexer, TOKEN_DOT);
-        case '-':
-            return lexer_emit(lexer, TOKEN_MINUS);
-        case '+':
-            return lexer_emit(lexer, TOKEN_PLUS);
-        case '/':
-            return lexer_emit(lexer, TOKEN_SLASH);
-        case '*':
-            return lexer_emit(lexer, TOKEN_STAR);
-        case '!':
-            return lexer_emit(lexer, MATCH('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-        case '=':
-            return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-        case '<':
-            return lexer_emit(lexer, MATCH('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-        case '>':
-            return lexer_emit(lexer, MATCH('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-        case '"':
-            return next_string(lexer);
-    }
+        case '(': return lexer_emit(lexer, TOKEN_LEFT_PAREN);
+        case ')': return lexer_emit(lexer, TOKEN_RIGHT_PAREN);
+        case '[': return lexer_emit(lexer, TOKEN_LEFT_BRACKET);
+        case ']': return lexer_emit(lexer, TOKEN_RIGHT_BRACKET);
+        case '{': return lexer_emit(lexer, TOKEN_LEFT_BRACE);
+        case '}': return lexer_emit(lexer, TOKEN_RIGHT_BRACE);
+        case ':': return lexer_emit(lexer, TOKEN_COLON);
+        case ';': return lexer_emit(lexer, TOKEN_SEMICOLON);
+        case ',': return lexer_emit(lexer, TOKEN_COMMA);
+        case '.': return lexer_emit(lexer, TOKEN_DOT);
+        case '-': return lexer_emit(lexer, TOKEN_MINUS);
+        case '+': return lexer_emit(lexer, TOKEN_PLUS);
+        case '/': return lexer_emit(lexer, TOKEN_SLASH);
+        case '*': return lexer_emit(lexer, TOKEN_STAR);
+        case '~': return lexer_emit(lexer, TOKEN_TILDE);
+        case '%': return lexer_emit(lexer, TOKEN_PERCENT);
+        case '!': return lexer_emit(lexer, MATCH('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
+        case '=': return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+        case '<': return lexer_emit(lexer, MATCH('=') ? TOKEN_LESS_EQUAL :
+                                           MATCH('<') ? TOKEN_LESS_LESS : TOKEN_LESS);
+        case '>': return lexer_emit(lexer, MATCH('=') ? TOKEN_GREATER_EQUAL :
+                                           MATCH('>') ? TOKEN_GREATER_GREATER : TOKEN_GREATER);
+        case '&': return lexer_emit(lexer, MATCH('&') ? TOKEN_AMPERSAND_AMPERSAND : TOKEN_AMPERSAND);
+        case '|': return lexer_emit(lexer, MATCH('|') ? TOKEN_PIPE_PIPE : TOKEN_PIPE);
+        case '"': return next_string(lexer);
 
-    return lexer_error(lexer, "Unexpected character");
+        default: return lexer_error(lexer, "Unexpected character");
+    }
 }
 
 Token lexer_emit(Lexer* lexer, TokenType type) {
@@ -139,7 +122,7 @@ Token lexer_emit(Lexer* lexer, TokenType type) {
     token.type = type;
     token.start = lexer->start;
     token.size = (size_t) (lexer->current - lexer->start);
-    token.line = lexer->line;
+    token.index = lexer->index;
 
     return token;
 }
@@ -149,7 +132,7 @@ Token lexer_error(Lexer* lexer, const char* msg) {
     token.type = TOKEN_ERROR;
     token.start = msg;
     token.size = strlen(msg);
-    token.line = lexer->line;
+    token.index = lexer->index;
 
     return token;
 }
@@ -173,8 +156,6 @@ Token next_identifier(Lexer* lexer) {
         ADVANCE(1);
 
     switch(*lexer->start) {
-        case 'a': return lexer_emit(lexer, CLASSIFY(1, 2, "nd", TOKEN_AND));
-        case 'c': return lexer_emit(lexer, CLASSIFY(1, 4, "lass", TOKEN_CLASS));
         case 'e': return lexer_emit(lexer, CLASSIFY(1, 3, "lse", TOKEN_ELSE));
         case 'f':
             if(lexer->current - lexer->start > 1) {
@@ -187,17 +168,8 @@ Token next_identifier(Lexer* lexer) {
             break;
         case 'i': return lexer_emit(lexer, CLASSIFY(1, 1, "f", TOKEN_IF));
         case 'n': return lexer_emit(lexer, CLASSIFY(1, 3, "ull", TOKEN_NULL));
-        case 'o': return lexer_emit(lexer, CLASSIFY(1, 1, "r", TOKEN_OR));
         case 'r': return lexer_emit(lexer, CLASSIFY(1, 5, "eturn", TOKEN_RETURN));
-        case 's': return lexer_emit(lexer, CLASSIFY(1, 4, "uper", TOKEN_SUPER));
-        case 't':
-            if(lexer->current - lexer->start > 1) {
-                switch(lexer->start[1]) {
-                    case 'h': return lexer_emit(lexer, CLASSIFY(2, 2, "is", TOKEN_THIS));
-                    case 'r': return lexer_emit(lexer, CLASSIFY(2, 2, "ue", TOKEN_TRUE));
-                }
-            }
-            break;
+        case 't': return lexer_emit(lexer, CLASSIFY(1, 3, "rue", TOKEN_TRUE));
         case 'v': return lexer_emit(lexer, CLASSIFY(1, 2, "ar", TOKEN_VAR));
         case 'w': return lexer_emit(lexer, CLASSIFY(1, 4, "hile", TOKEN_WHILE));
     }
