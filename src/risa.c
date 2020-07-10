@@ -4,8 +4,14 @@
 #include "compiler/compiler.h"
 
 RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
-    if(compiler_compile(str, chunk) == COMPILER_ERROR)
+    Compiler compiler;
+
+    compiler_init(&compiler);
+
+    if(compiler_compile(&compiler, str) == COMPILER_ERROR)
         return  RISA_COMPILE_ERROR;
+
+    *chunk = compiler.chunk;
     return RISA_COMPILE_OK;
 }
 

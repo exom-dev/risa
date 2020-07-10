@@ -9,6 +9,8 @@
 typedef struct {
     Chunk chunk;
     Parser parser;
+
+    uint8_t regIndex;
 } Compiler;
 
 typedef enum {

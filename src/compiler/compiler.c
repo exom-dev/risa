@@ -11,19 +11,27 @@
 
 void compile_number(Compiler* compiler);
 void compile_expression(Compiler* compiler);
+void compile_expression_precedence(Compiler* compiler, Precedence precedence);
 void compile_grouping(Compiler* compiler);
+void compile_unary(Compiler* compiler);
+void compile_binary(Compiler* compiler);
 
 void emit_byte(Compiler* compiler, uint8_t byte);
-void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2);
+void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
 void emit_word(Compiler* compiler, uint16_t word);
 void emit_constant(Compiler* compiler, Value value);
 void emit_return(Compiler* compiler);
 
 uint8_t create_constant(Compiler* compiler, Value value);
 
+bool register_reserve(Compiler* compiler);
+void register_free(Compiler* compiler);
+
 void compiler_init(Compiler* compiler) {
     chunk_init(&compiler->chunk);
     parser_init(&compiler->parser);
+
+    compiler->regIndex = 0;
 }
 
 void compiler_delete(Compiler* compiler) {
@@ -49,6 +57,10 @@ void compile_number(Compiler* compiler) {
 }
 
 void compile_expression(Compiler* compiler) {
+    compile_expression_precedence(PREC_ASSIGNMENT);
+}
+
+void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
 
 }
 
@@ -57,13 +69,36 @@ void compile_grouping(Compiler* compiler) {
     parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
 }
 
+void compile_unary(Compiler* compiler) {
+    TokenType operator = compiler->parser.previous.type;
+
+    uint8_t reg = compiler->regIndex;
+    if(!register_reserve(compiler))
+        return;
+
+    register_free(compiler);
+    compile_expression_precedence(compiler, PREC_ASSIGNMENT);
+
+    switch(operator) {
+        case TOKEN_MINUS: {
+            emit_bytes(compiler, OP_NEG, reg, reg);
+            break;
+        }
+    }
+}
+
+void compile_binary(Compiler* compiler) {
+    TokenType operator = compiler->parser.previous.type;
+}
+
 void emit_byte(Compiler* compiler, uint8_t byte) {
     chunk_write(&compiler->chunk, byte, compiler->parser.previous.index);
 }
 
-void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2) {
+void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
     emit_byte(compiler, byte1);
     emit_byte(compiler, byte2);
+    emit_byte(compiler, byte3);
 }
 
 void emit_word(Compiler* compiler, uint16_t word) {
@@ -73,10 +108,15 @@ void emit_word(Compiler* compiler, uint16_t word) {
 void emit_constant(Compiler* compiler, Value value) {
     uint16_t index = create_constant(compiler, value);
 
+    uint8_t reg = compiler->regIndex;
+    if(!register_reserve(compiler))
+        return;
+
     if(index < UINT8_MAX)
-        emit_bytes(compiler, OP_CNST, index);
+        emit_bytes(compiler, OP_CNST, reg, index);
     else {
         emit_byte(compiler, OP_CNSTW);
+        emit_byte(compiler, reg);
         emit_word(compiler, index);
     }
 }
@@ -94,4 +134,14 @@ uint8_t create_constant(Compiler* compiler, Value value) {
     }
 
     return (uint8_t) index;
+}
+
+bool register_reserve(Compiler* compiler) {
+    if(compiler->regIndex == 249)
+        parser_error_at_current(&compiler->parser, "Register limit exceeded (250)");
+    else ++compiler->regIndex;
+}
+
+void register_free(Compiler* compiler) {
+    --compiler->regIndex;
 }
