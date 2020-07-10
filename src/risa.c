@@ -2,6 +2,7 @@
 
 #include "chunk/chunk.h"
 #include "compiler/compiler.h"
+#include "debug/disassembler.h"
 
 RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
     Compiler compiler;
@@ -12,6 +13,9 @@ RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
         return  RISA_COMPILE_ERROR;
 
     *chunk = compiler.chunk;
+
+    debug_disassemble_chunk(chunk);
+
     return RISA_COMPILE_OK;
 }
 
@@ -28,7 +32,7 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
-    VM vm;
+    /*VM vm;
     vm_init(&vm);
 
     vm.chunk = &compiled;
@@ -41,6 +45,6 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
     }
 
     vm_delete(&vm);
-    chunk_delete(&compiled);
+    chunk_delete(&compiled);*/
     return RISA_INTERPRET_OK;
 }

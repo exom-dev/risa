@@ -41,7 +41,7 @@ void parser_error_at(Parser* parser, Token token, const char* msg) {
         size_t ln;
         size_t col;
 
-        mem_lncol(parser->lexer->source, token.index, &ln, &col);
+        mem_lncol(parser->lexer.source, token.index, &ln, &col);
         ERROR("at %zu:%zu in script: %s\n", ln, col, msg);
     }
 

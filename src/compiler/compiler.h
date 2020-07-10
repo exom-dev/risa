@@ -18,6 +18,29 @@ typedef enum {
     COMPILER_ERROR
 } CompilerStatus;
 
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT, // =
+    PREC_OR,         // ||
+    PREC_AND,        // &&
+    PREC_EQUALITY,   // == !=
+    PREC_COMPARISON, // < > <= >=
+    PREC_TERM,       // + -
+    PREC_FACTOR,     // * /
+    PREC_UNARY,      // ! - ~
+    PREC_CALL,       // . ()
+    PREC_PRIMARY
+} Precedence;
+
+typedef void (*RuleHandler)(Compiler*);
+
+typedef struct {
+    RuleHandler prefix;
+    RuleHandler infix;
+
+    Precedence precedence;
+} Rule;
+
 void compiler_init(Compiler* compiler);
 void compiler_delete(Compiler* compiler);
 
