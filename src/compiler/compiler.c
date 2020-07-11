@@ -98,6 +98,9 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
 }
 
 void compile_number(Compiler* compiler) {
+    if(!register_reserve(compiler))
+        return;
+
     double num = strtod(compiler->parser.previous.start, NULL);
     emit_constant(compiler, num);
 }
@@ -115,9 +118,6 @@ void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
         parser_error_at_previous(&compiler->parser, "Expected expression");
     }
 
-    if(!register_reserve(compiler))
-        return;
-
     prefix(compiler);
 
     while(precedence <= TOKEN_RULES[compiler->parser.current.type].precedence) {
@@ -126,8 +126,6 @@ void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
         RuleHandler infix = TOKEN_RULES[compiler->parser.previous.type].infix;
         infix(compiler);
     }
-
-    register_free(compiler);
 }
 
 void compile_grouping(Compiler* compiler) {
@@ -138,7 +136,6 @@ void compile_grouping(Compiler* compiler) {
 void compile_unary(Compiler* compiler) {
     TokenType operator = compiler->parser.previous.type;
 
-    register_free(compiler);
     compile_expression_precedence(compiler, PREC_ASSIGNMENT);
 
     switch(operator) {
@@ -172,6 +169,7 @@ void compile_binary(Compiler* compiler) {
             return;
     }
 
+    register_free(compiler);
     emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
 }
 

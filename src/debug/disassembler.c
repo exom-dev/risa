@@ -12,7 +12,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         PRINT("%04zu ", offset);
         PRINT("   . ");
     } else {
-        PRINT("\nINDX LINE OP\n");
+        PRINT("\nOFFS INDX OP\n");
         PRINT("%04zu ", offset);
         PRINT("%4zu ", chunk->indices[offset]);
     }
@@ -51,7 +51,7 @@ size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t
 
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
-    value_print(chunk->constants.values[chunk->bytecode[offset + 1]]);
+    value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
 
     return offset + 3;
