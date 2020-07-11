@@ -13,6 +13,8 @@ typedef struct {
 
     Value  stack[VM_STACK_SIZE];
     Value* stackTop;
+
+    Value* regs;
 } VM;
 
 typedef enum {
@@ -20,11 +22,10 @@ typedef enum {
     VM_ERROR
 } VMStatus;
 
-VM*  vm_create();
 void vm_init(VM* vm);
 void vm_delete(VM* vm);
 
-VMStatus vm_execute(VM* vm, Chunk* chunk);
+VMStatus vm_execute(VM* vm);
 VMStatus vm_run(VM* vm);
 
 void  vm_stack_reset(VM* vm);

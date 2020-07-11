@@ -3,10 +3,15 @@
 
 #include "../common/headers.h"
 
-void* mem_alloc(size_t size);
-void* mem_realloc(void* ptr, size_t size);
-void* mem_expand(void* ptr, size_t* size);
-void  mem_free(void* ptr);
+#define MEM_ALLOC(size) mem_alloc(size, __FILE__, __LINE__)
+#define MEM_REALLOC(ptr, size) mem_realloc(ptr, size, __FILE__, __LINE__)
+#define MEM_EXPAND(ptr, size) mem_expand(ptr, size, __FILE__, __LINE__)
+#define MEM_FREE(ptr) mem_free(ptr, __FILE__, __LINE__)
+
+void* mem_alloc(size_t size, const char* file, uint32_t line);
+void* mem_realloc(void* ptr, size_t size, const char* file, uint32_t line);
+void* mem_expand(void* ptr, size_t* size, const char* file, uint32_t line);
+void  mem_free(void* ptr, const char* file, uint32_t line);
 
 void  mem_destroy();
 void  mem_panic();

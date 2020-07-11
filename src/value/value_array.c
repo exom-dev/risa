@@ -1,9 +1,10 @@
 #include "value.h"
 
 #include "../memory/mem.h"
+#include "../common/logging.h"
 
 ValueArray* value_array_create() {
-    ValueArray* array = mem_alloc(sizeof(ValueArray));
+    ValueArray* array = (ValueArray*) MEM_ALLOC(sizeof(ValueArray));
     value_array_init(array);
 
     return array;
@@ -16,14 +17,13 @@ void value_array_init(ValueArray* array) {
 }
 
 void value_array_write(ValueArray* array, Value value) {
-    if(array->capacity <= array->size)
-        array->values = mem_expand(array->values, &array->capacity);
+    while(array->capacity <= array->size * sizeof(Value))
+        array->values = (Value*) MEM_EXPAND(array->values, &array->capacity);
 
     array->values[array->size++] = value;
 }
 
 void value_array_delete(ValueArray* array) {
-    mem_free(array->values);
-
+    MEM_FREE(array->values);
     value_array_init(array);
 }

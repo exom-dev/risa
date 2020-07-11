@@ -25,7 +25,9 @@ uint8_t create_constant(Compiler* compiler, Value value);
 bool register_reserve(Compiler* compiler);
 void register_free(Compiler* compiler);
 
-Rule TOKEN_RULES[] = {
+void finalize_compilation(Compiler* compiler);
+
+Rule EXPRESSION_RULES[] = {
         { compile_grouping, NULL,    PREC_NONE },       // TOKEN_LEFT_PAREN
         { NULL,     NULL,    PREC_NONE },       // TOKEN_RIGHT_PAREN
         { NULL,     NULL,    PREC_NONE },       // TOKEN_LEFT_BRACKET
@@ -81,7 +83,7 @@ void compiler_init(Compiler* compiler) {
 }
 
 void compiler_delete(Compiler* compiler) {
-    emit_return(compiler);
+    chunk_delete(&compiler->chunk);
 }
 
 CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
@@ -93,6 +95,8 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     compile_expression(compiler);
 
     parser_consume(&compiler->parser, TOKEN_EOF, "Expected end of expression");
+
+    finalize_compilation(compiler);
 
     return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
 }
@@ -112,7 +116,7 @@ void compile_expression(Compiler* compiler) {
 void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
     parser_advance(&compiler->parser);
 
-    RuleHandler prefix = TOKEN_RULES[compiler->parser.previous.type].prefix;
+    RuleHandler prefix = EXPRESSION_RULES[compiler->parser.previous.type].prefix;
 
     if(prefix == NULL) {
         parser_error_at_previous(&compiler->parser, "Expected expression");
@@ -120,10 +124,10 @@ void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
 
     prefix(compiler);
 
-    while(precedence <= TOKEN_RULES[compiler->parser.current.type].precedence) {
+    while(precedence <= EXPRESSION_RULES[compiler->parser.current.type].precedence) {
         parser_advance(&compiler->parser);
 
-        RuleHandler infix = TOKEN_RULES[compiler->parser.previous.type].infix;
+        RuleHandler infix = EXPRESSION_RULES[compiler->parser.previous.type].infix;
         infix(compiler);
     }
 }
@@ -149,7 +153,7 @@ void compile_unary(Compiler* compiler) {
 void compile_binary(Compiler* compiler) {
     TokenType operatorType = compiler->parser.previous.type;
 
-    Rule* rule = &TOKEN_RULES[operatorType];
+    Rule* rule = &EXPRESSION_RULES[operatorType];
     compile_expression_precedence(compiler, (Precedence) (rule->precedence + 1));
 
     switch(operatorType) {
@@ -228,4 +232,8 @@ bool register_reserve(Compiler* compiler) {
 
 void register_free(Compiler* compiler) {
     --compiler->regIndex;
+}
+
+void finalize_compilation(Compiler* compiler) {
+    emit_return(compiler);
 }

@@ -6,41 +6,42 @@
 
 #define MEM_BLOCK_START_SIZE 8
 
-void* mem_alloc(size_t size) {
+void* mem_alloc(size_t size, const char* file, uint32_t line) {
     void* ptr = malloc(size);
 
     if(ptr == NULL)
         mem_panic();
+    PRINT("+ %p                 at line %u in %s\n", ptr, line, file);
     return ptr;
 }
 
-void* mem_realloc(void* ptr, size_t size) {
+void* mem_realloc(void* ptr, size_t size, const char* file, uint32_t line) {
+    PRINT("~ %p -> ", ptr);
     void* newPtr = realloc(ptr, size);
 
     if(newPtr == NULL)
         mem_panic();
+    PRINT("%p     at line %u in %s\n", newPtr, line, file);
     return newPtr;
 }
 
-void* mem_expand(void* ptr, size_t* size) {
+void* mem_expand(void* ptr, size_t* size, const char* file, uint32_t line) {
     if(*size < MEM_BLOCK_START_SIZE)
         *size = MEM_BLOCK_START_SIZE;
-    else *size *= 2;
+    else (*size) *= 2;
 
-    void* newPtr = realloc(ptr, *size);
-
-    if(newPtr == NULL)
-        mem_panic();
-    return newPtr;
+    return mem_realloc(ptr, *size, file, line);
 }
 
-void mem_free(void* ptr) {
+void mem_free(void* ptr, const char* file, uint32_t line) {
+    PRINT("- %p", ptr);
     if(ptr != NULL)
         free(ptr);
+    PRINT("                 at line %u in %s\n", line, file);
 }
 
 void mem_destroy() {
-    WARNING("Mem Destroy");
+    VERBOSE("Mem Destroy");
 }
 
 void mem_panic() {

@@ -49,7 +49,7 @@ char* mem_chunk(const char* source, size_t index, size_t size, size_t chunk, siz
     if(chunkSize != 0)
         *chunkSize = chunk;
 
-    char* data = (char*) mem_alloc(chunk);
+    char* data = (char*) MEM_ALLOC(chunk);
     memcpy(data, source + startIndex, chunk);
 
     return data;
@@ -91,7 +91,7 @@ char* mem_lnchunk(const char* source, size_t index, size_t size, size_t chunk, s
         *chunkSize = chunk;
 
     char* data;
-    data = (char*) mem_alloc(chunk);
+    data = (char*) MEM_ALLOC(chunk);
     memcpy(data, start, chunk);
 
     return data;

@@ -6,6 +6,9 @@
 
 #define PRINT(fmt, ...) \
     fprintf(stdout, fmt, ##__VA_ARGS__)
+
+#define VERBOSE(fmt, ...) \
+    fprintf(stdout, "[verbose] " fmt "\n", ##__VA_ARGS__)
 #define WARNING(fmt, ...) \
     fprintf(stdout, "[warning] " fmt "\n", ##__VA_ARGS__)
 #define ERROR(fmt, ...) \

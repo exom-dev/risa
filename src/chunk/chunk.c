@@ -1,13 +1,7 @@
 #include "chunk.h"
 
 #include "../memory/mem.h"
-
-Chunk* chunk_create() {
-    Chunk* chunk = mem_alloc(sizeof(Chunk));
-    chunk_init(chunk);
-
-    return chunk;
-}
+#include "../common/logging.h"
 
 void chunk_init(Chunk* chunk) {
     chunk->size = 0;
@@ -19,9 +13,9 @@ void chunk_init(Chunk* chunk) {
 }
 
 void chunk_write(Chunk* chunk, uint8_t byte, uint32_t index) {
-    if(chunk->capacity <= chunk->size) {
-        chunk->bytecode = mem_expand(chunk->bytecode, &chunk->capacity);
-        chunk->indices = mem_realloc(chunk->indices, chunk->capacity * sizeof(uint32_t));
+    while(chunk->capacity <= chunk->size) {
+        chunk->bytecode = (uint8_t*) MEM_EXPAND(chunk->bytecode, &chunk->capacity);
+        chunk->indices = (uint32_t*) MEM_REALLOC(chunk->indices, chunk->capacity * sizeof(uint32_t));
     }
 
     chunk->bytecode[chunk->size] = byte;
@@ -35,7 +29,9 @@ size_t chunk_write_constant(Chunk* chunk, Value constant) {
 }
 
 void chunk_delete(Chunk* chunk) {
-    mem_free(chunk->bytecode);
+    MEM_FREE(chunk->bytecode);
+    MEM_FREE(chunk->indices);
+
     value_array_delete(&chunk->constants);
 
     chunk_init(chunk);

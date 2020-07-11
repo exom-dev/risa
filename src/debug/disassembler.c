@@ -6,6 +6,7 @@
 
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_simple_instruction(const char* name, size_t offset);
 
 size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
     if(offset > 0 && chunk->indices[offset] == chunk->indices[offset - 1]) {
@@ -14,7 +15,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
     } else {
         PRINT("\nOFFS INDX OP\n");
         PRINT("%04zu ", offset);
-        PRINT("%4zu ", chunk->indices[offset]);
+        PRINT("%4u ", chunk->indices[offset]);
     }
 
     uint8_t instruction = chunk->bytecode[offset];
@@ -33,7 +34,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_NEG:
             return disassemble_arithmetic_instruction("NEG", chunk, offset);
         case OP_RET:
-            return disassemble_arithmetic_instruction("RET", chunk, offset);
+            return disassemble_simple_instruction("RET", offset);
         default:
             return offset;
     }
@@ -55,4 +56,9 @@ size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t o
     PRINT("'\n");
 
     return offset + 3;
+}
+
+size_t disassemble_simple_instruction(const char* name, size_t offset) {
+    PRINT("%s\n", name);
+    return offset + 1;
 }

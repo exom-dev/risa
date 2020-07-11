@@ -6,33 +6,37 @@
 
 #include "../common/logging.h"
 
-VM* vm_create() {
-    VM* vm = mem_alloc(sizeof(VM));
-    vm_init(vm);
-
-    return vm;
-}
-
 void vm_init(VM* vm) {
     vm->ip = 0;
     vm->chunk = NULL;
     vm_stack_reset(vm);
+
+    vm->regs = vm->stackTop;
 }
 
 void vm_delete(VM* vm) {
 
 }
 
-VMStatus vm_execute(VM* vm, Chunk* chunk) {
-    vm->chunk = chunk;
-    vm->ip = vm->chunk->bytecode;
-
+VMStatus vm_execute(VM* vm) {
     return vm_run(vm);
 }
 
 VMStatus vm_run(VM* vm) {
     #define NEXT_BYTE() (*vm->ip++)
     #define NEXT_CONSTANT() (vm->chunk->constants.values[NEXT_BYTE()])
+
+    #define DEST  (*vm->ip)
+    #define LEFT  (vm->ip[1])
+    #define RIGHT (vm->ip[2])
+
+    #define LEFT_CONSTANT (vm->chunk->constants.values[LEFT])
+
+    #define DEST_REG  (vm->regs[DEST])
+    #define LEFT_REG  (vm->regs[LEFT])
+    #define RIGHT_REG (vm->regs[RIGHT])
+
+    #define SKIP_ARGS(count) (vm->ip += count)
 
     while(1) {
         #ifdef DEBUG_TRACE_EXECUTION
@@ -51,45 +55,43 @@ VMStatus vm_run(VM* vm) {
 
         switch(instruction) {
             case OP_CNST: {
-                Value constant = NEXT_CONSTANT();
+                DEST_REG = LEFT_CONSTANT;
 
-                vm_stack_push(vm, constant);
+                SKIP_ARGS(2);
                 break;
             }
             case OP_ADD: {
-                double right = vm_stack_pop(vm);
-                double left = vm_stack_pop(vm);
+                DEST_REG = LEFT_REG + RIGHT_REG;
 
-                vm_stack_push(vm, left + right);
+                SKIP_ARGS(3);
                 break;
             }
             case OP_SUB: {
-                double right = vm_stack_pop(vm);
-                double left = vm_stack_pop(vm);
+                DEST_REG = LEFT_REG - RIGHT_REG;
 
-                vm_stack_push(vm, left - right);
+                SKIP_ARGS(3);
                 break;
             }
             case OP_MUL: {
-                double right = vm_stack_pop(vm);
-                double left = vm_stack_pop(vm);
+                DEST_REG = LEFT_REG * RIGHT_REG;
 
-                vm_stack_push(vm, left * right);
+                SKIP_ARGS(3);
                 break;
             }
             case OP_DIV: {
-                double right = vm_stack_pop(vm);
-                double left = vm_stack_pop(vm);
+                DEST_REG = LEFT_REG / RIGHT_REG;
 
-                vm_stack_push(vm, left / right);
+                SKIP_ARGS(3);
                 break;
             }
             case OP_NEG: {
-                vm_stack_push(vm, -vm_stack_pop(vm));
+                DEST_REG = -LEFT_REG;
+
+                SKIP_ARGS(2);
                 break;
             }
             case OP_RET: {
-                value_print(vm_stack_pop(vm));
+                value_print(*vm->regs);
                 PRINT("\n");
                 return VM_OK;
             }
@@ -98,6 +100,16 @@ VMStatus vm_run(VM* vm) {
             }
         }
     }
+
+    #undef RIGHT_REG
+    #undef LEFT_REG
+    #undef DEST_REG
+
+    #undef LEFT_CONSTANT
+
+    #undef RIGHT
+    #undef LEFT
+    #undef DEST
 
     #undef NEXT_CONSTANT
     #undef NEXT_BYTE

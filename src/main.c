@@ -43,11 +43,11 @@ void run_file(const char* path) {
     size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    char* data = (char*) mem_alloc(size + 1);
+    char* data = (char*) MEM_ALLOC(size + 1);
 
     if(fread(data, sizeof(char), size, file) < size) {
         fclose(file);
-        mem_free(data);
+        MEM_FREE(data);
         TERMINATE(74, "Cannot read file '%s'\n", path);
     }
 
@@ -57,7 +57,7 @@ void run_file(const char* path) {
 
     RisaInterpretStatus status = risa_interpret_string(data);
 
-    mem_free(data);
+    MEM_FREE(data);
 
     if(status == RISA_INTERPRET_OK)
         exit(0);
