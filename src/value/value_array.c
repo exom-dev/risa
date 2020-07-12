@@ -17,8 +17,8 @@ void value_array_init(ValueArray* array) {
 }
 
 void value_array_write(ValueArray* array, Value value) {
-    while(array->capacity <= array->size * sizeof(Value))
-        array->values = (Value*) MEM_EXPAND(array->values, &array->capacity);
+    while(array->capacity <= array->size)
+        array->values = (Value*) MEM_EXPAND(array->values, &array->capacity, sizeof(Value));
 
     array->values[array->size++] = value;
 }

@@ -15,9 +15,9 @@ void* mem_alloc(size_t size, const char* file, uint32_t line) {
     return ptr;
 }
 
-void* mem_realloc(void* ptr, size_t size, const char* file, uint32_t line) {
+void* mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uint32_t line) {
     PRINT("~ %p -> ", ptr);
-    void* newPtr = realloc(ptr, size);
+    void* newPtr = realloc(ptr, size * unitSize);
 
     if(newPtr == NULL)
         mem_panic();
@@ -25,12 +25,12 @@ void* mem_realloc(void* ptr, size_t size, const char* file, uint32_t line) {
     return newPtr;
 }
 
-void* mem_expand(void* ptr, size_t* size, const char* file, uint32_t line) {
+void* mem_expand(void* ptr, size_t* size, size_t unitSize, const char* file, uint32_t line) {
     if(*size < MEM_BLOCK_START_SIZE)
         *size = MEM_BLOCK_START_SIZE;
     else (*size) *= 2;
 
-    return mem_realloc(ptr, *size, file, line);
+    return mem_realloc(ptr, *size, unitSize, file, line);
 }
 
 void mem_free(void* ptr, const char* file, uint32_t line) {

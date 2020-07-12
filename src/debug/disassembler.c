@@ -5,6 +5,7 @@
 #include "../common/logging.h"
 
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_simple_instruction(const char* name, size_t offset);
 
@@ -32,7 +33,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_DIV:
             return disassemble_arithmetic_instruction("DIV", chunk, offset);
         case OP_NEG:
-            return disassemble_arithmetic_instruction("NEG", chunk, offset);
+            return disassemble_unary_instruction("NEG", chunk, offset);
         case OP_RET:
             return disassemble_simple_instruction("RET", offset);
         default:
@@ -48,6 +49,11 @@ void debug_disassemble_chunk(Chunk* chunk) {
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], chunk->bytecode[offset + 3]);
     return offset + 4;
+}
+
+size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
+    return offset + 3;
 }
 
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset) {

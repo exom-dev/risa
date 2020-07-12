@@ -5,9 +5,12 @@
 #include "../common/logging.h"
 #include "../lexer/lexer.h"
 
+#include <math.h>
 #include <stdlib.h>
+#include <errno.h>
 
-void compile_number(Compiler* compiler);
+void compile_int(Compiler* compiler);
+void compile_float(Compiler* compiler);
 void compile_expression(Compiler* compiler);
 void compile_expression_precedence(Compiler* compiler, Precedence precedence);
 void compile_grouping(Compiler* compiler);
@@ -20,7 +23,7 @@ void emit_word(Compiler* compiler, uint16_t word);
 void emit_constant(Compiler* compiler, Value value);
 void emit_return(Compiler* compiler);
 
-uint8_t create_constant(Compiler* compiler, Value value);
+uint16_t create_constant(Compiler* compiler, Value value);
 
 bool register_reserve(Compiler* compiler);
 void register_free(Compiler* compiler);
@@ -60,7 +63,8 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,    PREC_NONE },       // TOKEN_PIPE_PIPE
         { NULL,     NULL,    PREC_NONE },       // TOKEN_IDENTIFIER
         { NULL,     NULL,    PREC_NONE },       // TOKEN_STRING
-        { compile_number,     NULL,    PREC_NONE },       // TOKEN_NUMBER
+        { compile_int,     NULL,    PREC_NONE },       // TOKEN_INT
+        { compile_float,     NULL,    PREC_NONE },       // TOKEN_FLOAT
         { NULL,     NULL,    PREC_NONE },       // TOKEN_IF
         { NULL,     NULL,    PREC_NONE },       // TOKEN_ELSE
         { NULL,     NULL,    PREC_NONE },       // TOKEN_WHILE
@@ -101,12 +105,32 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
 }
 
-void compile_number(Compiler* compiler) {
+void compile_int(Compiler* compiler) {
+    if(!register_reserve(compiler))
+        return;
+
+    int64_t num = strtol(compiler->parser.previous.start, NULL, 10);
+
+    if(errno == ERANGE) {
+        parser_error_at_previous(&compiler->parser, "Number is too large for type 'int'");
+        return;
+    }
+
+    emit_constant(compiler, INT_VALUE(num));
+}
+
+void compile_float(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
     double num = strtod(compiler->parser.previous.start, NULL);
-    emit_constant(compiler, num);
+
+    if(errno == ERANGE) {
+        parser_error_at_previous(&compiler->parser, "Number is too small or too large for type 'float'");
+        return;
+    }
+
+    emit_constant(compiler, FLOAT_VALUE(num));
 }
 
 void compile_expression(Compiler* compiler) {
@@ -140,7 +164,7 @@ void compile_grouping(Compiler* compiler) {
 void compile_unary(Compiler* compiler) {
     TokenType operator = compiler->parser.previous.type;
 
-    compile_expression_precedence(compiler, PREC_ASSIGNMENT);
+    compile_expression_precedence(compiler, PREC_UNARY);
 
     switch(operator) {
         case TOKEN_MINUS: {
@@ -208,7 +232,7 @@ void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RET);
 }
 
-uint8_t create_constant(Compiler* compiler, Value value) {
+uint16_t create_constant(Compiler* compiler, Value value) {
     size_t index = chunk_write_constant(&compiler->chunk, value);
 
     if(index > UINT16_MAX) {
@@ -216,7 +240,7 @@ uint8_t create_constant(Compiler* compiler, Value value) {
         return 0;
     }
 
-    return (uint8_t) index;
+    return (uint16_t) index;
 }
 
 bool register_reserve(Compiler* compiler) {

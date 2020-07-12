@@ -180,10 +180,14 @@ Token next_identifier(Lexer* lexer) {
 }
 
 Token next_number(Lexer* lexer) {
+    TokenType type = TOKEN_INT;
+
     while(!AT_END(0) && is_digit(PEEK(0)))
         ADVANCE(1);
 
     if(PEEK(0) == '.') {
+        type = TOKEN_FLOAT;
+
         if(!AT_END(1) && is_digit(PEEK(1))) {
             ADVANCE(1);
 
@@ -192,7 +196,7 @@ Token next_number(Lexer* lexer) {
         } else return lexer_error(lexer, "Expected digit after dot");
     }
 
-    return lexer_emit(lexer, TOKEN_NUMBER);
+    return lexer_emit(lexer, type);
 }
 
 Token next_string(Lexer* lexer) {

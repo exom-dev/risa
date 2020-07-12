@@ -14,8 +14,8 @@ void chunk_init(Chunk* chunk) {
 
 void chunk_write(Chunk* chunk, uint8_t byte, uint32_t index) {
     while(chunk->capacity <= chunk->size) {
-        chunk->bytecode = (uint8_t*) MEM_EXPAND(chunk->bytecode, &chunk->capacity);
-        chunk->indices = (uint32_t*) MEM_REALLOC(chunk->indices, chunk->capacity * sizeof(uint32_t));
+        chunk->bytecode = (uint8_t*) MEM_EXPAND(chunk->bytecode, &chunk->capacity, sizeof(uint8_t));
+        chunk->indices = (uint32_t*) MEM_REALLOC(chunk->indices, chunk->capacity, sizeof(uint32_t));
     }
 
     chunk->bytecode[chunk->size] = byte;
