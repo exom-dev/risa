@@ -123,7 +123,7 @@ Token lexer_emit(Lexer* lexer, TokenType type) {
     token.type = type;
     token.start = lexer->start;
     token.size = (size_t) (lexer->current - lexer->start);
-    token.index = lexer->index;
+    token.index = lexer->index - token.size;
 
     return token;
 }

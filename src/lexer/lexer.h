@@ -33,7 +33,7 @@ typedef struct {
     const char* start;
 
     size_t size;
-    size_t index;
+    uint32_t index;
 } Token;
 
 typedef struct {

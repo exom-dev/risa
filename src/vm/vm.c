@@ -39,7 +39,7 @@ VMStatus vm_run(VM* vm) {
     #define SKIP_ARGS(count) (vm->ip += count)
 
     #define VM_ERROR(vm, fmt, ...) \
-        fprintf(stderr, "[error] at index %u: " fmt "\n", vm->chunk->indices[instruction], ##__VA_ARGS__ )
+        fprintf(stderr, "[error] at index %u: " fmt "\n", vm->chunk->indices[vm->ip - vm->chunk->bytecode], ##__VA_ARGS__ )
 
     while(1) {
         #ifdef DEBUG_TRACE_EXECUTION

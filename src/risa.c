@@ -38,8 +38,6 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
-    //chunk_delete(&compiled);
-
     VM vm;
     vm_init(&vm);
 
