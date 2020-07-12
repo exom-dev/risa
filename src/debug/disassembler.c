@@ -33,8 +33,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_producer_instruction("FALSE", chunk, offset);
         case OP_NOT:
             return disassemble_unary_instruction("NOT", chunk, offset);
-        case OP_INV:
-            return disassemble_unary_instruction("INV", chunk, offset);
+        case OP_BNOT:
+            return disassemble_unary_instruction("BNOT", chunk, offset);
         case OP_NEG:
             return disassemble_unary_instruction("NEG", chunk, offset);
         case OP_ADD:
@@ -61,6 +61,10 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("EQ", chunk, offset);
         case OP_NEQ:
             return disassemble_arithmetic_instruction("NEQ", chunk, offset);
+        case OP_BAND:
+            return disassemble_arithmetic_instruction("BAND", chunk, offset);
+        case OP_BOR:
+            return disassemble_arithmetic_instruction("BOR", chunk, offset);
         case OP_RET:
             return disassemble_simple_instruction("RET", offset);
         default:

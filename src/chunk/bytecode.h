@@ -8,7 +8,7 @@ typedef enum {
     OP_TRUE,
     OP_FALSE,
     OP_NOT,
-    OP_INV,
+    OP_BNOT,
     OP_NEG,
     OP_ADD,
     OP_SUB,
@@ -22,6 +22,8 @@ typedef enum {
     OP_LTE,
     OP_EQ,
     OP_NEQ,
+    OP_BAND,
+    OP_BOR,
     OP_RET
 } OpCode;
 

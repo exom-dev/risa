@@ -20,16 +20,18 @@ typedef enum {
 
 typedef enum {
     PREC_NONE,
-    PREC_ASSIGNMENT, // =
-    PREC_OR,         // ||
-    PREC_AND,        // &&
-    PREC_EQUALITY,   // == !=
-    PREC_COMPARISON, // < > <= >=
-    PREC_SHIFT,      // << >>
-    PREC_TERM,       // + -
-    PREC_FACTOR,     // * /
-    PREC_UNARY,      // ! - ~
-    PREC_CALL,       // . ()
+    PREC_ASSIGNMENT,  // =
+    PREC_OR,          // ||
+    PREC_AND,         // &&
+    PREC_BITWISE_OR,  // |
+    PREC_BITWISE_AND, // &
+    PREC_EQUALITY,    // == !=
+    PREC_COMPARISON,  // < > <= >=
+    PREC_SHIFT,       // << >>
+    PREC_TERM,        // + -
+    PREC_FACTOR,      // * /
+    PREC_UNARY,       // ! - ~
+    PREC_CALL,        // . ()
     PREC_PRIMARY
 } Precedence;
 

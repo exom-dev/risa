@@ -59,9 +59,9 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS_EQUAL
         { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_LESS_LESS
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND
+        { NULL,     compile_binary,    PREC_BITWISE_AND },// TOKEN_AMPERSAND
         { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND_AMPERSAND
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE
+        { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE_PIPE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_IDENTIFIER
         { NULL,     NULL,    PREC_NONE },                // TOKEN_STRING
@@ -209,7 +209,7 @@ void compile_unary(Compiler* compiler) {
             emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->regIndex - 1);
             break;
         case TOKEN_TILDE:
-            emit_bytes(compiler, OP_INV, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_bytes(compiler, OP_BNOT, compiler->regIndex - 1, compiler->regIndex - 1);
             break;
         case TOKEN_MINUS:
             emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->regIndex - 1);
@@ -261,6 +261,12 @@ void compile_binary(Compiler* compiler) {
             break;
         case TOKEN_BANG_EQUAL:
             emit_byte(compiler, OP_NEQ);
+            break;
+        case TOKEN_AMPERSAND:
+            emit_byte(compiler, OP_BAND);
+            break;
+        case TOKEN_PIPE:
+            emit_byte(compiler, OP_BOR);
             break;
         default:
             return;
