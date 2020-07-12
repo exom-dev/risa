@@ -14,12 +14,14 @@ typedef enum {
     OP_SUB,
     OP_MUL,
     OP_DIV,
-    OP_EQ,
-    OP_NEQ,
+    OP_SHL,
+    OP_SHR,
     OP_GT,
     OP_GTE,
     OP_LT,
     OP_LTE,
+    OP_EQ,
+    OP_NEQ,
     OP_RET
 } OpCode;
 

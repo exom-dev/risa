@@ -196,6 +196,11 @@ Token next_number(Lexer* lexer) {
         } else return lexer_error(lexer, "Expected digit after dot");
     }
 
+    if(PEEK(0) == 'b') {
+        type = TOKEN_BYTE;
+        ADVANCE(1);
+    }
+
     return lexer_emit(lexer, type);
 }
 

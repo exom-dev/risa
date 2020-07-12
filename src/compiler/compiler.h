@@ -25,6 +25,7 @@ typedef enum {
     PREC_AND,        // &&
     PREC_EQUALITY,   // == !=
     PREC_COMPARISON, // < > <= >=
+    PREC_SHIFT,      // << >>
     PREC_TERM,       // + -
     PREC_FACTOR,     // * /
     PREC_UNARY,      // ! - ~

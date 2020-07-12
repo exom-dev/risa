@@ -45,10 +45,10 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("MUL", chunk, offset);
         case OP_DIV:
             return disassemble_arithmetic_instruction("DIV", chunk, offset);
-        case OP_EQ:
-            return disassemble_arithmetic_instruction("EQ", chunk, offset);
-        case OP_NEQ:
-            return disassemble_arithmetic_instruction("NEQ", chunk, offset);
+        case OP_SHL:
+            return disassemble_arithmetic_instruction("SHL", chunk, offset);
+        case OP_SHR:
+            return disassemble_arithmetic_instruction("SHR", chunk, offset);
         case OP_GT:
             return disassemble_arithmetic_instruction("GT", chunk, offset);
         case OP_GTE:
@@ -57,6 +57,10 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("LT", chunk, offset);
         case OP_LTE:
             return disassemble_arithmetic_instruction("LTE", chunk, offset);
+        case OP_EQ:
+            return disassemble_arithmetic_instruction("EQ", chunk, offset);
+        case OP_NEQ:
+            return disassemble_arithmetic_instruction("NEQ", chunk, offset);
         case OP_RET:
             return disassemble_simple_instruction("RET", offset);
         default:

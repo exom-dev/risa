@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
+void compile_byte(Compiler* compiler);
 void compile_int(Compiler* compiler);
 void compile_float(Compiler* compiler);
 void compile_literal(Compiler* compiler);
@@ -32,52 +33,53 @@ void register_free(Compiler* compiler);
 void finalize_compilation(Compiler* compiler);
 
 Rule EXPRESSION_RULES[] = {
-        { compile_grouping, NULL,    PREC_NONE },       // TOKEN_LEFT_PAREN
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_RIGHT_PAREN
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_LEFT_BRACKET
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_RIGHT_BRACKET
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_LEFT_BRACE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_RIGHT_BRACE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_COMMA
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_DOT
+        { compile_grouping, NULL,    PREC_NONE },        // TOKEN_LEFT_PAREN
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_PAREN
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACKET
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACKET
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_COMMA
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_DOT
         { compile_unary,    compile_binary,  PREC_TERM },// TOKEN_MINUS
-        { NULL,     compile_binary,  PREC_TERM },       // TOKEN_PLUS
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_COLON
-        { NULL,     NULL,  PREC_NONE },                 // TOKEN_SEMICOLON
-        { NULL,     compile_binary,  PREC_FACTOR },     // TOKEN_SLASH
-        { NULL,     compile_binary,    PREC_FACTOR },   // TOKEN_STAR
-        { compile_unary,     NULL,    PREC_NONE },               // TOKEN_TILDE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_PERCENT
-        { compile_unary,     NULL,    PREC_NONE },      // TOKEN_BANG
-        { NULL,     compile_binary,    PREC_EQUALITY }, // TOKEN_BANG_EQUAL
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_EQUAL
-        { NULL,     compile_binary,    PREC_EQUALITY }, // TOKEN_EQUAL_EQUAL
+        { NULL,     compile_binary,  PREC_TERM },        // TOKEN_PLUS
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_COLON
+        { NULL,     NULL,  PREC_NONE },                  // TOKEN_SEMICOLON
+        { NULL,     compile_binary,  PREC_FACTOR },      // TOKEN_SLASH
+        { NULL,     compile_binary,    PREC_FACTOR },    // TOKEN_STAR
+        { compile_unary,     NULL,    PREC_NONE },       // TOKEN_TILDE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_PERCENT
+        { compile_unary,     NULL,    PREC_NONE },       // TOKEN_BANG
+        { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_BANG_EQUAL
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL
+        { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_EQUAL_EQUAL
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER_EQUAL
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_GREATER_GREATER
+        { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_GREATER_GREATER
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS_EQUAL
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_LESS_LESS
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_AMPERSAND
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_AMPERSAND_AMPERSAND
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_PIPE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_PIPE_PIPE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_IDENTIFIER
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_STRING
-        { compile_int,     NULL,    PREC_NONE },        // TOKEN_INT
-        { compile_float,     NULL,    PREC_NONE },      // TOKEN_FLOAT
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_IF
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_ELSE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_WHILE
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_FOR
-        { compile_literal,     NULL,    PREC_NONE },    // TOKEN_TRUE
-        { compile_literal,     NULL,    PREC_NONE },    // TOKEN_FALSE
-        { compile_literal,     NULL,    PREC_NONE },    // TOKEN_NULL
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_VAR
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_FUNCTION
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_RETURN
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_ERROR
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_EOF
+        { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_LESS_LESS
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND_AMPERSAND
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE_PIPE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_IDENTIFIER
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_STRING
+        { compile_byte,     NULL,    PREC_NONE },        // TOKEN_BYTE
+        { compile_int,     NULL,    PREC_NONE },         // TOKEN_INT
+        { compile_float,     NULL,    PREC_NONE },       // TOKEN_FLOAT
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_IF
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_ELSE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_WHILE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_FOR
+        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_TRUE
+        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_FALSE
+        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_NULL
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_VAR
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_FUNCTION
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_RETURN
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_ERROR
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_EOF
 };
 
 void compiler_init(Compiler* compiler) {
@@ -104,6 +106,20 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     finalize_compilation(compiler);
 
     return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
+}
+
+void compile_byte(Compiler* compiler) {
+    if(!register_reserve(compiler))
+        return;
+
+    int64_t num = strtol(compiler->parser.previous.start, NULL, 10);
+
+    if(errno == ERANGE || num > 256) {
+        parser_error_at_previous(&compiler->parser, "Number is too large for type 'byte'");
+        return;
+    }
+
+    emit_constant(compiler, BYTE_VALUE(num));
 }
 
 void compile_int(Compiler* compiler) {
@@ -222,11 +238,11 @@ void compile_binary(Compiler* compiler) {
         case TOKEN_SLASH:
             emit_byte(compiler, OP_DIV);
             break;
-        case TOKEN_EQUAL_EQUAL:
-            emit_byte(compiler, OP_EQ);
+        case TOKEN_LESS_LESS:
+            emit_byte(compiler, OP_SHL);
             break;
-        case TOKEN_BANG_EQUAL:
-            emit_byte(compiler, OP_NEQ);
+        case TOKEN_GREATER_GREATER:
+            emit_byte(compiler, OP_SHR);
             break;
         case TOKEN_GREATER:
             emit_byte(compiler, OP_GT);
@@ -239,6 +255,12 @@ void compile_binary(Compiler* compiler) {
             break;
         case TOKEN_LESS_EQUAL:
             emit_byte(compiler, OP_LTE);
+            break;
+        case TOKEN_EQUAL_EQUAL:
+            emit_byte(compiler, OP_EQ);
+            break;
+        case TOKEN_BANG_EQUAL:
+            emit_byte(compiler, OP_NEQ);
             break;
         default:
             return;
