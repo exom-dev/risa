@@ -23,6 +23,7 @@ typedef enum {
     OP_EQ,
     OP_NEQ,
     OP_BAND,
+    OP_BXOR,
     OP_BOR,
     OP_RET
 } OpCode;

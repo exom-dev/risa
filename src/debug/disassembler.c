@@ -63,6 +63,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("NEQ", chunk, offset);
         case OP_BAND:
             return disassemble_arithmetic_instruction("BAND", chunk, offset);
+        case OP_BXOR:
+            return disassemble_arithmetic_instruction("BXOR", chunk, offset);
         case OP_BOR:
             return disassemble_arithmetic_instruction("BOR", chunk, offset);
         case OP_RET:

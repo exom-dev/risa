@@ -574,6 +574,33 @@ VMStatus vm_run(VM* vm) {
                 SKIP_ARGS(3);
                 break;
             }
+            case OP_BXOR: {
+                if(IS_BYTE(LEFT_REG)) {
+                    if(IS_BYTE(RIGHT_REG)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) ^ AS_BYTE(RIGHT_REG));
+                    } else if(IS_INT(RIGHT_REG)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) ^ AS_INT(RIGHT_REG));
+                    } else {
+                        VM_ERROR(vm, "Right operand must be either byte or int");
+                        return VM_ERROR;
+                    }
+                } else if(IS_INT(LEFT_REG)) {
+                    if(IS_BYTE(RIGHT_REG)) {
+                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) ^ AS_BYTE(RIGHT_REG));
+                    } else if(IS_INT(RIGHT_REG)) {
+                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) ^ AS_INT(RIGHT_REG));
+                    } else {
+                        VM_ERROR(vm, "Right operand must be either byte or int");
+                        return VM_ERROR;
+                    }
+                } else {
+                    VM_ERROR(vm, "Left operand must be either byte or int");
+                    return VM_ERROR;
+                }
+
+                SKIP_ARGS(3);
+                break;
+            }
             case OP_BOR: {
                 if(IS_BYTE(LEFT_REG)) {
                     if(IS_BYTE(RIGHT_REG)) {
