@@ -42,6 +42,9 @@ typedef struct {
 } ValueArray;
 
 void value_print(Value value);
+bool value_is_falsy(Value value);
+bool value_equals(Value left, Value right);
+bool value_not_equals(Value left, Value right);
 
 ValueArray* value_array_create();
 void value_array_init(ValueArray* array);
