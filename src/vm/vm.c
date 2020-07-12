@@ -542,7 +542,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_NEQ: {
-                DEST_REG = BOOL_VALUE(value_not_equals(LEFT_REG, RIGHT_REG));
+                DEST_REG = BOOL_VALUE(!value_equals(LEFT_REG, RIGHT_REG));
 
                 SKIP_ARGS(3);
                 break;

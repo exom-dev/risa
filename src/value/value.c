@@ -57,35 +57,3 @@ bool value_equals(Value left, Value right) {
         case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
     }
 }
-
-bool value_not_equals(Value left, Value right) {
-    if(left.type != right.type) {
-        if(IS_BYTE(left)){
-            if(IS_INT(right))
-                return AS_BYTE(left) != AS_INT(right);
-            if(IS_FLOAT(right))
-                return AS_BYTE(left) != AS_FLOAT(right);
-            return true;
-        } else if(IS_INT(left)){
-            if(IS_BYTE(right))
-                return AS_INT(left) != AS_BYTE(right);
-            if(IS_FLOAT(right))
-                return AS_INT(left) != AS_FLOAT(right);
-            return true;
-        } else if(IS_FLOAT(left)) {
-            if(IS_BYTE(right))
-                return AS_FLOAT(left) != AS_BYTE(right);
-            if(IS_INT(right))
-                return AS_FLOAT(left) != AS_INT(right);
-            return true;
-        }
-    }
-
-    switch(left.type) {
-        case VAL_NULL:  return false;
-        case VAL_BOOL:  return AS_BOOL(left) != AS_BOOL(right);
-        case VAL_BYTE:  return AS_BYTE(left) != AS_BYTE(right);
-        case VAL_INT:   return AS_INT(left) != AS_INT(right);
-        case VAL_FLOAT: return AS_FLOAT(left) != AS_FLOAT(right);
-    }
-}
