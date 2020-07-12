@@ -8,6 +8,7 @@ typedef enum {
     OP_TRUE,
     OP_FALSE,
     OP_NOT,
+    OP_INV,
     OP_NEG,
     OP_ADD,
     OP_SUB,

@@ -87,6 +87,17 @@ VMStatus vm_run(VM* vm) {
                 SKIP_ARGS(2);
                 break;
             }
+            case OP_INV: {
+                if(IS_INT(LEFT_REG))
+                    DEST_REG = INT_VALUE(~AS_INT(LEFT_REG));
+                else {
+                    VM_ERROR(vm, "Operand must be int");
+                    return VM_ERROR;
+                }
+
+                SKIP_ARGS(2);
+                break;
+            }
             case OP_NEG: {
                 if(IS_INT(LEFT_REG))
                     DEST_REG = INT_VALUE(-AS_INT(LEFT_REG));

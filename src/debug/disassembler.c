@@ -33,6 +33,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_producer_instruction("FALSE", chunk, offset);
         case OP_NOT:
             return disassemble_unary_instruction("NOT", chunk, offset);
+        case OP_INV:
+            return disassemble_unary_instruction("INV", chunk, offset);
         case OP_NEG:
             return disassemble_unary_instruction("NEG", chunk, offset);
         case OP_ADD:

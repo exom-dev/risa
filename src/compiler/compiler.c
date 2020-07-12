@@ -46,7 +46,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,  PREC_NONE },                 // TOKEN_SEMICOLON
         { NULL,     compile_binary,  PREC_FACTOR },     // TOKEN_SLASH
         { NULL,     compile_binary,    PREC_FACTOR },   // TOKEN_STAR
-        { NULL,     NULL,    PREC_NONE },               // TOKEN_TILDE
+        { compile_unary,     NULL,    PREC_NONE },               // TOKEN_TILDE
         { NULL,     NULL,    PREC_NONE },               // TOKEN_PERCENT
         { compile_unary,     NULL,    PREC_NONE },      // TOKEN_BANG
         { NULL,     compile_binary,    PREC_EQUALITY }, // TOKEN_BANG_EQUAL
@@ -191,6 +191,9 @@ void compile_unary(Compiler* compiler) {
     switch(operator) {
         case TOKEN_BANG:
             emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->regIndex - 1);
+            break;
+        case TOKEN_TILDE:
+            emit_bytes(compiler, OP_INV, compiler->regIndex - 1, compiler->regIndex - 1);
             break;
         case TOKEN_MINUS:
             emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->regIndex - 1);
