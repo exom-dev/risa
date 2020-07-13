@@ -23,7 +23,10 @@ typedef struct LinkedValue {
 
 typedef struct {
     LinkedValue link;
+
     uint32_t length;
+    uint32_t hash;
+
     char chars[];
 } ValString;
 
@@ -75,7 +78,8 @@ bool value_equals(Value left, Value right);
 
 bool value_is_linked_of_type(Value value, LinkedValueType type);
 
-ValString* value_string_copy(const char* chars, uint32_t length);
+uint32_t   value_string_hash(ValString* string);
+ValString* value_string_from(const char* chars, uint32_t length);
 ValString* value_string_concat(ValString* left, ValString* right);
 
 ValueArray* value_array_create();

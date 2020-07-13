@@ -1,10 +1,15 @@
 #include "value.h"
 
 #include "../memory/mem.h"
+#include "../data/map.h"
 
 #include <string.h>
 
-ValString* value_string_copy(const char* chars, uint32_t length) {
+uint32_t value_string_hash(ValString* string) {
+    return map_hash(string->chars, string->length);
+}
+
+ValString* value_string_from(const char* chars, uint32_t length) {
     ValString* string = MEM_ALLOC(sizeof(ValString) + length + 1);
 
     string->link.type = LVAL_STRING;
@@ -13,6 +18,8 @@ ValString* value_string_copy(const char* chars, uint32_t length) {
 
     memcpy(string->chars, chars, length);
     string->chars[length] = '\0';
+
+    string->hash = value_string_hash(string);
 
     return string;
 }
@@ -29,6 +36,8 @@ ValString* value_string_concat(ValString* left, ValString* right) {
     memcpy(string->chars, left->chars, left->length);
     memcpy(string->chars + left->length, right->chars, right->length);
     string->chars[length] = '\0';
+
+    string->hash = value_string_hash(string);
 
     return string;
 }

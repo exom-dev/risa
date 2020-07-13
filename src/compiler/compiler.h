@@ -5,10 +5,12 @@
 
 #include "../chunk/chunk.h"
 #include "../lexer/lexer.h"
+#include "../data/map.h"
 
 typedef struct {
     Chunk chunk;
     Parser parser;
+    Map strings;
 
     uint8_t regIndex;
 } Compiler;

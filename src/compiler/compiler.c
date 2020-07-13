@@ -5,33 +5,32 @@
 #include "../common/logging.h"
 #include "../lexer/lexer.h"
 
-#include <math.h>
 #include <stdlib.h>
 #include <errno.h>
 
-void compile_byte(Compiler* compiler);
-void compile_int(Compiler* compiler);
-void compile_float(Compiler* compiler);
-void compile_string(Compiler* compiler);
-void compile_literal(Compiler* compiler);
-void compile_expression(Compiler* compiler);
-void compile_expression_precedence(Compiler* compiler, Precedence precedence);
-void compile_grouping(Compiler* compiler);
-void compile_unary(Compiler* compiler);
-void compile_binary(Compiler* compiler);
+static void compile_byte(Compiler* compiler);
+static void compile_int(Compiler* compiler);
+static void compile_float(Compiler* compiler);
+static void compile_string(Compiler* compiler);
+static void compile_literal(Compiler* compiler);
+static void compile_expression(Compiler* compiler);
+static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
+static void compile_grouping(Compiler* compiler);
+static void compile_unary(Compiler* compiler);
+static void compile_binary(Compiler* compiler);
 
-void emit_byte(Compiler* compiler, uint8_t byte);
-void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-void emit_word(Compiler* compiler, uint16_t word);
-void emit_constant(Compiler* compiler, Value value);
-void emit_return(Compiler* compiler);
+static void emit_byte(Compiler* compiler, uint8_t byte);
+static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+static void emit_word(Compiler* compiler, uint16_t word);
+static void emit_constant(Compiler* compiler, Value value);
+static void emit_return(Compiler* compiler);
 
-uint16_t create_constant(Compiler* compiler, Value value);
+static uint16_t create_constant(Compiler* compiler, Value value);
 
-bool register_reserve(Compiler* compiler);
-void register_free(Compiler* compiler);
+static bool register_reserve(Compiler* compiler);
+static void register_free(Compiler* compiler);
 
-void finalize_compilation(Compiler* compiler);
+static void finalize_compilation(Compiler* compiler);
 
 Rule EXPRESSION_RULES[] = {
         { compile_grouping, NULL,    PREC_NONE },        // TOKEN_LEFT_PAREN
@@ -87,12 +86,13 @@ Rule EXPRESSION_RULES[] = {
 void compiler_init(Compiler* compiler) {
     chunk_init(&compiler->chunk);
     parser_init(&compiler->parser);
+    map_init(&compiler->strings);
 
     compiler->regIndex = 0;
 }
 
 void compiler_delete(Compiler* compiler) {
-    chunk_delete(&compiler->chunk);
+    map_delete(&compiler->strings);
 }
 
 CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
@@ -110,7 +110,7 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
 }
 
-void compile_byte(Compiler* compiler) {
+static void compile_byte(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
@@ -124,7 +124,7 @@ void compile_byte(Compiler* compiler) {
     emit_constant(compiler, BYTE_VALUE(num));
 }
 
-void compile_int(Compiler* compiler) {
+static void compile_int(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
@@ -138,7 +138,7 @@ void compile_int(Compiler* compiler) {
     emit_constant(compiler, INT_VALUE(num));
 }
 
-void compile_float(Compiler* compiler) {
+static void compile_float(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
@@ -152,14 +152,25 @@ void compile_float(Compiler* compiler) {
     emit_constant(compiler, FLOAT_VALUE(num));
 }
 
-void compile_string(Compiler* compiler) {
+static void compile_string(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
-    emit_constant(compiler, LINKED_VALUE(value_string_copy(compiler->parser.previous.start + 1, compiler->parser.previous.size - 2)));
+    const char* start = compiler->parser.previous.start + 1;
+    uint32_t length = compiler->parser.previous.size - 2;
+    uint32_t hash = map_hash(start, length);
+
+    ValString* interned = map_find(&compiler->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = value_string_from(start, length);
+        map_set(&compiler->strings, interned, NULL_VALUE);
+    }
+
+    emit_constant(compiler, LINKED_VALUE(interned));
 }
 
-void compile_literal(Compiler* compiler) {
+static void compile_literal(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
@@ -180,11 +191,11 @@ void compile_literal(Compiler* compiler) {
     emit_byte(compiler, compiler->regIndex - 1);
 }
 
-void compile_expression(Compiler* compiler) {
+static void compile_expression(Compiler* compiler) {
     compile_expression_precedence(compiler, PREC_ASSIGNMENT);
 }
 
-void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
+static void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
     parser_advance(&compiler->parser);
 
     RuleHandler prefix = EXPRESSION_RULES[compiler->parser.previous.type].prefix;
@@ -203,12 +214,12 @@ void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
     }
 }
 
-void compile_grouping(Compiler* compiler) {
+static void compile_grouping(Compiler* compiler) {
     compile_expression(compiler);
     parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
 }
 
-void compile_unary(Compiler* compiler) {
+static void compile_unary(Compiler* compiler) {
     TokenType operator = compiler->parser.previous.type;
 
     compile_expression_precedence(compiler, PREC_UNARY);
@@ -228,7 +239,7 @@ void compile_unary(Compiler* compiler) {
     }
 }
 
-void compile_binary(Compiler* compiler) {
+static void compile_binary(Compiler* compiler) {
     TokenType operatorType = compiler->parser.previous.type;
 
     Rule* rule = &EXPRESSION_RULES[operatorType];
@@ -291,22 +302,22 @@ void compile_binary(Compiler* compiler) {
     emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
 }
 
-void emit_byte(Compiler* compiler, uint8_t byte) {
+static void emit_byte(Compiler* compiler, uint8_t byte) {
     chunk_write(&compiler->chunk, byte, compiler->parser.previous.index);
 }
 
-void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
+static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
     emit_byte(compiler, byte1);
     emit_byte(compiler, byte2);
     emit_byte(compiler, byte3);
 }
 
-void emit_word(Compiler* compiler, uint16_t word) {
+static void emit_word(Compiler* compiler, uint16_t word) {
     emit_byte(compiler, ((uint8_t*) &word)[0]);
     emit_byte(compiler, ((uint8_t*) &word)[1]);
 }
 
-void emit_constant(Compiler* compiler, Value value) {
+static void emit_constant(Compiler* compiler, Value value) {
     uint16_t index = create_constant(compiler, value);
 
     if(index < UINT8_MAX)
@@ -318,11 +329,11 @@ void emit_constant(Compiler* compiler, Value value) {
     }
 }
 
-void emit_return(Compiler* compiler) {
+static void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RET);
 }
 
-uint16_t create_constant(Compiler* compiler, Value value) {
+static uint16_t create_constant(Compiler* compiler, Value value) {
     size_t index = chunk_write_constant(&compiler->chunk, value);
 
     if(index > UINT16_MAX) {
@@ -333,7 +344,7 @@ uint16_t create_constant(Compiler* compiler, Value value) {
     return (uint16_t) index;
 }
 
-bool register_reserve(Compiler* compiler) {
+static bool register_reserve(Compiler* compiler) {
     if(compiler->regIndex == 249) {
         parser_error_at_current(&compiler->parser, "Register limit exceeded (250)");
         return false;
@@ -344,10 +355,10 @@ bool register_reserve(Compiler* compiler) {
     }
 }
 
-void register_free(Compiler* compiler) {
+static void register_free(Compiler* compiler) {
     --compiler->regIndex;
 }
 
-void finalize_compilation(Compiler* compiler) {
+static void finalize_compilation(Compiler* compiler) {
     emit_return(compiler);
 }

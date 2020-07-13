@@ -3,6 +3,7 @@
 
 #include "../chunk/chunk.h"
 #include "../common/def.h"
+#include "../data/map.h"
 
 #define VM_STACK_SIZE 256
 
@@ -13,9 +14,9 @@ typedef struct {
 
     Value  stack[VM_STACK_SIZE];
     Value* stackTop;
-
     Value* regs;
 
+    Map strings;
     LinkedValue* values;
 } VM;
 
@@ -30,6 +31,7 @@ void vm_delete(VM* vm);
 VMStatus vm_execute(VM* vm);
 VMStatus vm_run(VM* vm);
 
+void vm_register_string(VM* vm, ValString* string);
 void vm_register_value(VM* vm, LinkedValue* value);
 
 void  vm_stack_reset(VM* vm);

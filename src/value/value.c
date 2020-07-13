@@ -69,11 +69,7 @@ bool value_equals(Value left, Value right) {
         case VAL_INT:   return AS_INT(left) == AS_INT(right);
         case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
         case VAL_LINKED: {
-            switch(AS_LINKED(left)->type) {
-                case LVAL_STRING:
-                    return AS_STRING(left)->length == AS_STRING(right)->length &&
-                        memcmp(AS_CSTRING(left), AS_CSTRING(right), AS_STRING(left)->length) == 0;
-            }
+            return AS_LINKED(left) == AS_LINKED(right);
         }
         default: return false;
     }

@@ -2,9 +2,11 @@
 
 #include "../memory/mem.h"
 #include "../chunk/bytecode.h"
-#include "../debug/disassembler.h"
-
 #include "../common/logging.h"
+
+#ifdef DEBUG_TRACE_EXECUTION
+    #include "../debug/disassembler.h"
+#endif
 
 void vm_init(VM* vm) {
     vm->ip = 0;
@@ -12,10 +14,13 @@ void vm_init(VM* vm) {
     vm_stack_reset(vm);
 
     vm->regs = vm->stackTop;
+
+    map_init(&vm->strings);
     vm->values = NULL;
 }
 
 void vm_delete(VM* vm) {
+    map_delete(&vm->strings);
     LinkedValue* value = vm->values;
 
     while(value != NULL) {
@@ -159,9 +164,15 @@ VMStatus vm_run(VM* vm) {
                     }
                 } else if(value_is_linked_of_type(LEFT_REG, LVAL_STRING)) {
                     if(value_is_linked_of_type(RIGHT_REG, LVAL_STRING)) {
-                        DEST_REG = LINKED_VALUE(value_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG)));
+                        ValString* result = value_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG));
+                        ValString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
 
-                        vm_register_value(vm, (LinkedValue*) AS_STRING(DEST_REG));
+                        if(interned != NULL) {
+                            MEM_FREE(result);
+                            result = interned;
+                        } else vm_register_value(vm, (LinkedValue*) result);
+
+                        DEST_REG = LINKED_VALUE(result);
                     } else {
                         VM_ERROR(vm, "Left operand must be string");
                         return VM_ERROR;
@@ -697,6 +708,10 @@ VMStatus vm_run(VM* vm) {
 
     #undef NEXT_CONSTANT
     #undef NEXT_BYTE
+}
+
+void vm_register_string(VM* vm, ValString* string) {
+    map_set(&vm->strings, string, NULL_VALUE);
 }
 
 void vm_register_value(VM* vm, LinkedValue* value) {
