@@ -45,6 +45,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("MUL", chunk, offset);
         case OP_DIV:
             return disassemble_arithmetic_instruction("DIV", chunk, offset);
+        case OP_MOD:
+            return disassemble_arithmetic_instruction("MOD", chunk, offset);
         case OP_SHL:
             return disassemble_arithmetic_instruction("SHL", chunk, offset);
         case OP_SHR:

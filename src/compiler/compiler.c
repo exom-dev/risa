@@ -49,7 +49,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_FACTOR },    // TOKEN_STAR
         { compile_unary,     NULL,    PREC_NONE },       // TOKEN_TILDE
         { NULL,     compile_binary,    PREC_BITWISE_XOR },// TOKEN_AMPERSAND
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_PERCENT
+        { NULL,     compile_binary,    PREC_FACTOR },     // TOKEN_PERCENT
         { compile_unary,     NULL,    PREC_NONE },       // TOKEN_BANG
         { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_BANG_EQUAL
         { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL
@@ -238,6 +238,9 @@ void compile_binary(Compiler* compiler) {
             break;
         case TOKEN_SLASH:
             emit_byte(compiler, OP_DIV);
+            break;
+        case TOKEN_PERCENT:
+            emit_byte(compiler, OP_MOD);
             break;
         case TOKEN_LESS_LESS:
             emit_byte(compiler, OP_SHL);

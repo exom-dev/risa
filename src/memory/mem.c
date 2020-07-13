@@ -11,17 +11,16 @@ void* mem_alloc(size_t size, const char* file, uint32_t line) {
 
     if(ptr == NULL)
         mem_panic();
-    MEMORY("+ %p                 at line %u in %s\n", ptr, line, file);
+    MEMORY("+ %p                 at line %u in %s", ptr, line, file);
     return ptr;
 }
 
 void* mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uint32_t line) {
-    MEMORY("~ %p -> ", ptr);
     void* newPtr = realloc(ptr, size * unitSize);
 
     if(newPtr == NULL)
         mem_panic();
-    MEMORY("%p     at line %u in %s\n", newPtr, line, file);
+    MEMORY("~ %p -> %p     at line %u in %s", ptr, newPtr, line, file);
     return newPtr;
 }
 
@@ -34,10 +33,9 @@ void* mem_expand(void* ptr, size_t* size, size_t unitSize, const char* file, uin
 }
 
 void mem_free(void* ptr, const char* file, uint32_t line) {
-    MEMORY("- %p", ptr);
     if(ptr != NULL)
         free(ptr);
-    MEMORY("                 at line %u in %s\n", line, file);
+    MEMORY("- %p                 at line %u in %s", ptr, line, file);
 }
 
 void mem_destroy() {
