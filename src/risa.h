@@ -3,7 +3,7 @@
 
 #include "vm/vm.h"
 
-#define RISA_VERSION "0.1"
+#define RISA_VERSION "0.1 ALPHA"
 #define RISA_CODENAME "Initus"
 
 typedef enum {
