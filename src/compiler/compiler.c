@@ -12,6 +12,7 @@
 void compile_byte(Compiler* compiler);
 void compile_int(Compiler* compiler);
 void compile_float(Compiler* compiler);
+void compile_string(Compiler* compiler);
 void compile_literal(Compiler* compiler);
 void compile_expression(Compiler* compiler);
 void compile_expression_precedence(Compiler* compiler, Precedence precedence);
@@ -65,7 +66,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE_PIPE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_IDENTIFIER
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_STRING
+        { compile_string,     NULL,    PREC_NONE },                // TOKEN_STRING
         { compile_byte,     NULL,    PREC_NONE },        // TOKEN_BYTE
         { compile_int,     NULL,    PREC_NONE },         // TOKEN_INT
         { compile_float,     NULL,    PREC_NONE },       // TOKEN_FLOAT
@@ -149,6 +150,13 @@ void compile_float(Compiler* compiler) {
     }
 
     emit_constant(compiler, FLOAT_VALUE(num));
+}
+
+void compile_string(Compiler* compiler) {
+    if(!register_reserve(compiler))
+        return;
+
+    emit_constant(compiler, LINKED_VALUE(value_string_copy(compiler->parser.previous.start + 1, compiler->parser.previous.size - 2)));
 }
 
 void compile_literal(Compiler* compiler) {

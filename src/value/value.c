@@ -2,6 +2,8 @@
 
 #include "../common/logging.h"
 
+#include <string.h>
+
 void value_print(Value value) {
     switch(value.type) {
         case VAL_NULL:
@@ -18,6 +20,17 @@ void value_print(Value value) {
             break;
         case VAL_FLOAT:
             PRINT("%f", AS_FLOAT(value));
+            break;
+        case VAL_LINKED:
+            value_print_linked(AS_LINKED(value));
+            break;
+    }
+}
+
+void value_print_linked(LinkedValue* linked) {
+    switch(linked->type) {
+        case LVAL_STRING:
+            PRINT("%s", ((ValString*) linked)->chars);
             break;
     }
 }
@@ -46,7 +59,7 @@ bool value_equals(Value left, Value right) {
             if(IS_INT(right))
                 return AS_FLOAT(left) == AS_INT(right);
             return false;
-        }
+        } else return false;
     }
 
     switch(left.type) {
@@ -55,5 +68,17 @@ bool value_equals(Value left, Value right) {
         case VAL_BYTE:  return AS_BYTE(left) == AS_BYTE(right);
         case VAL_INT:   return AS_INT(left) == AS_INT(right);
         case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
+        case VAL_LINKED: {
+            switch(AS_LINKED(left)->type) {
+                case LVAL_STRING:
+                    return AS_STRING(left)->length == AS_STRING(right)->length &&
+                        memcmp(AS_CSTRING(left), AS_CSTRING(right), AS_STRING(left)->length) == 0;
+            }
+        }
+        default: return false;
     }
+}
+
+bool value_is_linked_of_type(Value value, LinkedValueType type) {
+    return IS_LINKED(value) && AS_LINKED(value)->type == type;
 }

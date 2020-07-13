@@ -15,6 +15,8 @@ typedef struct {
     Value* stackTop;
 
     Value* regs;
+
+    LinkedValue* values;
 } VM;
 
 typedef enum {
@@ -27,6 +29,8 @@ void vm_delete(VM* vm);
 
 VMStatus vm_execute(VM* vm);
 VMStatus vm_run(VM* vm);
+
+void vm_register_value(VM* vm, LinkedValue* value);
 
 void  vm_stack_reset(VM* vm);
 void  vm_stack_push(VM* vm, Value value);

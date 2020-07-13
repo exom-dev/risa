@@ -12,10 +12,18 @@ void vm_init(VM* vm) {
     vm_stack_reset(vm);
 
     vm->regs = vm->stackTop;
+    vm->values = NULL;
 }
 
 void vm_delete(VM* vm) {
+    LinkedValue* value = vm->values;
 
+    while(value != NULL) {
+        LinkedValue* next = value->next;
+        MEM_FREE(value);
+
+        value = next;
+    }
 }
 
 VMStatus vm_execute(VM* vm) {
@@ -149,8 +157,17 @@ VMStatus vm_run(VM* vm) {
                         VM_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
+                } else if(value_is_linked_of_type(LEFT_REG, LVAL_STRING)) {
+                    if(value_is_linked_of_type(RIGHT_REG, LVAL_STRING)) {
+                        DEST_REG = LINKED_VALUE(value_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG)));
+
+                        vm_register_value(vm, (LinkedValue*) AS_STRING(DEST_REG));
+                    } else {
+                        VM_ERROR(vm, "Left operand must be string");
+                        return VM_ERROR;
+                    }
                 } else {
-                    VM_ERROR(vm, "Left operand must be either byte, int or float");
+                    VM_ERROR(vm, "Left operand must be either byte, int, float or string");
                     return VM_ERROR;
                 }
 
@@ -680,4 +697,9 @@ VMStatus vm_run(VM* vm) {
 
     #undef NEXT_CONSTANT
     #undef NEXT_BYTE
+}
+
+void vm_register_value(VM* vm, LinkedValue* value) {
+    value->next = vm->values;
+    vm->values = value;
 }

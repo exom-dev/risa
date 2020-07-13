@@ -41,6 +41,10 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
     VM vm;
     vm_init(&vm);
 
+    for(uint32_t i = 0; i < compiled.constants.size; ++i)
+        if(IS_LINKED(compiled.constants.values[i]))
+            vm_register_value(&vm, AS_LINKED(compiled.constants.values[i]));
+
     if(risa_execute_chunk(&vm, &compiled) == RISA_EXECUTE_ERROR) {
         vm_delete(&vm);
         chunk_delete(&compiled);
