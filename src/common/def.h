@@ -2,5 +2,6 @@
 #define RISA_DEFS_H_GUARD
 
 //#define DEBUG_TRACE_EXECUTION
+#define TRACE_MEMORY_OPS
 
 #endif

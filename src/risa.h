@@ -3,6 +3,9 @@
 
 #include "vm/vm.h"
 
+#define RISA_VERSION "0.1"
+#define RISA_CODENAME "Initus"
+
 typedef enum {
     RISA_COMPILE_OK,
     RISA_COMPILE_ERROR

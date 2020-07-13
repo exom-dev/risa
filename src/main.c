@@ -10,6 +10,8 @@
 void run_repl();
 void run_file(const char* path);
 
+void print_info();
+
 int main(int argc, char** argv) {
     if(argc == 1)
         run_repl();
@@ -19,10 +21,12 @@ int main(int argc, char** argv) {
 }
 
 void run_repl() {
+    print_info();
+
     char line[256];
 
     while(1) {
-        PRINT("> ");
+        PRINT("#> ");
 
         if(!fgets(line, sizeof(line), stdin)) {
             PRINT("\n");
@@ -65,4 +69,23 @@ void run_file(const char* path) {
         exit(1);
     if(status == RISA_INTERPRET_EXECUTE_ERROR)
         exit(1);
+}
+
+void print_info() {
+    PRINT("Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
+    PRINT("(C) Exom Developers 2020 (exom.dev)\n\n");
+
+    PRINT("     _____________________      _______\n");
+    PRINT("    |#####################\\    /######/\n");
+    PRINT("    |######################\\  /######/\n");
+    PRINT("    |#######################\\/######/\n");
+    PRINT("    |#####|  _______   \\###########/\n");
+    PRINT("    |#####| |######/    \\#########/\n");
+    PRINT("    |#####| |#####/      \\#######/\n");
+    PRINT("    |#####| |####/       /#######\\\n");
+    PRINT("    |#####|             /#########\\\n");
+    PRINT("    |#####|____________/###########\\\n");
+    PRINT("    |#######################/\\######\\\n");
+    PRINT("    |######################/  \\######\\\n");
+    PRINT("    |#####################/    \\######\\\n\n");
 }
