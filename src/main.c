@@ -73,7 +73,7 @@ void run_file(const char* path) {
 
 void print_info() {
     PRINT("Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
-    PRINT("(C) Exom Developers 2020 (exom.dev)\n\n");
+    PRINT("(c) 2020 The Exom Developers (exom.dev)\n\n");
 
     PRINT("     _____________________      _______\n");
     PRINT("    |#####################\\    /######/\n");

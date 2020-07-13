@@ -16,7 +16,7 @@
 #define ERROR(fmt, ...) \
     fprintf(stderr, "[error] " fmt "\n", ##__VA_ARGS__ )
 
-#ifdef TRACE_MEMORY_OPS
+#ifdef DEBUG_TRACE_MEMORY_OPS
     #define MEMORY(fmt, ...) \
         fprintf(stdout, "[memory] " fmt "\n", ##__VA_ARGS__)
 #else

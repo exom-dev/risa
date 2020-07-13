@@ -4,6 +4,7 @@
 #include "compiler/compiler.h"
 #include "debug/disassembler.h"
 #include "common/logging.h"
+#include "common/def.h"
 
 RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
     Compiler compiler;
@@ -15,7 +16,9 @@ RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
 
     *chunk = compiler.chunk;
 
-    debug_disassemble_chunk(chunk);
+    #ifdef DEBUG_SHOW_DISASSEMBLY
+        debug_disassemble_chunk(chunk);
+    #endif
 
     return RISA_COMPILE_OK;
 }
