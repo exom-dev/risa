@@ -54,11 +54,11 @@ typedef struct {
 #define AS_STRING(value)  ((ValString*) ((value).as.linked))
 #define AS_CSTRING(value) (((ValString*) ((value).as.linked))->chars)
 
-#define IS_NULL(value)  ((value).type == VAL_NULL)
-#define IS_BOOL(value)  ((value).type == VAL_BOOL)
-#define IS_BYTE(value)  ((value).type == VAL_BYTE)
-#define IS_INT(value)   ((value).type == VAL_INT)
-#define IS_FLOAT(value) ((value).type == VAL_FLOAT)
+#define IS_NULL(value)   ((value).type == VAL_NULL)
+#define IS_BOOL(value)   ((value).type == VAL_BOOL)
+#define IS_BYTE(value)   ((value).type == VAL_BYTE)
+#define IS_INT(value)    ((value).type == VAL_INT)
+#define IS_FLOAT(value)  ((value).type == VAL_FLOAT)
 #define IS_LINKED(value) ((value).type == VAL_LINKED)
 
 typedef struct {
