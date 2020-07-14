@@ -2,6 +2,97 @@
 
 **Risa** is an embeddable and modular scripting language.
 
+# Extended BNF (EBNF) notation
+
+This is the EBNF notation for Risa's grammar.
+
+```ebnf
+script = ( space declaration space )* EOF
+
+declaration = fnDecl
+            | varDecl
+            | stmt
+
+fnDecl  = "function" space fn
+varDecl = "var" space IDENTIFIER ( space "=" expr)? ";"
+
+fn     = IDENTIFIER space "(" space params? space ")" block
+params = IDENTIFIER ( "," space IDENTIFIER )*
+
+stmt = exprStmt
+     | ifStmt
+     | whileStmt
+     | forStmt
+     | returnStmt
+     | block
+
+exprStmt   = expr ";" space
+ifStmt     = "if" space "(" expr ")" space stmt space ( space "else" space stmt space )?
+whileStmt  = "while" space "(" expr ")" space stmt
+forStmt    = "for" "(" ( varDec | exprStmt | ";" ) expr? ";" expr? ")" space stmt
+returnStmt = space "return" expr? ";"
+block      = space "{" declaration* "}"
+
+expr = space assignment space
+
+assignment = ( call space "." space )? IDENTIFIER space "=" space assignment
+           | or
+
+or  = and ( "||" and)*
+and = bitwiseOr ( "&&" bitwiseOr )*
+
+bitwiseOr  = bitwiseXor ( "|" bitwiseXor )*
+bitwiseXor = bitwiseAnd ( "^" bitwiseAnd )*
+bitwiseAnd = equality ( "&" equality )*
+
+equality       = comparison ( ( "==" | "!=" ) comparison )*
+comparison     = shift ( ( "<" | "<=" | ">" | ">=" ) shift )*
+shift          = addition ( ( "<<" | ">>" ) addition )*
+addition       = multiplication ( ( "+" | "-" ) multiplication )*
+multiplication = unary ( ( "*" | "/" | "%" ) unary )*
+
+unary = space ( ( "!" | "-" | "~" ) unary | call ) space
+call  = primary ( "(" args? ")" | "." IDENTIFIER )*
+args  = expr ( "," expr )*
+
+primary = "null"
+        | "true"
+        | "false"
+        | NUMBER
+        | STRING
+        | IDENTIFIER
+        | "(" expr ")"
+
+space = ""
+      | " "
+      | "\t"
+      | "\r"
+      | "\n"
+      | comment
+
+comment = "//" ( commentChar )*
+        | "/*" ( anyChar )* "*/"
+
+commentChar = [#x00-#x09#x0B-#xFF]
+anyChar     = [#x00-#xFF]
+
+NUMBER = BYTE
+       | INTEGER
+       | FLOAT
+
+STRING     = "\"" STRCHAR "\""
+IDENTIFIER = ALPHA ( ALPHA | DIGIT )*
+
+BYTE    = DIGIT+ "b"
+INTEGER = DIGIT+
+FLOAT   = DIGIT+ "." DIGIT+
+
+STRCHAR = [#x00-#x09#x0B-#x21#x23-#xFF] | "\\\""
+
+ALPHA = [a-zA-Z] | "_"
+DIGIT = [0-9]
+```
+
 # License <a href="https://github.com/exom-dev/risa/blob/master/LICENSE"><img align="right" src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 
 This project was created by [The Exom Developers](https://github.com/exom-dev).

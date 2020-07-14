@@ -32,7 +32,7 @@ typedef enum {
     PREC_COMPARISON,  // < > <= >=
     PREC_SHIFT,       // << >>
     PREC_TERM,        // + -
-    PREC_FACTOR,      // * /
+    PREC_FACTOR,      // * / %
     PREC_UNARY,       // ! - ~
     PREC_CALL,        // . ()
     PREC_PRIMARY
