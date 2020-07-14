@@ -17,6 +17,8 @@ typedef struct {
     Value* regs;
 
     Map strings;
+    Map globals;
+
     LinkedValue* values;
 } VM;
 

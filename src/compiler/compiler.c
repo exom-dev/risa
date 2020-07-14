@@ -8,16 +8,21 @@
 #include <stdlib.h>
 #include <errno.h>
 
-static void compile_byte(Compiler* compiler);
-static void compile_int(Compiler* compiler);
-static void compile_float(Compiler* compiler);
-static void compile_string(Compiler* compiler);
-static void compile_literal(Compiler* compiler);
+static void compile_byte(Compiler* compiler, bool);
+static void compile_int(Compiler* compiler, bool);
+static void compile_float(Compiler* compiler, bool);
+static void compile_string(Compiler* compiler, bool);
+static void compile_literal(Compiler* compiler, bool);
+static void compile_identifier(Compiler* compiler, bool);
+static void compile_declaration(Compiler* compiler);
+static void compile_variable_declaration(Compiler* compiler);
+static void compile_statement(Compiler* compiler);
+static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
-static void compile_grouping(Compiler* compiler);
-static void compile_unary(Compiler* compiler);
-static void compile_binary(Compiler* compiler);
+static void compile_grouping(Compiler* compiler, bool);
+static void compile_unary(Compiler* compiler, bool);
+static void compile_binary(Compiler* compiler, bool);
 
 static void emit_byte(Compiler* compiler, uint8_t byte);
 static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
@@ -26,6 +31,9 @@ static void emit_constant(Compiler* compiler, Value value);
 static void emit_return(Compiler* compiler);
 
 static uint16_t create_constant(Compiler* compiler, Value value);
+static uint16_t create_identifier_constant(Compiler* compiler);
+static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
+static uint16_t get_variable_name(Compiler* compiler);
 
 static bool register_reserve(Compiler* compiler);
 static void register_free(Compiler* compiler);
@@ -64,8 +72,8 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND_AMPERSAND
         { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE_PIPE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_IDENTIFIER
-        { compile_string,     NULL,    PREC_NONE },                // TOKEN_STRING
+        { compile_identifier,     NULL,    PREC_NONE },  // TOKEN_IDENTIFIER
+        { compile_string,     NULL,    PREC_NONE },      // TOKEN_STRING
         { compile_byte,     NULL,    PREC_NONE },        // TOKEN_BYTE
         { compile_int,     NULL,    PREC_NONE },         // TOKEN_INT
         { compile_float,     NULL,    PREC_NONE },       // TOKEN_FLOAT
@@ -101,16 +109,17 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     lexer_source(&compiler->parser.lexer, str);
 
     parser_advance(&compiler->parser);
-    compile_expression(compiler);
 
-    parser_consume(&compiler->parser, TOKEN_EOF, "Expected end of expression");
+    while(compiler->parser.current.type != TOKEN_EOF) {
+        compile_declaration(compiler);
+    }
 
     finalize_compilation(compiler);
 
     return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
 }
 
-static void compile_byte(Compiler* compiler) {
+static void compile_byte(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
@@ -124,7 +133,7 @@ static void compile_byte(Compiler* compiler) {
     emit_constant(compiler, BYTE_VALUE(num));
 }
 
-static void compile_int(Compiler* compiler) {
+static void compile_int(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
@@ -138,7 +147,7 @@ static void compile_int(Compiler* compiler) {
     emit_constant(compiler, INT_VALUE(num));
 }
 
-static void compile_float(Compiler* compiler) {
+static void compile_float(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
@@ -152,7 +161,7 @@ static void compile_float(Compiler* compiler) {
     emit_constant(compiler, FLOAT_VALUE(num));
 }
 
-static void compile_string(Compiler* compiler) {
+static void compile_string(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
@@ -170,7 +179,7 @@ static void compile_string(Compiler* compiler) {
     emit_constant(compiler, LINKED_VALUE(interned));
 }
 
-static void compile_literal(Compiler* compiler) {
+static void compile_literal(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
@@ -191,6 +200,72 @@ static void compile_literal(Compiler* compiler) {
     emit_byte(compiler, compiler->regIndex - 1);
 }
 
+static void compile_identifier(Compiler* compiler, bool allowAssignment) {
+    if(!register_reserve(compiler))
+        return;
+
+    uint16_t index = create_identifier_constant(compiler);
+
+    if(allowAssignment && (compiler->parser.current.type == TOKEN_EQUAL)) {
+        parser_advance(&compiler->parser);
+        compile_expression(compiler);
+
+        emit_byte(compiler, OP_SGLOB);
+        emit_byte(compiler, compiler->regIndex);
+
+        register_free(compiler);
+    } else {
+        emit_byte(compiler, OP_GGLOB);
+        emit_byte(compiler, compiler->regIndex - 1);
+    }
+
+    emit_byte(compiler, index);
+}
+
+static void compile_declaration(Compiler* compiler) {
+    if(compiler->parser.current.type == TOKEN_VAR) {
+        parser_advance(&compiler->parser);
+        compile_variable_declaration(compiler);
+    } else compile_statement(compiler);
+
+    if(compiler->parser.panic)
+        parser_sync(&compiler->parser);
+}
+
+static void compile_variable_declaration(Compiler* compiler) {
+    uint16_t index = get_variable_name(compiler);
+
+    if(compiler->parser.current.type == TOKEN_EQUAL) {
+        parser_advance(&compiler->parser);
+        compile_expression(compiler);
+    } else {
+        if(!register_reserve(compiler))
+            return;
+
+        emit_byte(compiler, OP_NULL);
+        emit_byte(compiler, compiler->regIndex - 1);
+    }
+
+    register_free(compiler);
+    parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
+
+    emit_byte(compiler, OP_DGLOB);
+    emit_byte(compiler, compiler->regIndex);
+    emit_byte(compiler, index);
+}
+
+static void compile_statement(Compiler* compiler) {
+    compile_expression_statement(compiler);
+}
+
+static void compile_expression_statement(Compiler* compiler) {
+    compile_expression(compiler);
+
+    parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
+
+    register_free(compiler);
+}
+
 static void compile_expression(Compiler* compiler) {
     compile_expression_precedence(compiler, PREC_ASSIGNMENT);
 }
@@ -204,22 +279,27 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
         parser_error_at_previous(&compiler->parser, "Expected expression");
     }
 
-    prefix(compiler);
+    bool allowAssignment = precedence <= PREC_ASSIGNMENT;
+    prefix(compiler, allowAssignment);
 
     while(precedence <= EXPRESSION_RULES[compiler->parser.current.type].precedence) {
         parser_advance(&compiler->parser);
 
         RuleHandler infix = EXPRESSION_RULES[compiler->parser.previous.type].infix;
-        infix(compiler);
+        infix(compiler, allowAssignment);
+    }
+
+    if(allowAssignment && (compiler->parser.current.type == TOKEN_EQUAL)) {
+        parser_error_at_previous(&compiler->parser, "Invalid assignment target");
     }
 }
 
-static void compile_grouping(Compiler* compiler) {
+static void compile_grouping(Compiler* compiler, bool allowAssignment) {
     compile_expression(compiler);
     parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
 }
 
-static void compile_unary(Compiler* compiler) {
+static void compile_unary(Compiler* compiler, bool allowAssignment) {
     TokenType operator = compiler->parser.previous.type;
 
     compile_expression_precedence(compiler, PREC_UNARY);
@@ -239,7 +319,7 @@ static void compile_unary(Compiler* compiler) {
     }
 }
 
-static void compile_binary(Compiler* compiler) {
+static void compile_binary(Compiler* compiler, bool allowAssignment) {
     TokenType operatorType = compiler->parser.previous.type;
 
     Rule* rule = &EXPRESSION_RULES[operatorType];
@@ -342,6 +422,29 @@ static uint16_t create_constant(Compiler* compiler, Value value) {
     }
 
     return (uint16_t) index;
+}
+
+static uint16_t create_identifier_constant(Compiler* compiler) {
+    return create_string_constant(compiler, compiler->parser.previous.start, compiler->parser.previous.size);
+}
+
+static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length) {
+    uint32_t hash = map_hash(start, length);
+
+    ValString* interned = map_find(&compiler->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = value_string_from(start, length);
+        map_set(&compiler->strings, interned, NULL_VALUE);
+    }
+
+    return create_constant(compiler, LINKED_VALUE(interned));
+}
+
+static uint16_t get_variable_name(Compiler* compiler) {
+    parser_consume(&compiler->parser, TOKEN_IDENTIFIER, "Expected identifier");
+
+    return create_identifier_constant(compiler);
 }
 
 static bool register_reserve(Compiler* compiler) {

@@ -38,7 +38,7 @@ typedef enum {
     PREC_PRIMARY
 } Precedence;
 
-typedef void (*RuleHandler)(Compiler*);
+typedef void (*RuleHandler)(Compiler*, bool);
 
 typedef struct {
     RuleHandler prefix;

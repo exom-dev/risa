@@ -30,6 +30,27 @@ void parser_consume(Parser* parser, TokenType type, const char* err) {
     parser_error_at_current(parser, err);
 }
 
+void parser_sync(Parser* parser) {
+    parser->panic = false;
+
+    while(parser->current.type != TOKEN_EOF) {
+        if(parser->previous.type == TOKEN_SEMICOLON)
+            return;
+
+        switch(parser->current.type) {
+            case TOKEN_FUNCTION:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_RETURN:
+                return;
+            default:  ;
+        }
+
+        parser_advance(parser);
+    }
+}
+
 void parser_error_at(Parser* parser, Token token, const char* msg) {
     if(parser->panic)
         return;
