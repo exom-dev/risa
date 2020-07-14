@@ -6,7 +6,7 @@
 
 This is the EBNF notation for Risa's grammar.
 
-```ebnf
+```abnf
 script ::= ( space declaration space )* EOF ;
 
 declaration ::= fnDecl
@@ -70,11 +70,11 @@ space ::= ""
         | "\n"
         | comment ;
 
-comment ::= "//" ( commentChar )*
-          | "/*" ( anyChar )* "*/" ;
+comment ::= "//" ( COMMENTCHAR )*
+          | "/*" ( ANYCHAR )* "*/" ;
 
-commentChar ::= [#x00-#x09#x0B-#xFF] ;
-anyChar     ::= [#x00-#xFF] ;
+COMMENTCHAR ::= [#x00-#x09#x0B-#xFF] ;
+ANYCHAR     ::= [#x00-#xFF] ;
 
 NUMBER ::= BYTE
          | INTEGER
