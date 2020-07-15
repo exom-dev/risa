@@ -4,6 +4,7 @@
 typedef enum {
     OP_CNST,
     OP_CNSTW,
+    OP_MOV,
     OP_DGLOB,
     OP_GGLOB,
     OP_SGLOB,

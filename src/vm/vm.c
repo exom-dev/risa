@@ -89,6 +89,12 @@ VMStatus vm_run(VM* vm) {
                 SKIP_ARGS(3);
                 break;
             }
+            case OP_MOV: {
+                DEST_REG = LEFT_REG;
+
+                SKIP_ARGS(2);
+                break;
+            }
             case OP_DGLOB: {
                 map_set(&vm->globals, AS_STRING(LEFT_CONSTANT), DEST_REG);
 

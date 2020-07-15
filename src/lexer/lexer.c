@@ -138,6 +138,12 @@ Token lexer_error(Lexer* lexer, const char* msg) {
     return token;
 }
 
+bool identifier_equals(Token* left, Token* right) {
+    if(left->size != right->size)
+        return false;
+    return memcmp(left->start, right->start, left->size) == 0;
+}
+
 bool is_digit(char c) {
     return c >= '0' && c <= '9';
 }

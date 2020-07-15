@@ -17,12 +17,19 @@ static void compile_identifier(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_statement(Compiler* compiler);
+static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
 static void compile_grouping(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
+
+static void begin_scope(Compiler* compiler);
+static void end_scope(Compiler* compiler);
+
+static void    local_add(Compiler* compiler, Token identifier);
+static uint8_t local_resolve(Compiler* compiler, Token* identifier);
 
 static void emit_byte(Compiler* compiler, uint8_t byte);
 static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
@@ -97,6 +104,9 @@ void compiler_init(Compiler* compiler) {
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
+
+    compiler->localCount = 0;
+    compiler->scopeDepth = 0;
 }
 
 void compiler_delete(Compiler* compiler) {
@@ -204,18 +214,31 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    uint16_t index = create_identifier_constant(compiler);
+    uint8_t get;
+    uint8_t set;
+
+    uint8_t index = local_resolve(compiler, &compiler->parser.previous);
+
+    if(index != 251) {
+        get = OP_MOV;
+        set = OP_MOV;
+    } else {
+        index = create_identifier_constant(compiler);
+
+        get = OP_GGLOB;
+        set = OP_SGLOB;
+    }
 
     if(allowAssignment && (compiler->parser.current.type == TOKEN_EQUAL)) {
         parser_advance(&compiler->parser);
         compile_expression(compiler);
 
-        emit_byte(compiler, OP_SGLOB);
-        emit_byte(compiler, compiler->regIndex);
+        emit_byte(compiler, set);
+        emit_byte(compiler, index != 251 ? compiler->locals[index].reg : compiler->regIndex);
 
         register_free(compiler);
     } else {
-        emit_byte(compiler, OP_GGLOB);
+        emit_byte(compiler, get);
         emit_byte(compiler, compiler->regIndex - 1);
     }
 
@@ -246,8 +269,14 @@ static void compile_variable_declaration(Compiler* compiler) {
         emit_byte(compiler, compiler->regIndex - 1);
     }
 
-    register_free(compiler);
     parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
+
+    if(compiler->scopeDepth > 0) {
+        compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+        return;
+    }
+
+    register_free(compiler);
 
     emit_byte(compiler, OP_DGLOB);
     emit_byte(compiler, compiler->regIndex);
@@ -255,7 +284,23 @@ static void compile_variable_declaration(Compiler* compiler) {
 }
 
 static void compile_statement(Compiler* compiler) {
-    compile_expression_statement(compiler);
+    if(compiler->parser.current.type == TOKEN_LEFT_BRACE) {
+        parser_advance(&compiler->parser);
+
+        begin_scope(compiler);
+        compile_block(compiler);
+        end_scope(compiler);
+    } else {
+        compile_expression_statement(compiler);
+    }
+}
+
+static void compile_block(Compiler* compiler) {
+    while(compiler->parser.current.type != TOKEN_EOF && compiler->parser.current.type != TOKEN_RIGHT_BRACE) {
+        compile_declaration(compiler);
+    }
+
+    parser_consume(&compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
 }
 
 static void compile_expression_statement(Compiler* compiler) {
@@ -382,6 +427,42 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
 }
 
+static void begin_scope(Compiler* compiler) {
+    ++compiler->scopeDepth;
+}
+
+static void end_scope(Compiler* compiler) {
+    --compiler->scopeDepth;
+
+    while(compiler->localCount > 0 && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
+        register_free(compiler);
+        --compiler->localCount;
+    }
+}
+
+static void local_add(Compiler* compiler, Token identifier) {
+    if(compiler->localCount > 250) {
+        parser_error_at_previous(&compiler->parser, "Local variable limit exceeded (250)");
+        return;
+    }
+
+    Local* local = &compiler->locals[compiler->localCount++];
+    local->identifier = identifier;
+    local->depth = -1;
+    local->reg = compiler->regIndex;
+}
+
+static uint8_t local_resolve(Compiler* compiler, Token* identifier) {
+    for(int16_t i = compiler->localCount - 1; i >= 0; --i) {
+        Local* local = &compiler->locals[i];
+
+        if(identifier_equals(identifier, &local->identifier) && local->depth > -1)
+            return local->reg;
+    }
+
+    return 251;
+}
+
 static void emit_byte(Compiler* compiler, uint8_t byte) {
     chunk_write(&compiler->chunk, byte, compiler->parser.previous.index);
 }
@@ -443,6 +524,25 @@ static uint16_t create_string_constant(Compiler* compiler, const char* start, ui
 
 static uint16_t get_variable_name(Compiler* compiler) {
     parser_consume(&compiler->parser, TOKEN_IDENTIFIER, "Expected identifier");
+
+    if(compiler->scopeDepth > 0) {
+        Token* identifier = &compiler->parser.previous;
+
+        for(int16_t i = compiler->localCount - 1; i >= 0; --i) {
+            Local* local = &compiler->locals[i];
+
+            if(local->depth != -1 && local->depth < compiler->scopeDepth)
+                break;
+
+            if(identifier_equals(identifier, &local->identifier)) {
+                parser_error_at_previous(&compiler->parser, "Variable already declared in this scope");
+            }
+        }
+
+        local_add(compiler, *identifier);
+
+        return 0;
+    }
 
     return create_identifier_constant(compiler);
 }

@@ -8,6 +8,7 @@ size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t
 size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_producer_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_simple_instruction(const char* name, size_t offset);
 
@@ -28,6 +29,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_constant_instruction("CNST", chunk, offset);
         case OP_CNSTW:
             return disassemble_constant_instruction("CNSTW", chunk, offset);
+        case OP_MOV:
+            return disassemble_mov_instruction("MOV", chunk, offset);
         case OP_DGLOB:
             return disassemble_global_instruction("DGLOB", chunk, offset);
         case OP_GGLOB:
@@ -111,6 +114,11 @@ size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t o
     value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
 
+    return offset + 3;
+}
+
+size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
     return offset + 3;
 }
 

@@ -8,11 +8,22 @@
 #include "../data/map.h"
 
 typedef struct {
+    Token identifier;
+    int32_t depth;
+    uint8_t reg;
+} Local;
+
+typedef struct {
     Chunk chunk;
     Parser parser;
     Map strings;
 
     uint8_t regIndex;
+
+    Local locals[250];
+
+    uint8_t  localCount;
+    int32_t  scopeDepth;
 } Compiler;
 
 typedef enum {

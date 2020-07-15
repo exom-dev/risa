@@ -44,12 +44,14 @@ typedef struct {
     size_t index;
 } Lexer;
 
-void   lexer_init(Lexer* lexer);
-void   lexer_source(Lexer* lexer, const char* src);
-void   lexer_delete(Lexer* lexer);
+void  lexer_init(Lexer* lexer);
+void  lexer_source(Lexer* lexer, const char* src);
+void  lexer_delete(Lexer* lexer);
 
-Token  lexer_next(Lexer* lexer);
-Token  lexer_emit(Lexer* lexer, TokenType type);
-Token  lexer_error(Lexer* lexer, const char* msg);
+Token lexer_next(Lexer* lexer);
+Token lexer_emit(Lexer* lexer, TokenType type);
+Token lexer_error(Lexer* lexer, const char* msg);
+
+bool identifier_equals(Token* left, Token* right);
 
 #endif
