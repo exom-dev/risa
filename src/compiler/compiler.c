@@ -17,6 +17,7 @@ static void compile_identifier(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_statement(Compiler* compiler);
+static void compile_if_statement(Compiler* compiler);
 static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
@@ -24,6 +25,8 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
 static void compile_grouping(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
+static void compile_and(Compiler* compiler, bool);
+static void compile_or(Compiler* compiler, bool);
 
 static void begin_scope(Compiler* compiler);
 static void end_scope(Compiler* compiler);
@@ -31,11 +34,14 @@ static void end_scope(Compiler* compiler);
 static void    local_add(Compiler* compiler, Token identifier);
 static uint8_t local_resolve(Compiler* compiler, Token* identifier);
 
-static void emit_byte(Compiler* compiler, uint8_t byte);
-static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-static void emit_word(Compiler* compiler, uint16_t word);
-static void emit_constant(Compiler* compiler, Value value);
-static void emit_return(Compiler* compiler);
+static void    emit_byte(Compiler* compiler, uint8_t byte);
+static void    emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+static void    emit_word(Compiler* compiler, uint16_t word);
+static void    emit_constant(Compiler* compiler, Value value);
+static void    emit_return(Compiler* compiler);
+static int32_t emit_blank(Compiler* compiler);
+
+static void patch_jump(Compiler* compiler, int32_t index);
 
 static uint16_t create_constant(Compiler* compiler, Value value);
 static uint16_t create_identifier_constant(Compiler* compiler);
@@ -76,9 +82,9 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS_EQUAL
         { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_LESS_LESS
         { NULL,     compile_binary,    PREC_BITWISE_AND },// TOKEN_AMPERSAND
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_AMPERSAND_AMPERSAND
+        { NULL,     compile_and,    PREC_AND },         // TOKEN_AMPERSAND_AMPERSAND
         { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_PIPE_PIPE
+        { NULL,     compile_or,    PREC_OR },          // TOKEN_PIPE_PIPE
         { compile_identifier,     NULL,    PREC_NONE },  // TOKEN_IDENTIFIER
         { compile_string,     NULL,    PREC_NONE },      // TOKEN_STRING
         { compile_byte,     NULL,    PREC_NONE },        // TOKEN_BYTE
@@ -208,6 +214,8 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
     }
 
     emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
 }
 
 static void compile_identifier(Compiler* compiler, bool allowAssignment) {
@@ -243,6 +251,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     }
 
     emit_byte(compiler, index);
+    emit_byte(compiler, 0);
 }
 
 static void compile_declaration(Compiler* compiler) {
@@ -267,6 +276,8 @@ static void compile_variable_declaration(Compiler* compiler) {
 
         emit_byte(compiler, OP_NULL);
         emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
     }
 
     parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
@@ -281,10 +292,15 @@ static void compile_variable_declaration(Compiler* compiler) {
     emit_byte(compiler, OP_DGLOB);
     emit_byte(compiler, compiler->regIndex);
     emit_byte(compiler, index);
+    emit_byte(compiler, 0);
 }
 
 static void compile_statement(Compiler* compiler) {
-    if(compiler->parser.current.type == TOKEN_LEFT_BRACE) {
+    if(compiler->parser.current.type == TOKEN_IF) {
+        parser_advance(&compiler->parser);
+
+        compile_if_statement(compiler);
+    } else if(compiler->parser.current.type == TOKEN_LEFT_BRACE) {
         parser_advance(&compiler->parser);
 
         begin_scope(compiler);
@@ -293,6 +309,34 @@ static void compile_statement(Compiler* compiler) {
     } else {
         compile_expression_statement(compiler);
     }
+}
+
+static void compile_if_statement(Compiler* compiler) {
+    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
+    compile_expression(compiler);
+    parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+
+    emit_byte(compiler, OP_TEST);
+    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    register_free(compiler);
+
+    uint16_t startIndex = emit_blank(compiler);
+
+    compile_statement(compiler);
+
+    uint16_t endIndex = emit_blank(compiler);
+
+    patch_jump(compiler, startIndex);
+
+    if(compiler->parser.current.type == TOKEN_ELSE) {
+        parser_advance(&compiler->parser);
+        compile_statement(compiler);
+    }
+
+    patch_jump(compiler, endIndex);
 }
 
 static void compile_block(Compiler* compiler) {
@@ -352,12 +396,15 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
     switch(operator) {
         case TOKEN_BANG:
             emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_byte(compiler, 0);
             break;
         case TOKEN_TILDE:
             emit_bytes(compiler, OP_BNOT, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_byte(compiler, 0);
             break;
         case TOKEN_MINUS:
             emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_byte(compiler, 0);
             break;
         default:
             return;
@@ -427,6 +474,36 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
 }
 
+static void compile_and(Compiler* compiler, bool allowAssignment) {
+    emit_byte(compiler, OP_TEST);
+    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    register_free(compiler);
+
+    uint16_t index = emit_blank(compiler);
+
+    compile_expression_precedence(compiler, PREC_AND);
+
+    patch_jump(compiler, index);
+}
+
+static void compile_or(Compiler* compiler, bool allowAssignment) {
+    emit_byte(compiler, OP_NTEST);
+    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    register_free(compiler);
+
+    uint16_t index = emit_blank(compiler);
+
+    compile_expression_precedence(compiler, PREC_OR);
+
+    patch_jump(compiler, index);
+}
+
 static void begin_scope(Compiler* compiler) {
     ++compiler->scopeDepth;
 }
@@ -481,9 +558,10 @@ static void emit_word(Compiler* compiler, uint16_t word) {
 static void emit_constant(Compiler* compiler, Value value) {
     uint16_t index = create_constant(compiler, value);
 
-    if(index < UINT8_MAX)
+    if(index < UINT8_MAX) {
         emit_bytes(compiler, OP_CNST, compiler->regIndex - 1, index);
-    else {
+        emit_byte(compiler, 0);
+    } else {
         emit_byte(compiler, OP_CNSTW);
         emit_byte(compiler, compiler->regIndex - 1);
         emit_word(compiler, index);
@@ -492,6 +570,36 @@ static void emit_constant(Compiler* compiler, Value value) {
 
 static void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RET);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+}
+
+static int32_t emit_blank(Compiler* compiler) {
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    return compiler->chunk.size - 4;
+}
+
+static void patch_jump(Compiler* compiler, int32_t index) {
+    uint32_t diff = (compiler->chunk.size - index - 4) / 4;
+
+    if(diff <= UINT8_MAX) {
+        compiler->chunk.bytecode[index] = OP_JMP;
+        compiler->chunk.bytecode[index + 1] = (uint8_t) diff;
+    } else if(diff <= UINT16_MAX) {
+        uint16_t word = (uint16_t) diff;
+
+        compiler->chunk.bytecode[index] = OP_JMPW;
+        compiler->chunk.bytecode[index + 1] = ((uint8_t*) &word)[0];
+        compiler->chunk.bytecode[index + 2] = ((uint8_t*) &word)[1];
+    } else {
+        parser_error_at_previous(&compiler->parser, "Jump limit exceeded (65535)");
+        return;
+    }
 }
 
 static uint16_t create_constant(Compiler* compiler, Value value) {

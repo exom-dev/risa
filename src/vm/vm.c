@@ -56,7 +56,8 @@ VMStatus vm_run(VM* vm) {
     #define LEFT_REG  (vm->regs[LEFT])
     #define RIGHT_REG (vm->regs[RIGHT])
 
-    #define SKIP_ARGS(count) (vm->ip += count)
+    #define SKIP(count) (vm->ip += count)
+    #define BSKIP(count) (vm->ip -= count)
 
     #define VM_RUNTIME_ERROR(vm, fmt, ...) \
         fprintf(stderr, "[error] at index %u: " fmt "\n", vm->chunk->indices[vm->ip - vm->chunk->bytecode], ##__VA_ARGS__ )
@@ -80,25 +81,25 @@ VMStatus vm_run(VM* vm) {
             case OP_CNST: {
                 DEST_REG = LEFT_CONSTANT;
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_CNSTW: {
                 DEST_REG = COMBINED_CONSTANT;
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_MOV: {
                 DEST_REG = LEFT_REG;
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_DGLOB: {
                 map_set(&vm->globals, AS_STRING(LEFT_CONSTANT), DEST_REG);
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_GGLOB: {
@@ -111,7 +112,7 @@ VMStatus vm_run(VM* vm) {
 
                 DEST_REG = value;
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_SGLOB: {
@@ -121,31 +122,31 @@ VMStatus vm_run(VM* vm) {
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONSTANT));
                 }
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_NULL: {
                 DEST_REG = NULL_VALUE;
 
-                SKIP_ARGS(1);
+                SKIP(3);
                 break;
             }
             case OP_TRUE: {
                 DEST_REG = BOOL_VALUE(true);
 
-                SKIP_ARGS(1);
+                SKIP(3);
                 break;
             }
             case OP_FALSE: {
                 DEST_REG = BOOL_VALUE(false);
 
-                SKIP_ARGS(1);
+                SKIP(3);
                 break;
             }
             case OP_NOT: {
                 DEST_REG = BOOL_VALUE(value_is_falsy(LEFT_REG));
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_BNOT: {
@@ -158,7 +159,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_NEG: {
@@ -173,7 +174,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(2);
+                SKIP(3);
                 break;
             }
             case OP_ADD: {
@@ -230,7 +231,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_SUB: {
@@ -272,7 +273,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_MUL: {
@@ -314,7 +315,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_DIV: {
@@ -356,7 +357,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_MOD: {
@@ -383,7 +384,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_SHL: {
@@ -425,7 +426,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_SHR: {
@@ -467,7 +468,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_GT: {
@@ -509,7 +510,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_GTE: {
@@ -551,7 +552,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_LT: {
@@ -593,7 +594,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_LTE: {
@@ -635,19 +636,19 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_EQ: {
                 DEST_REG = BOOL_VALUE(value_equals(LEFT_REG, RIGHT_REG));
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_NEQ: {
                 DEST_REG = BOOL_VALUE(!value_equals(LEFT_REG, RIGHT_REG));
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_BAND: {
@@ -674,7 +675,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_BXOR: {
@@ -701,7 +702,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
                 break;
             }
             case OP_BOR: {
@@ -728,7 +729,43 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                SKIP_ARGS(3);
+                SKIP(3);
+                break;
+            }
+            case OP_TEST: {
+                if(!value_is_falsy(DEST_REG))
+                    SKIP(4);
+                SKIP(3);
+                break;
+            }
+            case OP_NTEST: {
+                if(value_is_falsy(DEST_REG))
+                    SKIP(4);
+                SKIP(3);
+                break;
+            }
+            case OP_JMP: {
+                SKIP(DEST * 4);
+                SKIP(3);
+                break;
+            }
+            case OP_JMPW: {
+                uint16_t amount = *((uint16_t*) &vm->ip);
+
+                SKIP(amount * 4);
+                SKIP(3);
+                break;
+            }
+            case OP_BJMP: {
+                BSKIP(DEST * 4);
+                BSKIP(3);
+                break;
+            }
+            case OP_BJMPW: {
+                uint16_t amount = *((uint16_t*) &vm->ip);
+
+                BSKIP(amount * 4);
+                BSKIP(3);
                 break;
             }
             case OP_RET: {

@@ -30,6 +30,12 @@ typedef enum {
     OP_BAND,
     OP_BXOR,
     OP_BOR,
+    OP_TEST,
+    OP_NTEST,
+    OP_JMP,
+    OP_JMPW,
+    OP_BJMP,
+    OP_BJMPW,
     OP_RET
 } OpCode;
 

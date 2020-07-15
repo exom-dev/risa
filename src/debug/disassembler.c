@@ -6,7 +6,8 @@
 
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset);
-size_t disassemble_producer_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_byte_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_word_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset);
@@ -33,11 +34,11 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_SGLOB:
             return disassemble_global_instruction("SGLOB", chunk, offset);
         case OP_NULL:
-            return disassemble_producer_instruction("NULL", chunk, offset);
+            return disassemble_byte_instruction("NULL", chunk, offset);
         case OP_TRUE:
-            return disassemble_producer_instruction("TRUE", chunk, offset);
+            return disassemble_byte_instruction("TRUE", chunk, offset);
         case OP_FALSE:
-            return disassemble_producer_instruction("FALSE", chunk, offset);
+            return disassemble_byte_instruction("FALSE", chunk, offset);
         case OP_NOT:
             return disassemble_unary_instruction("NOT", chunk, offset);
         case OP_BNOT:
@@ -76,6 +77,18 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_arithmetic_instruction("BXOR", chunk, offset);
         case OP_BOR:
             return disassemble_arithmetic_instruction("BOR", chunk, offset);
+        case OP_TEST:
+            return disassemble_byte_instruction("TEST", chunk, offset);
+        case OP_NTEST:
+            return disassemble_byte_instruction("NTEST", chunk, offset);
+        case OP_JMP:
+            return disassemble_byte_instruction("JMP", chunk, offset);
+        case OP_JMPW:
+            return disassemble_word_instruction("JMPW", chunk, offset);
+        case OP_BJMP:
+            return disassemble_byte_instruction("BJMP", chunk, offset);
+        case OP_BJMPW:
+            return disassemble_word_instruction("BJMPW", chunk, offset);
         case OP_RET:
             return disassemble_simple_instruction("RET", offset);
         default:
@@ -97,13 +110,19 @@ size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t
 
 size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
-    return offset + 3;
+    return offset + 4;
 }
 
-size_t disassemble_producer_instruction(const char* name, Chunk* chunk, size_t offset) {
+size_t disassemble_byte_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d\n", name, chunk->bytecode[offset + 1]);
 
-    return offset + 2;
+    return offset + 4;
+}
+
+size_t disassemble_word_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %5hu\n", name, (uint16_t) chunk->bytecode[offset + 1]);
+
+    return offset + 4;
 }
 
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset) {
@@ -111,12 +130,12 @@ size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t o
     value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
 
-    return offset + 3;
+    return offset + 4;
 }
 
 size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
-    return offset + 3;
+    return offset + 4;
 }
 
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset) {
@@ -124,10 +143,10 @@ size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t off
     value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
 
-    return offset + 3;
+    return offset + 4;
 }
 
 size_t disassemble_simple_instruction(const char* name, size_t offset) {
     PRINT("%s\n", name);
-    return offset + 1;
+    return offset + 4;
 }
