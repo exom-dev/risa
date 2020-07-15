@@ -13,14 +13,9 @@ size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t off
 size_t disassemble_simple_instruction(const char* name, size_t offset);
 
 size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
-    if(offset > 0 && chunk->indices[offset] == chunk->indices[offset - 1]) {
-        PRINT("%04zu ", offset);
-        PRINT("   . ");
-    } else {
-        PRINT("\nOFFS INDX OP\n");
-        PRINT("%04zu ", offset);
-        PRINT("%4u ", chunk->indices[offset]);
-    }
+    if(offset > 0 && chunk->indices[offset] == chunk->indices[offset - 1])
+        PRINT("%04zu    . ", offset);
+    else PRINT("%04zu %4u ", offset, chunk->indices[offset]);
 
     uint8_t instruction = chunk->bytecode[offset];
 
@@ -89,6 +84,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
 }
 
 void debug_disassemble_chunk(Chunk* chunk) {
+    PRINT("\nOFFS INDX OP\n");
+
     for(size_t offset = 0; offset < chunk->size;)
         offset = debug_disassemble_instruction(chunk, offset);
 }

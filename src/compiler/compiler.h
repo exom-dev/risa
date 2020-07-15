@@ -22,8 +22,8 @@ typedef struct {
 
     Local locals[250];
 
-    uint8_t  localCount;
-    int32_t  scopeDepth;
+    uint8_t localCount;
+    int32_t scopeDepth;
 } Compiler;
 
 typedef enum {
