@@ -11,6 +11,7 @@ size_t disassemble_word_instruction(const char* name, Chunk* chunk, size_t offse
 size_t disassemble_constant_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_simple_instruction(const char* name, size_t offset);
 
 size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
@@ -32,7 +33,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_GGLOB:
             return disassemble_global_instruction("GGLOB", chunk, offset);
         case OP_SGLOB:
-            return disassemble_global_instruction("SGLOB", chunk, offset);
+            return disassemble_global_set_instruction("SGLOB", chunk, offset);
         case OP_NULL:
             return disassemble_byte_instruction("NULL", chunk, offset);
         case OP_TRUE:
@@ -141,6 +142,14 @@ size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d    '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
     value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
+    PRINT("'\n");
+
+    return offset + 4;
+}
+
+size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d    '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
+    value_print(chunk->constants.values[chunk->bytecode[offset + 1]]);
     PRINT("'\n");
 
     return offset + 4;

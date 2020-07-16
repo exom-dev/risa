@@ -18,6 +18,8 @@ static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_statement(Compiler* compiler);
 static void compile_if_statement(Compiler* compiler);
+static void compile_while_statement(Compiler* compiler);
+static void compile_for_statement(Compiler* compiler);
 static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
@@ -34,14 +36,15 @@ static void end_scope(Compiler* compiler);
 static void    local_add(Compiler* compiler, Token identifier);
 static uint8_t local_resolve(Compiler* compiler, Token* identifier);
 
-static void    emit_byte(Compiler* compiler, uint8_t byte);
-static void    emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-static void    emit_word(Compiler* compiler, uint16_t word);
-static void    emit_constant(Compiler* compiler, Value value);
-static void    emit_return(Compiler* compiler);
-static int32_t emit_blank(Compiler* compiler);
+static void     emit_byte(Compiler* compiler, uint8_t byte);
+static void     emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+static void     emit_word(Compiler* compiler, uint16_t word);
+static void     emit_constant(Compiler* compiler, Value value);
+static void     emit_return(Compiler* compiler);
+static void     emit_backwards_jump(Compiler* compiler, uint32_t index);
+static uint32_t emit_blank(Compiler* compiler);
 
-static void patch_jump(Compiler* compiler, int32_t index);
+static void patch_jump(Compiler* compiler, uint32_t index);
 
 static uint16_t create_constant(Compiler* compiler, Value value);
 static uint16_t create_identifier_constant(Compiler* compiler);
@@ -219,15 +222,13 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_identifier(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
-
     uint8_t get;
     uint8_t set;
 
     uint8_t index = local_resolve(compiler, &compiler->parser.previous);
+    bool global = index == 251;
 
-    if(index != 251) {
+    if(!global) {
         get = OP_MOV;
         set = OP_MOV;
     } else {
@@ -242,16 +243,20 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
         compile_expression(compiler);
 
         emit_byte(compiler, set);
-        emit_byte(compiler, index != 251 ? compiler->locals[index].reg : compiler->regIndex);
+        emit_byte(compiler, index);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
 
-        register_free(compiler);
+        //register_free(compiler);
     } else {
+        if(!register_reserve(compiler))
+            return;
+
         emit_byte(compiler, get);
         emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, index);
+        emit_byte(compiler, 0);
     }
-
-    emit_byte(compiler, index);
-    emit_byte(compiler, 0);
 }
 
 static void compile_declaration(Compiler* compiler) {
@@ -298,8 +303,13 @@ static void compile_variable_declaration(Compiler* compiler) {
 static void compile_statement(Compiler* compiler) {
     if(compiler->parser.current.type == TOKEN_IF) {
         parser_advance(&compiler->parser);
-
         compile_if_statement(compiler);
+    } else if(compiler->parser.current.type == TOKEN_WHILE) {
+        parser_advance(&compiler->parser);
+        compile_while_statement(compiler);
+    } else if(compiler->parser.current.type == TOKEN_FOR) {
+        parser_advance(&compiler->parser);
+        compile_for_statement(compiler);
     } else if(compiler->parser.current.type == TOKEN_LEFT_BRACE) {
         parser_advance(&compiler->parser);
 
@@ -323,20 +333,99 @@ static void compile_if_statement(Compiler* compiler) {
 
     register_free(compiler);
 
-    uint16_t startIndex = emit_blank(compiler);
+    uint32_t ifEnd = emit_blank(compiler);
 
     compile_statement(compiler);
 
-    uint16_t endIndex = emit_blank(compiler);
+    uint32_t elseEnd = emit_blank(compiler);
 
-    patch_jump(compiler, startIndex);
+    patch_jump(compiler, ifEnd);
 
     if(compiler->parser.current.type == TOKEN_ELSE) {
         parser_advance(&compiler->parser);
         compile_statement(compiler);
     }
 
-    patch_jump(compiler, endIndex);
+    patch_jump(compiler, elseEnd);
+}
+
+static void compile_while_statement(Compiler* compiler) {
+    uint32_t start = compiler->chunk.size;
+
+    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
+    compile_expression(compiler);
+    parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+
+    emit_byte(compiler, OP_TEST);
+    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    register_free(compiler);
+
+    uint32_t end = emit_blank(compiler);
+
+    compile_statement(compiler);
+    emit_backwards_jump(compiler, start);
+    patch_jump(compiler, end);
+}
+
+static void compile_for_statement(Compiler* compiler) {
+    begin_scope(compiler);
+
+    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
+
+    if(compiler->parser.current.type == TOKEN_SEMICOLON) {
+        parser_advance(&compiler->parser);
+    } else if(compiler->parser.current.type == TOKEN_VAR) {
+        parser_advance(&compiler->parser);
+        compile_variable_declaration(compiler);
+    } else {
+        parser_advance(&compiler->parser);
+        compile_expression_statement(compiler);
+    }
+
+    uint32_t start = compiler->chunk.size;
+    uint32_t exitIndex = 0;
+    bool infinite = true;
+
+    if(compiler->parser.current.type != TOKEN_SEMICOLON) {
+        compile_expression(compiler);
+        parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
+
+        emit_byte(compiler, OP_TEST);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+
+        register_free(compiler);
+
+        exitIndex = emit_blank(compiler);
+        infinite = false;
+    }
+
+    if(compiler->parser.current.type != TOKEN_RIGHT_PAREN) {
+        uint32_t bodyJump = emit_blank(compiler);
+        uint32_t post = compiler->chunk.size;
+
+        compile_expression(compiler);
+        register_free(compiler);
+
+        parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after clauses");
+
+        emit_backwards_jump(compiler, start);
+        start = post;
+        patch_jump(compiler, bodyJump);
+    }
+
+    compile_statement(compiler);
+    emit_backwards_jump(compiler, start);
+
+    if(!infinite) {
+        patch_jump(compiler, exitIndex);
+    }
+
+    end_scope(compiler);
 }
 
 static void compile_block(Compiler* compiler) {
@@ -575,7 +664,7 @@ static void emit_return(Compiler* compiler) {
     emit_byte(compiler, 0);
 }
 
-static int32_t emit_blank(Compiler* compiler) {
+static uint32_t emit_blank(Compiler* compiler) {
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
@@ -584,7 +673,7 @@ static int32_t emit_blank(Compiler* compiler) {
     return compiler->chunk.size - 4;
 }
 
-static void patch_jump(Compiler* compiler, int32_t index) {
+static void patch_jump(Compiler* compiler, uint32_t index) {
     uint32_t diff = (compiler->chunk.size - index - 4) / 4;
 
     if(diff <= UINT8_MAX) {
@@ -596,6 +685,26 @@ static void patch_jump(Compiler* compiler, int32_t index) {
         compiler->chunk.bytecode[index] = OP_JMPW;
         compiler->chunk.bytecode[index + 1] = ((uint8_t*) &word)[0];
         compiler->chunk.bytecode[index + 2] = ((uint8_t*) &word)[1];
+    } else {
+        parser_error_at_previous(&compiler->parser, "Jump limit exceeded (65535)");
+        return;
+    }
+}
+
+static void emit_backwards_jump(Compiler* compiler, uint32_t index) {
+    uint32_t diff = (compiler->chunk.size - index) / 4;
+
+    if(diff <= UINT8_MAX) {
+        emit_byte(compiler, OP_BJMP);
+        emit_byte(compiler, (uint8_t) diff);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+    } else if(diff <= UINT16_MAX) {
+        uint16_t word = (uint16_t) diff;
+
+        emit_byte(compiler, OP_BJMPW);
+        emit_word(compiler, word);
+        emit_byte(compiler, 0);
     } else {
         parser_error_at_previous(&compiler->parser, "Jump limit exceeded (65535)");
         return;
