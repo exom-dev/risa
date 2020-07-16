@@ -6,6 +6,7 @@
 #include "../chunk/chunk.h"
 #include "../lexer/lexer.h"
 #include "../data/map.h"
+#include "../common/def.h"
 
 typedef struct {
     Token identifier;
@@ -13,9 +14,11 @@ typedef struct {
     uint8_t reg;
 } Local;
 
-typedef struct {
-    Chunk chunk;
-    Parser parser;
+typedef struct Compiler {
+    struct Compiler* enclosing;
+    DenseFunction* function;
+
+    Parser* parser;
     Map strings;
 
     uint8_t regIndex;

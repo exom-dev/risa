@@ -1,6 +1,7 @@
 #include "vm.h"
 
 void  vm_stack_reset(VM* vm) {
+    vm->frameCount = 0;
     vm->stackTop = vm->stack;
 }
 

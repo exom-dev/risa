@@ -1,8 +1,6 @@
 #include "value.h"
-
+#include "dense.h"
 #include "../common/logging.h"
-
-#include <string.h>
 
 void value_print(Value value) {
     switch(value.type) {
@@ -21,16 +19,8 @@ void value_print(Value value) {
         case VAL_FLOAT:
             PRINT("%f", AS_FLOAT(value));
             break;
-        case VAL_LINKED:
-            value_print_linked(AS_LINKED(value));
-            break;
-    }
-}
-
-void value_print_linked(LinkedValue* linked) {
-    switch(linked->type) {
-        case LVAL_STRING:
-            PRINT("%s", ((ValString*) linked)->chars);
+        case VAL_DENSE:
+            dense_print(AS_DENSE(value));
             break;
     }
 }
@@ -68,13 +58,13 @@ bool value_equals(Value left, Value right) {
         case VAL_BYTE:  return AS_BYTE(left) == AS_BYTE(right);
         case VAL_INT:   return AS_INT(left) == AS_INT(right);
         case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
-        case VAL_LINKED: {
-            return AS_LINKED(left) == AS_LINKED(right);
+        case VAL_DENSE: {
+            return AS_DENSE(left) == AS_DENSE(right);
         }
         default: return false;
     }
 }
 
-bool value_is_linked_of_type(Value value, LinkedValueType type) {
-    return IS_LINKED(value) && AS_LINKED(value)->type == type;
+bool value_is_dense_of_type(Value value, DenseValueType type) {
+    return IS_DENSE(value) && AS_DENSE(value)->type == type;
 }

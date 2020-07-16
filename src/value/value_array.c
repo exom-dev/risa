@@ -1,14 +1,6 @@
 #include "value.h"
 
 #include "../memory/mem.h"
-#include "../common/logging.h"
-
-ValueArray* value_array_create() {
-    ValueArray* array = (ValueArray*) MEM_ALLOC(sizeof(ValueArray));
-    value_array_init(array);
-
-    return array;
-}
 
 void value_array_init(ValueArray* array) {
     array->size = 0;

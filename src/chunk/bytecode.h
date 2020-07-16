@@ -36,6 +36,7 @@ typedef enum {
     OP_JMPW,
     OP_BJMP,
     OP_BJMPW,
+    OP_CALL,
     OP_RET
 } OpCode;
 

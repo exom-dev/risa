@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "parser.h"
 
+#include "../value/dense.h"
 #include "../chunk/bytecode.h"
 #include "../common/logging.h"
 #include "../lexer/lexer.h"
@@ -16,19 +17,25 @@ static void compile_literal(Compiler* compiler, bool);
 static void compile_identifier(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
+static void compile_function_declaration(Compiler* compiler);
+static void compile_function(Compiler* compiler);
 static void compile_statement(Compiler* compiler);
 static void compile_if_statement(Compiler* compiler);
 static void compile_while_statement(Compiler* compiler);
 static void compile_for_statement(Compiler* compiler);
+static void compile_return_statement(Compiler* compiler);
 static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
+static void compile_call(Compiler* compiler, bool);
 static void compile_grouping(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
 static void compile_and(Compiler* compiler, bool);
 static void compile_or(Compiler* compiler, bool);
+
+static uint8_t compile_arguments(Compiler* compiler);
 
 static void begin_scope(Compiler* compiler);
 static void end_scope(Compiler* compiler);
@@ -41,10 +48,9 @@ static void     emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uin
 static void     emit_word(Compiler* compiler, uint16_t word);
 static void     emit_constant(Compiler* compiler, Value value);
 static void     emit_return(Compiler* compiler);
+static void     emit_jump(Compiler* compiler, uint32_t index);
 static void     emit_backwards_jump(Compiler* compiler, uint32_t index);
 static uint32_t emit_blank(Compiler* compiler);
-
-static void patch_jump(Compiler* compiler, uint32_t index);
 
 static uint16_t create_constant(Compiler* compiler, Value value);
 static uint16_t create_identifier_constant(Compiler* compiler);
@@ -57,7 +63,7 @@ static void register_free(Compiler* compiler);
 static void finalize_compilation(Compiler* compiler);
 
 Rule EXPRESSION_RULES[] = {
-        { compile_grouping, NULL,    PREC_NONE },        // TOKEN_LEFT_PAREN
+        { compile_grouping, compile_call,    PREC_CALL },// TOKEN_LEFT_PAREN
         { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_PAREN
         { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACKET
         { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACKET
@@ -108,8 +114,10 @@ Rule EXPRESSION_RULES[] = {
 };
 
 void compiler_init(Compiler* compiler) {
-    chunk_init(&compiler->chunk);
-    parser_init(&compiler->parser);
+    compiler->enclosing = NULL;
+    compiler->function = dense_function_create();
+
+    chunk_init(&compiler->function->chunk);
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
@@ -123,29 +131,33 @@ void compiler_delete(Compiler* compiler) {
 }
 
 CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
-    parser_init(&compiler->parser);
-    lexer_init(&compiler->parser.lexer);
-    lexer_source(&compiler->parser.lexer, str);
+    Parser parser;
+    parser_init(&parser);
 
-    parser_advance(&compiler->parser);
+    compiler->parser = &parser;
 
-    while(compiler->parser.current.type != TOKEN_EOF) {
+    lexer_init(&compiler->parser->lexer);
+    lexer_source(&compiler->parser->lexer, str);
+
+    parser_advance(compiler->parser);
+
+    while(compiler->parser->current.type != TOKEN_EOF) {
         compile_declaration(compiler);
     }
 
     finalize_compilation(compiler);
 
-    return compiler->parser.error ? COMPILER_ERROR : COMPILER_OK;
+    return compiler->parser->error ? COMPILER_ERROR : COMPILER_OK;
 }
 
 static void compile_byte(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    int64_t num = strtol(compiler->parser.previous.start, NULL, 10);
+    int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
 
     if(errno == ERANGE || num > 256) {
-        parser_error_at_previous(&compiler->parser, "Number is too large for type 'byte'");
+        parser_error_at_previous(compiler->parser, "Number is too large for type 'byte'");
         return;
     }
 
@@ -156,10 +168,10 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    int64_t num = strtol(compiler->parser.previous.start, NULL, 10);
+    int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
 
     if(errno == ERANGE) {
-        parser_error_at_previous(&compiler->parser, "Number is too large for type 'int'");
+        parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
         return;
     }
 
@@ -170,10 +182,10 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    double num = strtod(compiler->parser.previous.start, NULL);
+    double num = strtod(compiler->parser->previous.start, NULL);
 
     if(errno == ERANGE) {
-        parser_error_at_previous(&compiler->parser, "Number is too small or too large for type 'float'");
+        parser_error_at_previous(compiler->parser, "Number is too small or too large for type 'float'");
         return;
     }
 
@@ -184,25 +196,25 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    const char* start = compiler->parser.previous.start + 1;
-    uint32_t length = compiler->parser.previous.size - 2;
+    const char* start = compiler->parser->previous.start + 1;
+    uint32_t length = compiler->parser->previous.size - 2;
     uint32_t hash = map_hash(start, length);
 
-    ValString* interned = map_find(&compiler->strings, start, length, hash);
+    DenseString* interned = map_find(&compiler->strings, start, length, hash);
 
     if(interned == NULL) {
-        interned = value_string_from(start, length);
+        interned = dense_string_from(start, length);
         map_set(&compiler->strings, interned, NULL_VALUE);
     }
 
-    emit_constant(compiler, LINKED_VALUE(interned));
+    emit_constant(compiler, DENSE_VALUE(interned));
 }
 
 static void compile_literal(Compiler* compiler, bool allowAssignment) {
     if(!register_reserve(compiler))
         return;
 
-    switch(compiler->parser.previous.type) {
+    switch(compiler->parser->previous.type) {
         case TOKEN_NULL:
             emit_byte(compiler, OP_NULL);
             break;
@@ -225,7 +237,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     uint8_t get;
     uint8_t set;
 
-    uint8_t index = local_resolve(compiler, &compiler->parser.previous);
+    uint8_t index = local_resolve(compiler, &compiler->parser->previous);
     bool global = index == 251;
 
     if(!global) {
@@ -238,8 +250,8 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
         set = OP_SGLOB;
     }
 
-    if(allowAssignment && (compiler->parser.current.type == TOKEN_EQUAL)) {
-        parser_advance(&compiler->parser);
+    if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
+        parser_advance(compiler->parser);
         compile_expression(compiler);
 
         emit_byte(compiler, set);
@@ -260,20 +272,23 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_declaration(Compiler* compiler) {
-    if(compiler->parser.current.type == TOKEN_VAR) {
-        parser_advance(&compiler->parser);
+    if(compiler->parser->current.type == TOKEN_VAR) {
+        parser_advance(compiler->parser);
         compile_variable_declaration(compiler);
+    } else if(compiler->parser->current.type == TOKEN_FUNCTION) {
+        parser_advance(compiler->parser);
+        compile_function_declaration(compiler);
     } else compile_statement(compiler);
 
-    if(compiler->parser.panic)
-        parser_sync(&compiler->parser);
+    if(compiler->parser->panic)
+        parser_sync(compiler->parser);
 }
 
 static void compile_variable_declaration(Compiler* compiler) {
     uint16_t index = get_variable_name(compiler);
 
-    if(compiler->parser.current.type == TOKEN_EQUAL) {
-        parser_advance(&compiler->parser);
+    if(compiler->parser->current.type == TOKEN_EQUAL) {
+        parser_advance(compiler->parser);
         compile_expression(compiler);
     } else {
         if(!register_reserve(compiler))
@@ -285,7 +300,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         emit_byte(compiler, 0);
     }
 
-    parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
+    parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
 
     if(compiler->scopeDepth > 0) {
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
@@ -300,18 +315,95 @@ static void compile_variable_declaration(Compiler* compiler) {
     emit_byte(compiler, 0);
 }
 
+static void compile_function_declaration(Compiler* compiler) {
+    uint16_t index = get_variable_name(compiler);
+
+    if(compiler->scopeDepth > 0)
+        compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+
+    compile_function(compiler);
+
+    if(compiler->scopeDepth > 0)
+        return;
+
+    register_free(compiler);
+
+    emit_byte(compiler, OP_DGLOB);
+    emit_byte(compiler, compiler->regIndex);
+    emit_byte(compiler, index);
+    emit_byte(compiler, 0);
+}
+
+static void compile_function(Compiler* compiler) {
+    Compiler subcompiler;
+    compiler_init(&subcompiler);
+
+    DenseFunction* function = dense_function_create();
+
+    const char* start = compiler->parser->previous.start;
+    uint32_t length = compiler->parser->previous.size;
+    uint32_t hash = map_hash(start, length);
+
+    DenseString* interned = map_find(&compiler->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = dense_string_from(start, length);
+        map_set(&compiler->strings, interned, NULL_VALUE);
+    }
+
+    function->name = interned;
+
+    subcompiler.enclosing = compiler;
+    subcompiler.function = function;
+    subcompiler.parser = compiler->parser;
+
+    begin_scope(&subcompiler);
+
+    parser_consume(subcompiler.parser, TOKEN_LEFT_PAREN, "Expected '(' after function name");
+
+    if(subcompiler.parser->current.type != TOKEN_RIGHT_PAREN) {
+        do {
+            ++subcompiler.function->arity;
+
+            if (subcompiler.function->arity > 250) {
+                parser_error_at_current(subcompiler.parser, "Parameter limit exceeded (250)");
+            }
+
+            get_variable_name(&subcompiler);
+            subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
+
+            ++subcompiler.regIndex;
+        } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
+    }
+
+    parser_consume(subcompiler.parser, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
+    parser_consume(subcompiler.parser, TOKEN_LEFT_BRACE, "Expected '{' before function body");
+
+    compile_block(&subcompiler);
+
+    emit_return(&subcompiler);
+
+    if(!register_reserve(compiler))
+        return;
+
+    emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+}
+
 static void compile_statement(Compiler* compiler) {
-    if(compiler->parser.current.type == TOKEN_IF) {
-        parser_advance(&compiler->parser);
+    if(compiler->parser->current.type == TOKEN_IF) {
+        parser_advance(compiler->parser);
         compile_if_statement(compiler);
-    } else if(compiler->parser.current.type == TOKEN_WHILE) {
-        parser_advance(&compiler->parser);
+    } else if(compiler->parser->current.type == TOKEN_WHILE) {
+        parser_advance(compiler->parser);
         compile_while_statement(compiler);
-    } else if(compiler->parser.current.type == TOKEN_FOR) {
-        parser_advance(&compiler->parser);
+    } else if(compiler->parser->current.type == TOKEN_FOR) {
+        parser_advance(compiler->parser);
         compile_for_statement(compiler);
-    } else if(compiler->parser.current.type == TOKEN_LEFT_BRACE) {
-        parser_advance(&compiler->parser);
+    } else if(compiler->parser->current.type == TOKEN_RETURN) {
+        parser_advance(compiler->parser);
+        compile_return_statement(compiler);
+    } else if(compiler->parser->current.type == TOKEN_LEFT_BRACE) {
+        parser_advance(compiler->parser);
 
         begin_scope(compiler);
         compile_block(compiler);
@@ -322,9 +414,9 @@ static void compile_statement(Compiler* compiler) {
 }
 
 static void compile_if_statement(Compiler* compiler) {
-    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
+    parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
     compile_expression(compiler);
-    parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
     emit_byte(compiler, compiler->regIndex - 1);
@@ -339,22 +431,22 @@ static void compile_if_statement(Compiler* compiler) {
 
     uint32_t elseEnd = emit_blank(compiler);
 
-    patch_jump(compiler, ifEnd);
+    emit_jump(compiler, ifEnd);
 
-    if(compiler->parser.current.type == TOKEN_ELSE) {
-        parser_advance(&compiler->parser);
+    if(compiler->parser->current.type == TOKEN_ELSE) {
+        parser_advance(compiler->parser);
         compile_statement(compiler);
     }
 
-    patch_jump(compiler, elseEnd);
+    emit_jump(compiler, elseEnd);
 }
 
 static void compile_while_statement(Compiler* compiler) {
-    uint32_t start = compiler->chunk.size;
+    uint32_t start = compiler->function->chunk.size;
 
-    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
+    parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
     compile_expression(compiler);
-    parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
     emit_byte(compiler, compiler->regIndex - 1);
@@ -367,31 +459,31 @@ static void compile_while_statement(Compiler* compiler) {
 
     compile_statement(compiler);
     emit_backwards_jump(compiler, start);
-    patch_jump(compiler, end);
+    emit_jump(compiler, end);
 }
 
 static void compile_for_statement(Compiler* compiler) {
     begin_scope(compiler);
 
-    parser_consume(&compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
+    parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
 
-    if(compiler->parser.current.type == TOKEN_SEMICOLON) {
-        parser_advance(&compiler->parser);
-    } else if(compiler->parser.current.type == TOKEN_VAR) {
-        parser_advance(&compiler->parser);
+    if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        parser_advance(compiler->parser);
+    } else if(compiler->parser->current.type == TOKEN_VAR) {
+        parser_advance(compiler->parser);
         compile_variable_declaration(compiler);
     } else {
-        parser_advance(&compiler->parser);
+        parser_advance(compiler->parser);
         compile_expression_statement(compiler);
     }
 
-    uint32_t start = compiler->chunk.size;
+    uint32_t start = compiler->function->chunk.size;
     uint32_t exitIndex = 0;
     bool infinite = true;
 
-    if(compiler->parser.current.type != TOKEN_SEMICOLON) {
+    if(compiler->parser->current.type != TOKEN_SEMICOLON) {
         compile_expression(compiler);
-        parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
+        parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
 
         emit_byte(compiler, OP_TEST);
         emit_byte(compiler, compiler->regIndex - 1);
@@ -404,42 +496,62 @@ static void compile_for_statement(Compiler* compiler) {
         infinite = false;
     }
 
-    if(compiler->parser.current.type != TOKEN_RIGHT_PAREN) {
+    if(compiler->parser->current.type != TOKEN_RIGHT_PAREN) {
         uint32_t bodyJump = emit_blank(compiler);
-        uint32_t post = compiler->chunk.size;
+        uint32_t post = compiler->function->chunk.size;
 
         compile_expression(compiler);
         register_free(compiler);
 
-        parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after clauses");
+        parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after clauses");
 
         emit_backwards_jump(compiler, start);
         start = post;
-        patch_jump(compiler, bodyJump);
+        emit_jump(compiler, bodyJump);
     }
 
     compile_statement(compiler);
     emit_backwards_jump(compiler, start);
 
     if(!infinite) {
-        patch_jump(compiler, exitIndex);
+        emit_jump(compiler, exitIndex);
     }
 
     end_scope(compiler);
 }
 
+static void compile_return_statement(Compiler* compiler) {
+    if(compiler->function->name == NULL) {
+        parser_error_at_previous(compiler->parser, "Cannot return from top-level scope");
+    }
+
+    if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        emit_return(compiler);
+    } else {
+        compile_expression(compiler);
+        parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after return expression");
+
+        emit_byte(compiler, OP_RET);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+
+        register_free(compiler);
+    }
+}
+
 static void compile_block(Compiler* compiler) {
-    while(compiler->parser.current.type != TOKEN_EOF && compiler->parser.current.type != TOKEN_RIGHT_BRACE) {
+    while(compiler->parser->current.type != TOKEN_EOF && compiler->parser->current.type != TOKEN_RIGHT_BRACE) {
         compile_declaration(compiler);
     }
 
-    parser_consume(&compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
+    parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
 }
 
 static void compile_expression_statement(Compiler* compiler) {
     compile_expression(compiler);
 
-    parser_consume(&compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
+    parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
 
     register_free(compiler);
 }
@@ -449,36 +561,64 @@ static void compile_expression(Compiler* compiler) {
 }
 
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
-    parser_advance(&compiler->parser);
+    parser_advance(compiler->parser);
 
-    RuleHandler prefix = EXPRESSION_RULES[compiler->parser.previous.type].prefix;
+    RuleHandler prefix = EXPRESSION_RULES[compiler->parser->previous.type].prefix;
 
     if(prefix == NULL) {
-        parser_error_at_previous(&compiler->parser, "Expected expression");
+        parser_error_at_previous(compiler->parser, "Expected expression");
     }
 
     bool allowAssignment = precedence <= PREC_ASSIGNMENT;
     prefix(compiler, allowAssignment);
 
-    while(precedence <= EXPRESSION_RULES[compiler->parser.current.type].precedence) {
-        parser_advance(&compiler->parser);
+    while(precedence <= EXPRESSION_RULES[compiler->parser->current.type].precedence) {
+        parser_advance(compiler->parser);
 
-        RuleHandler infix = EXPRESSION_RULES[compiler->parser.previous.type].infix;
+        RuleHandler infix = EXPRESSION_RULES[compiler->parser->previous.type].infix;
         infix(compiler, allowAssignment);
     }
 
-    if(allowAssignment && (compiler->parser.current.type == TOKEN_EQUAL)) {
-        parser_error_at_previous(&compiler->parser, "Invalid assignment target");
+    if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
+        parser_error_at_previous(compiler->parser, "Invalid assignment target");
     }
+}
+
+static void compile_call(Compiler* compiler, bool allowAssignment) {
+    uint8_t functionReg = compiler->regIndex - 1;
+    uint8_t argc = compile_arguments(compiler);
+
+    emit_byte(compiler, OP_CALL);
+    emit_byte(compiler, functionReg);
+    emit_byte(compiler, argc);
+    emit_byte(compiler, 0);
+}
+
+static uint8_t compile_arguments(Compiler* compiler) {
+    uint8_t argc = 0;
+
+    if(compiler->parser->current.type != TOKEN_RIGHT_PAREN) {
+        do {
+            compile_expression(compiler);
+
+            if(argc == 255)
+                parser_error_at_previous(compiler->parser, "Argument limit exceeded (255)");
+
+            ++argc;
+        } while(compiler->parser->current.type == TOKEN_COMMA && (parser_advance(compiler->parser), true));
+    }
+
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments");
+    return argc;
 }
 
 static void compile_grouping(Compiler* compiler, bool allowAssignment) {
     compile_expression(compiler);
-    parser_consume(&compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
 }
 
 static void compile_unary(Compiler* compiler, bool allowAssignment) {
-    TokenType operator = compiler->parser.previous.type;
+    TokenType operator = compiler->parser->previous.type;
 
     compile_expression_precedence(compiler, PREC_UNARY);
 
@@ -501,7 +641,7 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_binary(Compiler* compiler, bool allowAssignment) {
-    TokenType operatorType = compiler->parser.previous.type;
+    TokenType operatorType = compiler->parser->previous.type;
 
     Rule* rule = &EXPRESSION_RULES[operatorType];
     compile_expression_precedence(compiler, (Precedence) (rule->precedence + 1));
@@ -575,7 +715,7 @@ static void compile_and(Compiler* compiler, bool allowAssignment) {
 
     compile_expression_precedence(compiler, PREC_AND);
 
-    patch_jump(compiler, index);
+    emit_jump(compiler, index);
 }
 
 static void compile_or(Compiler* compiler, bool allowAssignment) {
@@ -590,7 +730,7 @@ static void compile_or(Compiler* compiler, bool allowAssignment) {
 
     compile_expression_precedence(compiler, PREC_OR);
 
-    patch_jump(compiler, index);
+    emit_jump(compiler, index);
 }
 
 static void begin_scope(Compiler* compiler) {
@@ -608,7 +748,7 @@ static void end_scope(Compiler* compiler) {
 
 static void local_add(Compiler* compiler, Token identifier) {
     if(compiler->localCount > 250) {
-        parser_error_at_previous(&compiler->parser, "Local variable limit exceeded (250)");
+        parser_error_at_previous(compiler->parser, "Local variable limit exceeded (250)");
         return;
     }
 
@@ -630,7 +770,7 @@ static uint8_t local_resolve(Compiler* compiler, Token* identifier) {
 }
 
 static void emit_byte(Compiler* compiler, uint8_t byte) {
-    chunk_write(&compiler->chunk, byte, compiler->parser.previous.index);
+    chunk_write(&compiler->function->chunk, byte, compiler->parser->previous.index);
 }
 
 static void emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
@@ -659,7 +799,7 @@ static void emit_constant(Compiler* compiler, Value value) {
 
 static void emit_return(Compiler* compiler) {
     emit_byte(compiler, OP_RET);
-    emit_byte(compiler, 0);
+    emit_byte(compiler, 251);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 }
@@ -670,29 +810,29 @@ static uint32_t emit_blank(Compiler* compiler) {
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    return compiler->chunk.size - 4;
+    return compiler->function->chunk.size - 4;
 }
 
-static void patch_jump(Compiler* compiler, uint32_t index) {
-    uint32_t diff = (compiler->chunk.size - index - 4) / 4;
+static void emit_jump(Compiler* compiler, uint32_t index) {
+    uint32_t diff = (compiler->function->chunk.size - index - 4) / 4;
 
     if(diff <= UINT8_MAX) {
-        compiler->chunk.bytecode[index] = OP_JMP;
-        compiler->chunk.bytecode[index + 1] = (uint8_t) diff;
+        compiler->function->chunk.bytecode[index] = OP_JMP;
+        compiler->function->chunk.bytecode[index + 1] = (uint8_t) diff;
     } else if(diff <= UINT16_MAX) {
         uint16_t word = (uint16_t) diff;
 
-        compiler->chunk.bytecode[index] = OP_JMPW;
-        compiler->chunk.bytecode[index + 1] = ((uint8_t*) &word)[0];
-        compiler->chunk.bytecode[index + 2] = ((uint8_t*) &word)[1];
+        compiler->function->chunk.bytecode[index] = OP_JMPW;
+        compiler->function->chunk.bytecode[index + 1] = ((uint8_t*) &word)[0];
+        compiler->function->chunk.bytecode[index + 2] = ((uint8_t*) &word)[1];
     } else {
-        parser_error_at_previous(&compiler->parser, "Jump limit exceeded (65535)");
+        parser_error_at_previous(compiler->parser, "Jump limit exceeded (65535)");
         return;
     }
 }
 
 static void emit_backwards_jump(Compiler* compiler, uint32_t index) {
-    uint32_t diff = (compiler->chunk.size - index) / 4;
+    uint32_t diff = (compiler->function->chunk.size - index) / 4;
 
     if(diff <= UINT8_MAX) {
         emit_byte(compiler, OP_BJMP);
@@ -706,16 +846,16 @@ static void emit_backwards_jump(Compiler* compiler, uint32_t index) {
         emit_word(compiler, word);
         emit_byte(compiler, 0);
     } else {
-        parser_error_at_previous(&compiler->parser, "Jump limit exceeded (65535)");
+        parser_error_at_previous(compiler->parser, "Jump limit exceeded (65535)");
         return;
     }
 }
 
 static uint16_t create_constant(Compiler* compiler, Value value) {
-    size_t index = chunk_write_constant(&compiler->chunk, value);
+    size_t index = chunk_write_constant(&compiler->function->chunk, value);
 
     if(index > UINT16_MAX) {
-        parser_error_at_previous(&compiler->parser, "Constant limit exceeded (65535)");
+        parser_error_at_previous(compiler->parser, "Constant limit exceeded (65535)");
         return 0;
     }
 
@@ -723,27 +863,27 @@ static uint16_t create_constant(Compiler* compiler, Value value) {
 }
 
 static uint16_t create_identifier_constant(Compiler* compiler) {
-    return create_string_constant(compiler, compiler->parser.previous.start, compiler->parser.previous.size);
+    return create_string_constant(compiler, compiler->parser->previous.start, compiler->parser->previous.size);
 }
 
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length) {
     uint32_t hash = map_hash(start, length);
 
-    ValString* interned = map_find(&compiler->strings, start, length, hash);
+    DenseString* interned = map_find(&compiler->strings, start, length, hash);
 
     if(interned == NULL) {
-        interned = value_string_from(start, length);
+        interned = dense_string_from(start, length);
         map_set(&compiler->strings, interned, NULL_VALUE);
     }
 
-    return create_constant(compiler, LINKED_VALUE(interned));
+    return create_constant(compiler, DENSE_VALUE(interned));
 }
 
 static uint16_t get_variable_name(Compiler* compiler) {
-    parser_consume(&compiler->parser, TOKEN_IDENTIFIER, "Expected identifier");
+    parser_consume(compiler->parser, TOKEN_IDENTIFIER, "Expected identifier");
 
     if(compiler->scopeDepth > 0) {
-        Token* identifier = &compiler->parser.previous;
+        Token* identifier = &compiler->parser->previous;
 
         for(int16_t i = compiler->localCount - 1; i >= 0; --i) {
             Local* local = &compiler->locals[i];
@@ -752,7 +892,7 @@ static uint16_t get_variable_name(Compiler* compiler) {
                 break;
 
             if(identifier_equals(identifier, &local->identifier)) {
-                parser_error_at_previous(&compiler->parser, "Variable already declared in this scope");
+                parser_error_at_previous(compiler->parser, "Variable already declared in this scope");
             }
         }
 
@@ -766,7 +906,7 @@ static uint16_t get_variable_name(Compiler* compiler) {
 
 static bool register_reserve(Compiler* compiler) {
     if(compiler->regIndex == 249) {
-        parser_error_at_current(&compiler->parser, "Register limit exceeded (250)");
+        parser_error_at_current(compiler->parser, "Register limit exceeded (250)");
         return false;
     }
     else {

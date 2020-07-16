@@ -23,7 +23,8 @@ typedef enum {
 } RisaInterpretStatus;
 
 RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk);
-RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk* chunk);
+RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk);
+RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function);
 RisaInterpretStatus risa_interpret_string(const char* str);
 
 #endif

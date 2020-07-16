@@ -7,7 +7,7 @@
 #define MAP_MAX_LOAD 0.75
 #define MAP_START_SIZE 8
 
-static Entry* map_find_bucket(Entry* entries, int capacity, ValString* key);
+static Entry* map_find_bucket(Entry* entries, int capacity, DenseString* key);
 static void map_adjust_capacity(Map* map);
 
 void map_init(Map* map) {
@@ -32,7 +32,7 @@ uint32_t map_hash(const char* chars, uint32_t length) {
     return hash;
 }
 
-bool map_get(Map* map, ValString *key, Value* value) {
+bool map_get(Map* map, DenseString *key, Value* value) {
     if(map->count == 0)
         return false;
 
@@ -45,7 +45,7 @@ bool map_get(Map* map, ValString *key, Value* value) {
     return true;
 }
 
-bool map_set(Map* map, ValString *key, Value value) {
+bool map_set(Map* map, DenseString *key, Value value) {
     map_adjust_capacity(map);
 
     Entry* entry = map_find_bucket(map->entries, map->capacity, key);
@@ -60,7 +60,7 @@ bool map_set(Map* map, ValString *key, Value value) {
     return isNewKey;
 }
 
-bool map_erase(Map* map, ValString *key) {
+bool map_erase(Map* map, DenseString *key) {
     if(map->count == 0)
         return false;
 
@@ -82,7 +82,7 @@ void map_copy(Map* map, Map* from) {
     }
 }
 
-ValString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
+DenseString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
     if(map->count == 0)
         return NULL;
 
@@ -104,7 +104,7 @@ ValString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
     }
 }
 
-static Entry* map_find_bucket(Entry* entries, int capacity, ValString* key) {
+static Entry* map_find_bucket(Entry* entries, int capacity, DenseString* key) {
     uint32_t index = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
 

@@ -3,17 +3,20 @@
 #include "../memory/mem.h"
 #include "../chunk/bytecode.h"
 #include "../common/logging.h"
+#include "../value/dense.h"
 
 #ifdef DEBUG_TRACE_EXECUTION
     #include "../debug/disassembler.h"
 #endif
 
-void vm_init(VM* vm) {
-    vm->ip = 0;
-    vm->chunk = NULL;
-    vm_stack_reset(vm);
+#define VM_RUNTIME_ERROR(vm, fmt, ...) \
+    fprintf(stderr, "[error] at index %u: " fmt "\n", vm->frames[vm->frameCount - 1].function->chunk.indices[vm->frames[vm->frameCount - 1].ip - vm->frames[vm->frameCount - 1].function->chunk.bytecode], ##__VA_ARGS__ )
 
-    vm->regs = vm->stackTop;
+static bool call_value(VM* vm, uint8_t reg, uint8_t argc);
+static bool call_function(VM* vm, uint8_t reg, uint8_t argc);
+
+void vm_init(VM* vm) {
+    vm_stack_reset(vm);
 
     map_init(&vm->strings);
     map_init(&vm->globals);
@@ -25,11 +28,18 @@ void vm_delete(VM* vm) {
     map_delete(&vm->strings);
     map_delete(&vm->globals);
 
-    LinkedValue* value = vm->values;
+    DenseValue* value = vm->values;
 
     while(value != NULL) {
-        LinkedValue* next = value->next;
-        MEM_FREE(value);
+        DenseValue* next = value->next;
+        switch(value->type) {
+            case DVAL_STRING:
+                MEM_FREE(value);
+                break;
+            case DVAL_FUNCTION:
+                chunk_delete(&((DenseFunction*) value)->chunk);
+                break;
+        }
 
         value = next;
     }
@@ -40,35 +50,34 @@ VMStatus vm_execute(VM* vm) {
 }
 
 VMStatus vm_run(VM* vm) {
-    #define NEXT_BYTE() (*vm->ip++)
-    #define NEXT_CONSTANT() (vm->chunk->constants.values[NEXT_BYTE()])
+    CallFrame* frame = &vm->frames[vm->frameCount - 1];
 
-    #define DEST     (*vm->ip)
-    #define LEFT     (vm->ip[1])
-    #define RIGHT    (vm->ip[2])
-    #define COMBINED ((((uint16_t) vm->ip[1]) << 8) | (vm->ip[2]))
+    #define NEXT_BYTE() (*frame->ip++)
+    #define NEXT_CONSTANT() (frame->function->chunk.constants.values[NEXT_BYTE()])
 
-    #define DEST_CONSTANT     (vm->chunk->constants.values[DEST])
-    #define LEFT_CONSTANT     (vm->chunk->constants.values[LEFT])
-    #define RIGHT_CONSTANT    (vm->chunk->constants.values[RIGHT])
-    #define COMBINED_CONSTANT (vm->chunk->constants.values[COMBINED])
+    #define DEST     (*frame->ip)
+    #define LEFT     (frame->ip[1])
+    #define RIGHT    (frame->ip[2])
+    #define COMBINED ((((uint16_t) frame->ip[1]) << 8) | (frame->ip[2]))
 
-    #define DEST_REG  (vm->regs[DEST])
-    #define LEFT_REG  (vm->regs[LEFT])
-    #define RIGHT_REG (vm->regs[RIGHT])
+    #define DEST_CONSTANT     (frame->function->chunk.constants.values[DEST])
+    #define LEFT_CONSTANT     (frame->function->chunk.constants.values[LEFT])
+    #define RIGHT_CONSTANT    (frame->function->chunk.constants.values[RIGHT])
+    #define COMBINED_CONSTANT (frame->function->chunk.constants.values[COMBINED])
 
-    #define SKIP(count) (vm->ip += count)
-    #define BSKIP(count) (vm->ip -= count)
+    #define DEST_REG  (frame->regs[DEST])
+    #define LEFT_REG  (frame->regs[LEFT])
+    #define RIGHT_REG (frame->regs[RIGHT])
 
-    #define VM_RUNTIME_ERROR(vm, fmt, ...) \
-        fprintf(stderr, "[error] at index %u: " fmt "\n", vm->chunk->indices[vm->ip - vm->chunk->bytecode], ##__VA_ARGS__ )
+    #define SKIP(count) (frame->ip += count)
+    #define BSKIP(count) (frame->ip -= count)
 
     while(1) {
         #ifdef DEBUG_TRACE_EXECUTION
-            debug_disassemble_instruction(vm->chunk, (size_t) (vm->ip - vm->chunk->bytecode));
+            debug_disassemble_instruction(&frame->function->chunk, (uint32_t) (frame->ip - frame->function->chunk.bytecode));
 
             PRINT("          ");
-            for(Value* entry = vm->stack; entry < vm->stackTop; ++entry) {
+            for(Value* entry = vm->stack; entry < vm->stackTop + 5; ++entry) {
                 PRINT("[ ");
                 value_print(*entry);
                 PRINT(" ]");
@@ -212,17 +221,17 @@ VMStatus vm_run(VM* vm) {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(value_is_linked_of_type(LEFT_REG, LVAL_STRING)) {
-                    if(value_is_linked_of_type(RIGHT_REG, LVAL_STRING)) {
-                        ValString* result = value_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG));
-                        ValString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
+                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
+                    if(value_is_dense_of_type(RIGHT_REG, DVAL_STRING)) {
+                        DenseString* result = dense_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG));
+                        DenseString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
 
                         if(interned != NULL) {
                             MEM_FREE(result);
                             result = interned;
-                        } else vm_register_value(vm, (LinkedValue*) result);
+                        } else vm_register_value(vm, (DenseValue*) result);
 
-                        DEST_REG = LINKED_VALUE(result);
+                        DEST_REG = DENSE_VALUE(result);
                     } else {
                         VM_RUNTIME_ERROR(vm, "Left operand must be string");
                         return VM_ERROR;
@@ -751,7 +760,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_JMPW: {
-                uint16_t amount = *((uint16_t*) &vm->ip);
+                uint16_t amount = *((uint16_t*) &frame->ip);
 
                 SKIP(amount * 4);
                 SKIP(3);
@@ -763,22 +772,39 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_BJMPW: {
-                uint16_t amount = *((uint16_t*) &vm->ip);
+                uint16_t amount = *((uint16_t*) &frame->ip);
 
                 BSKIP(amount * 4);
                 BSKIP(1);
                 break;
             }
+            case OP_CALL: {
+                if(!call_value(vm, DEST, LEFT))
+                    return VM_ERROR;
+                frame = &vm->frames[vm->frameCount - 1];
+                break;
+            }
             case OP_RET: {
-                return VM_OK;
+                --vm->frameCount;
+
+                if(vm->frameCount == 0)
+                    return VM_OK;
+
+                if(DEST == 251)
+                    *frame->base = NULL_VALUE;
+                else *frame->base = DEST_REG;
+
+                vm->stackTop = frame->base + 1;
+                frame = &vm->frames[vm->frameCount - 1];
+
+                SKIP(3);
+                break;
             }
             default: {
 
             }
         }
     }
-
-    #undef VM_RUNTIME_ERROR
 
     #undef RIGHT_REG
     #undef LEFT_REG
@@ -794,11 +820,51 @@ VMStatus vm_run(VM* vm) {
     #undef NEXT_BYTE
 }
 
-void vm_register_string(VM* vm, ValString* string) {
+void vm_register_string(VM* vm, DenseString* string) {
     map_set(&vm->strings, string, NULL_VALUE);
 }
 
-void vm_register_value(VM* vm, LinkedValue* value) {
+void vm_register_value(VM* vm, DenseValue* value) {
     value->next = vm->values;
     vm->values = value;
 }
+
+static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
+    Value value = vm->frames[vm->frameCount - 1].regs[reg];
+
+    if(IS_DENSE(value)) {
+        switch(AS_DENSE(value)->type) {
+            case DVAL_FUNCTION:
+                return call_function(vm, reg, argc);
+            default: ;
+        }
+    }
+
+    VM_RUNTIME_ERROR(vm, "Cannot call non-function type");
+    return false;
+}
+
+static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
+    DenseFunction* function = AS_FUNCTION(vm->frames[vm->frameCount - 1].regs[reg]);
+
+    if(argc != function->arity) {
+        VM_RUNTIME_ERROR(vm, "Expected %x args, got %x", function->arity, argc);
+        return false;
+    }
+
+    if(vm->frameCount == CALLFRAME_STACK_SIZE) {
+        VM_RUNTIME_ERROR(vm, "Stack overflow");
+        return false;
+    }
+
+    CallFrame* frame = &vm->frames[vm->frameCount++];
+    frame->function = function;
+    frame->ip = function->chunk.bytecode;
+
+    frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
+    frame->regs = frame->base + 1;
+
+    return true;
+}
+
+#undef VM_RUNTIME_ERROR
