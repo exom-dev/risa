@@ -95,7 +95,7 @@ DIGIT ::= [0-9] ;
 
 # TODO
 
-- functions
+- ~~functions~~
 - closures
 - garbage collector
 - break statement
