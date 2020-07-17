@@ -67,6 +67,11 @@ RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
     return RISA_EXECUTE_OK;
 }
 
+Value print(void* vm, uint8_t argc, Value* args) {
+    value_print(args[0]);
+    return args[0];
+}
+
 RisaInterpretStatus risa_interpret_string(const char* str) {
     Chunk compiled;
     chunk_init(&compiled);
@@ -88,12 +93,26 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         }
     }
 
+    DenseNative* native = dense_native_create(print);
+    DenseString* string = map_find(&vm.strings, "print", 5, map_hash("print", 5));
+
+    if(string == NULL) {
+        string = dense_string_from("print", 5);
+        map_set(&vm.strings, string, NULL_VALUE);
+    }
+
+    map_set(&vm.globals, string, DENSE_VALUE(native));
+
     if(risa_execute_chunk(&vm, compiled) == RISA_EXECUTE_ERROR) {
+        MEM_FREE(string);
+        MEM_FREE(native);
         vm_delete(&vm);
         chunk_delete(&compiled);
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
+    MEM_FREE(string);
+    MEM_FREE(native);
     vm_delete(&vm);
     chunk_delete(&compiled);
 

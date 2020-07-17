@@ -9,7 +9,9 @@ void dense_print(DenseValue* value) {
         case DVAL_FUNCTION:
             if(((DenseFunction*) value)->name == NULL)
                 PRINT("<script>");
-            else PRINT("<function %s>", ((DenseFunction*) value)->name->chars);
+            else PRINT("<fn %s>", ((DenseFunction*) value)->name->chars);
             break;
+        case DVAL_NATIVE:
+            PRINT("<native fn>");
     }
 }

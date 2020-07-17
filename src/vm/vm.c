@@ -14,6 +14,7 @@
 
 static bool call_value(VM* vm, uint8_t reg, uint8_t argc);
 static bool call_function(VM* vm, uint8_t reg, uint8_t argc);
+static bool call_native(VM* vm, uint8_t reg, uint8_t argc);
 
 void vm_init(VM* vm) {
     vm_stack_reset(vm);
@@ -38,6 +39,9 @@ void vm_delete(VM* vm) {
                 break;
             case DVAL_FUNCTION:
                 chunk_delete(&((DenseFunction*) value)->chunk);
+                break;
+            case DVAL_NATIVE:
+                MEM_FREE(value);
                 break;
         }
 
@@ -781,7 +785,12 @@ VMStatus vm_run(VM* vm) {
             case OP_CALL: {
                 if(!call_value(vm, DEST, LEFT))
                     return VM_ERROR;
-                frame = &vm->frames[vm->frameCount - 1];
+
+                // Native function.
+                if(frame == &vm->frames[vm->frameCount - 1])
+                    SKIP(3);
+                else frame = &vm->frames[vm->frameCount - 1];
+
                 break;
             }
             case OP_RET: {
@@ -797,7 +806,7 @@ VMStatus vm_run(VM* vm) {
                 vm->stackTop = frame->base + 1;
                 frame = &vm->frames[vm->frameCount - 1];
 
-                SKIP(3);
+                SKIP(3); // Skip the CALL args.
                 break;
             }
             default: {
@@ -836,6 +845,8 @@ static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
         switch(AS_DENSE(value)->type) {
             case DVAL_FUNCTION:
                 return call_function(vm, reg, argc);
+            case DVAL_NATIVE:
+                return call_native(vm, reg, argc);
             default: ;
         }
     }
@@ -865,6 +876,17 @@ static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
     frame->regs = frame->base + 1;
 
     return true;
+}
+
+static bool call_native(VM* vm, uint8_t reg, uint8_t argc) {
+    #define FRAME vm->frames[vm->frameCount - 1]
+
+    DenseNative* native = AS_NATIVE(FRAME.regs[reg]);
+
+    vm->frames[vm->frameCount - 1].regs[reg] = native->function(vm, argc, &FRAME.regs[reg + 1]);
+    return true;
+
+    #undef FRAME
 }
 
 #undef VM_RUNTIME_ERROR

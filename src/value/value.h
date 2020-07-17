@@ -15,6 +15,7 @@ typedef enum {
 typedef enum {
     DVAL_STRING,
     DVAL_FUNCTION,
+    DVAL_NATIVE
 } DenseValueType;
 
 typedef struct DenseValue {

@@ -5,6 +5,8 @@
 #include "../chunk/chunk.h"
 #include "../memory/mem.h"
 
+typedef Value (*NativeFunction)(void* vm, uint8_t argc, Value* args);
+
 typedef struct {
     DenseValue dense;
 
@@ -22,9 +24,16 @@ typedef struct {
     DenseString* name;
 } DenseFunction;
 
+typedef struct {
+    DenseValue dense;
+
+    NativeFunction function;
+} DenseNative;
+
 #define AS_STRING(value)  ((DenseString*) ((value).as.dense))
 #define AS_CSTRING(value) (((DenseString*) ((value).as.dense))->chars)
 #define AS_FUNCTION(value)  ((DenseFunction*) ((value).as.dense))
+#define AS_NATIVE(value)  ((DenseNative*) ((value).as.dense))
 
 void dense_print(DenseValue* value);
 
@@ -35,5 +44,7 @@ DenseString* dense_string_concat(DenseString* left, DenseString* right);
 DenseFunction* dense_function_create();
 void           dense_function_init(DenseFunction* function);
 void           dense_function_delete(DenseFunction* function);
+
+DenseNative* dense_native_create(NativeFunction function);
 
 #endif
