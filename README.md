@@ -96,10 +96,12 @@ DIGIT ::= [0-9] ;
 # TODO
 
 - ~~functions~~
-- closures
+- ~~closures~~
 - garbage collector
 - break statement
 - continue statement
+- objects
+- arrays
 - compiler optimizations
 - assembler + inline assembly
 
