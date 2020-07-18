@@ -7,14 +7,26 @@
 
 #define VM_STACK_SIZE CALLFRAME_STACK_SIZE * 251
 
+typedef enum {
+    FRAME_FUNCTION,
+    FRAME_CLOSURE
+} CallFrameType;
+
 typedef struct {
-    DenseFunction* function;
+    CallFrameType type;
+
+    union {
+        DenseFunction* function;
+        DenseClosure* closure;
+    } callee;
 
     uint8_t* ip;
 
     Value* base;
     Value* regs;
 } CallFrame;
+
+#define FRAME_FUNCTION(frame) ((frame).type == FRAME_FUNCTION ? (frame).callee.function : (frame).callee.closure->function)
 
 typedef struct {
     CallFrame frames[CALLFRAME_STACK_SIZE];
@@ -27,6 +39,7 @@ typedef struct {
     Map globals;
 
     DenseValue* values;
+    DenseUpvalue* upvalues;
 } VM;
 
 typedef enum {

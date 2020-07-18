@@ -6,32 +6,15 @@
 #include "common/logging.h"
 #include "common/def.h"
 
-RisaCompileStatus risa_compile_string(const char* str, Chunk* chunk) {
-    Compiler compiler;
-
-    compiler_init(&compiler);
-
-    if(compiler_compile(&compiler, str) == COMPILER_ERROR)
+RisaCompileStatus risa_compile_string(Compiler* compiler, const char* str) {
+    if(compiler_compile(compiler, str) == COMPILER_ERROR)
         return  RISA_COMPILE_ERROR;
-
-    *chunk = compiler.function->chunk;
 
     #ifdef DEBUG_SHOW_DISASSEMBLY
         PRINT("\n<script>");
-        debug_disassemble_chunk(chunk);
-
+        debug_disassemble_chunk(&compiler->function->chunk);
         PRINT("\n");
-
-        for(uint32_t i = 0; i < chunk->constants.size; ++i) {
-            if(value_is_dense_of_type(chunk->constants.values[i], DVAL_FUNCTION)) {
-                PRINT("<%s>", AS_FUNCTION(chunk->constants.values[i])->name->chars);
-                debug_disassemble_chunk(&AS_FUNCTION(chunk->constants.values[i])->chunk);
-                PRINT("\n");
-            }
-        }
     #endif
-
-    compiler_delete(&compiler);
 
     return RISA_COMPILE_OK;
 }
@@ -54,8 +37,9 @@ RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk) {
 RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
     CallFrame frame;
 
-    frame.function = function;
-    frame.ip = frame.function->chunk.bytecode;
+    frame.type = FRAME_FUNCTION;
+    frame.callee.function = function;
+    frame.ip = frame.callee.function->chunk.bytecode;
     frame.base = vm->stackTop++;
     frame.regs = frame.base + 1;
 
@@ -73,24 +57,29 @@ Value print(void* vm, uint8_t argc, Value* args) {
 }
 
 RisaInterpretStatus risa_interpret_string(const char* str) {
-    Chunk compiled;
-    chunk_init(&compiled);
+    Compiler compiler;
+    compiler_init(&compiler);
 
-    if(risa_compile_string(str, &compiled) == RISA_COMPILE_ERROR) {
-        chunk_delete(&compiled);
+    if(risa_compile_string(&compiler, str) == RISA_COMPILE_ERROR) {
+        compiler_delete(&compiler);
+        chunk_delete(&compiler.function->chunk);
+        MEM_FREE(compiler.function);
+
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
     VM vm;
     vm_init(&vm);
 
-    for(uint32_t i = 0; i < compiled.constants.size; ++i) {
-        if(IS_DENSE(compiled.constants.values[i])) {
-            vm_register_value(&vm, AS_DENSE(compiled.constants.values[i]));
+    for(uint32_t i = 0; i < compiler.function->chunk.constants.size; ++i)
+        if(IS_DENSE(compiler.function->chunk.constants.values[i]))
+            vm_register_value(&vm, AS_DENSE(compiler.function->chunk.constants.values[i]));
 
-            if(AS_DENSE(compiled.constants.values[i])->type == DVAL_STRING)
-                vm_register_string(&vm, AS_STRING(compiled.constants.values[i]));
-        }
+    for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
+        DenseString* string = compiler.strings.entries[i].key;
+
+        if(string != NULL)
+            vm_register_string(&vm, string);
     }
 
     DenseNative* native = dense_native_create(print);
@@ -103,18 +92,24 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
 
     map_set(&vm.globals, string, DENSE_VALUE(native));
 
-    if(risa_execute_chunk(&vm, compiled) == RISA_EXECUTE_ERROR) {
-        MEM_FREE(string);
+    if(risa_execute_chunk(&vm, compiler.function->chunk) == RISA_EXECUTE_ERROR) {
+        compiler_delete(&compiler);
+        chunk_delete(&compiler.function->chunk);
+        MEM_FREE(compiler.function);
+
         MEM_FREE(native);
         vm_delete(&vm);
-        chunk_delete(&compiled);
+        chunk_delete(&compiler.function->chunk);
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
-    MEM_FREE(string);
+    compiler_delete(&compiler);
+    chunk_delete(&compiler.function->chunk);
+    MEM_FREE(compiler.function);
+
     MEM_FREE(native);
     vm_delete(&vm);
-    chunk_delete(&compiled);
+    chunk_delete(&compiler.function->chunk);
 
     return RISA_INTERPRET_OK;
 }

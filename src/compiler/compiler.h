@@ -12,7 +12,14 @@ typedef struct {
     Token identifier;
     int32_t depth;
     uint8_t reg;
+
+    bool captured;
 } Local;
+
+typedef struct {
+    uint8_t index;
+    bool local;
+} Upvalue;
 
 typedef struct Compiler {
     struct Compiler* enclosing;
@@ -24,8 +31,11 @@ typedef struct Compiler {
     uint8_t regIndex;
 
     Local locals[250];
+    Upvalue upvalues[250];
 
     uint8_t localCount;
+    uint8_t upvalueCount;
+
     int32_t scopeDepth;
 } Compiler;
 

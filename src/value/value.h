@@ -14,13 +14,15 @@ typedef enum {
 
 typedef enum {
     DVAL_STRING,
+    DVAL_UPVALUE,
     DVAL_FUNCTION,
+    DVAL_CLOSURE,
     DVAL_NATIVE
 } DenseValueType;
 
 typedef struct DenseValue {
     DenseValueType type;
-    struct DenseValue* next;
+    struct DenseValue* link;
 } DenseValue;
 
 typedef struct {

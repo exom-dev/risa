@@ -1,8 +1,8 @@
 #include "disassembler.h"
 
 #include "../chunk/bytecode.h"
-
 #include "../common/logging.h"
+#include "../value/dense.h"
 
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_unary_instruction(const char* name, Chunk* chunk, size_t offset);
@@ -13,6 +13,11 @@ size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset
 size_t disassemble_call_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_upvalue_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_upvalue_get_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_upvalue_set_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_upvalue_close_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_return_instruction(const char* name, Chunk* chunk, size_t offset);
 
 size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
@@ -33,6 +38,16 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_global_instruction("GGLOB", chunk, offset);
         case OP_SGLOB:
             return disassemble_global_set_instruction("SGLOB", chunk, offset);
+        case OP_UPVAL:
+            return disassemble_upvalue_instruction("UPVAL", chunk, offset);
+        case OP_GUPVAL:
+            return disassemble_upvalue_get_instruction("GUPVAL", chunk, offset);
+        case OP_SUPVAL:
+            return disassemble_upvalue_set_instruction("SUPVAL", chunk, offset);
+        case OP_CUPVAL:
+            return disassemble_upvalue_close_instruction("CUPVAL", chunk, offset);
+        case OP_CLSR:
+            return disassemble_closure_instruction("CLSR", chunk, offset);
         case OP_NULL:
             return disassemble_byte_instruction("NULL", chunk, offset);
         case OP_TRUE:
@@ -103,6 +118,15 @@ void debug_disassemble_chunk(Chunk* chunk) {
 
     for(size_t offset = 0; offset < chunk->size;)
         offset = debug_disassemble_instruction(chunk, offset);
+    for(size_t i = 0; i < chunk->constants.size; ++i) {
+        if(value_is_dense_of_type(chunk->constants.values[i], DVAL_FUNCTION)) {
+            PRINT("\n<%s>", AS_FUNCTION(chunk->constants.values[i])->name->chars);
+            debug_disassemble_chunk(&(AS_FUNCTION(chunk->constants.values[i]))->chunk);
+        } else if(value_is_dense_of_type(chunk->constants.values[i], DVAL_CLOSURE)) {
+            PRINT("\n<%s>", AS_CLOSURE(chunk->constants.values[i])->function->name->chars);
+            debug_disassemble_chunk(&(AS_CLOSURE(chunk->constants.values[i]))->function->chunk);
+        }
+    }
 }
 
 size_t disassemble_arithmetic_instruction(const char* name, Chunk* chunk, size_t offset) {
@@ -156,6 +180,38 @@ size_t disassemble_global_instruction(const char* name, Chunk* chunk, size_t off
 size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d    '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
     value_print(chunk->constants.values[chunk->bytecode[offset + 1]]);
+    PRINT("'\n");
+
+    return offset + 4;
+}
+
+size_t disassemble_upvalue_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d    %s\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], chunk->bytecode[offset + 2] == 0 ? "upvalue" : "local");
+
+    return offset + 4;
+}
+
+size_t disassemble_upvalue_get_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
+
+    return offset + 4;
+}
+
+size_t disassemble_upvalue_set_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
+
+    return offset + 4;
+}
+
+size_t disassemble_upvalue_close_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d\n", name, chunk->bytecode[offset + 1]);
+
+    return offset + 4;
+}
+
+size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d %4d   '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], chunk->bytecode[offset + 3]);
+    value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
 
     return offset + 4;

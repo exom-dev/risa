@@ -10,11 +10,15 @@
 #endif
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
-    fprintf(stderr, "[error] at index %u: " fmt "\n", vm->frames[vm->frameCount - 1].function->chunk.indices[vm->frames[vm->frameCount - 1].ip - vm->frames[vm->frameCount - 1].function->chunk.bytecode], ##__VA_ARGS__ )
+    fprintf(stderr, "[error] at index %u: " fmt "\n", FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.indices[vm->frames[vm->frameCount - 1].ip - FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.bytecode], ##__VA_ARGS__ )
 
 static bool call_value(VM* vm, uint8_t reg, uint8_t argc);
 static bool call_function(VM* vm, uint8_t reg, uint8_t argc);
+static bool call_closure(VM* vm, uint8_t reg, uint8_t argc);
 static bool call_native(VM* vm, uint8_t reg, uint8_t argc);
+
+static DenseUpvalue* upvalue_capture(VM* vm, Value* local);
+static void          upvalue_close_from(VM* vm, Value* slot);
 
 void vm_init(VM* vm) {
     vm_stack_reset(vm);
@@ -32,14 +36,23 @@ void vm_delete(VM* vm) {
     DenseValue* value = vm->values;
 
     while(value != NULL) {
-        DenseValue* next = value->next;
+        DenseValue* next = value->link;
         switch(value->type) {
             case DVAL_STRING:
                 MEM_FREE(value);
                 break;
+            case DVAL_UPVALUE:
+                MEM_FREE(value);
+                break;
             case DVAL_FUNCTION:
                 chunk_delete(&((DenseFunction*) value)->chunk);
+                MEM_FREE(value);
                 break;
+            case DVAL_CLOSURE: {
+                MEM_FREE(((DenseClosure *) value)->upvalues);
+                MEM_FREE(value);
+                break;
+            }
             case DVAL_NATIVE:
                 MEM_FREE(value);
                 break;
@@ -57,17 +70,17 @@ VMStatus vm_run(VM* vm) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
 
     #define NEXT_BYTE() (*frame->ip++)
-    #define NEXT_CONSTANT() (frame->function->chunk.constants.values[NEXT_BYTE()])
+    #define NEXT_CONSTANT() (FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
 
     #define DEST     (*frame->ip)
     #define LEFT     (frame->ip[1])
     #define RIGHT    (frame->ip[2])
     #define COMBINED ((((uint16_t) frame->ip[1]) << 8) | (frame->ip[2]))
 
-    #define DEST_CONSTANT     (frame->function->chunk.constants.values[DEST])
-    #define LEFT_CONSTANT     (frame->function->chunk.constants.values[LEFT])
-    #define RIGHT_CONSTANT    (frame->function->chunk.constants.values[RIGHT])
-    #define COMBINED_CONSTANT (frame->function->chunk.constants.values[COMBINED])
+    #define DEST_CONST     (FRAME_FUNCTION(*frame)->chunk.constants.values[DEST])
+    #define LEFT_CONST     (FRAME_FUNCTION(*frame)->chunk.constants.values[LEFT])
+    #define RIGHT_CONST    (FRAME_FUNCTION(*frame)->chunk.constants.values[RIGHT])
+    #define COMBINED_CONST (FRAME_FUNCTION(*frame)->chunk.constants.values[COMBINED])
 
     #define DEST_REG  (frame->regs[DEST])
     #define LEFT_REG  (frame->regs[LEFT])
@@ -78,10 +91,10 @@ VMStatus vm_run(VM* vm) {
 
     while(1) {
         #ifdef DEBUG_TRACE_EXECUTION
-            debug_disassemble_instruction(&frame->function->chunk, (uint32_t) (frame->ip - frame->function->chunk.bytecode));
+            debug_disassemble_instruction(&FRAME_FUNCTION(*frame)->chunk, (uint32_t) (frame->ip - FRAME_FUNCTION(*frame)->chunk.bytecode));
 
             PRINT("          ");
-            for(Value* entry = vm->stack; entry < vm->stackTop + 5; ++entry) {
+            for(Value* entry = vm->stack; entry < vm->stackTop + 7; ++entry) {
                 PRINT("[ ");
                 value_print(*entry);
                 PRINT(" ]");
@@ -93,13 +106,13 @@ VMStatus vm_run(VM* vm) {
 
         switch(instruction) {
             case OP_CNST: {
-                DEST_REG = LEFT_CONSTANT;
+                DEST_REG = LEFT_CONST;
 
                 SKIP(3);
                 break;
             }
             case OP_CNSTW: {
-                DEST_REG = COMBINED_CONSTANT;
+                DEST_REG = COMBINED_CONST;
 
                 SKIP(3);
                 break;
@@ -111,7 +124,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_DGLOB: {
-                map_set(&vm->globals, AS_STRING(LEFT_CONSTANT), DEST_REG);
+                map_set(&vm->globals, AS_STRING(LEFT_CONST), DEST_REG);
 
                 SKIP(3);
                 break;
@@ -119,8 +132,8 @@ VMStatus vm_run(VM* vm) {
             case OP_GGLOB: {
                 Value value;
 
-                if(!map_get(&vm->globals, AS_STRING(LEFT_CONSTANT), &value)) {
-                    VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONSTANT));
+                if(!map_get(&vm->globals, AS_STRING(LEFT_CONST), &value)) {
+                    VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONST));
                     return VM_ERROR;
                 }
 
@@ -130,10 +143,67 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_SGLOB: {
-                if(map_set(&vm->globals, AS_STRING(DEST_CONSTANT), LEFT_REG)) {
-                    map_erase(&vm->globals, AS_STRING(DEST_CONSTANT));
+                if(map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_REG)) {
+                    map_erase(&vm->globals, AS_STRING(DEST_CONST));
 
-                    VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(DEST_CONSTANT));
+                    VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(DEST_CONST));
+                }
+
+                SKIP(3);
+                break;
+            }
+            case OP_UPVAL: {
+                VM_RUNTIME_ERROR(vm, "Illegal instruction 'UPVAL'");
+                return VM_ERROR;
+            }
+            case OP_GUPVAL: {
+                if(frame->type != FRAME_CLOSURE) {
+                    VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
+                    return VM_ERROR;
+                }
+
+                DEST_REG = *frame->callee.closure->upvalues[LEFT]->ref;
+
+                SKIP(3);
+                break;
+            }
+            case OP_SUPVAL: {
+                if(frame->type != FRAME_CLOSURE) {
+                    VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
+                    return VM_ERROR;
+                }
+
+                *frame->callee.closure->upvalues[DEST]->ref = LEFT_REG;
+
+                SKIP(3);
+                break;
+            }
+            case OP_CUPVAL: {
+                upvalue_close_from(vm, &DEST_REG);
+                break;
+            }
+            case OP_CLSR: {
+                DenseFunction* function = (DenseFunction*) AS_DENSE(LEFT_CONST);
+                DenseClosure* closure = dense_closure_create(function, RIGHT);
+
+                DEST_REG = DENSE_VALUE(closure);
+
+                for(uint8_t i = 0; i < RIGHT; ++i) {
+                    SKIP(4);
+
+                    uint8_t index = DEST;
+                    bool local = LEFT;
+
+                    if(local)
+                        closure->upvalues[i] = upvalue_capture(vm, frame->regs + index);
+                    else {
+                        if(frame->type != FRAME_CLOSURE) {
+                            VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
+                            return VM_ERROR;
+                        }
+
+                        closure->upvalues[i] = frame->callee.closure->upvalues[i];
+                    }
                 }
 
                 SKIP(3);
@@ -794,6 +864,8 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_RET: {
+                upvalue_close_from(vm, frame->regs);
+
                 --vm->frameCount;
 
                 if(vm->frameCount == 0)
@@ -819,7 +891,7 @@ VMStatus vm_run(VM* vm) {
     #undef LEFT_REG
     #undef DEST_REG
 
-    #undef LEFT_CONSTANT
+    #undef LEFT_CONST
 
     #undef RIGHT
     #undef LEFT
@@ -834,7 +906,7 @@ void vm_register_string(VM* vm, DenseString* string) {
 }
 
 void vm_register_value(VM* vm, DenseValue* value) {
-    value->next = vm->values;
+    value->link = vm->values;
     vm->values = value;
 }
 
@@ -845,6 +917,8 @@ static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
         switch(AS_DENSE(value)->type) {
             case DVAL_FUNCTION:
                 return call_function(vm, reg, argc);
+            case DVAL_CLOSURE:
+                return call_closure(vm, reg, argc);
             case DVAL_NATIVE:
                 return call_native(vm, reg, argc);
             default: ;
@@ -869,7 +943,33 @@ static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
     }
 
     CallFrame* frame = &vm->frames[vm->frameCount++];
-    frame->function = function;
+    frame->type = FRAME_FUNCTION;
+    frame->callee.function = function;
+    frame->ip = function->chunk.bytecode;
+
+    frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
+    frame->regs = frame->base + 1;
+
+    return true;
+}
+
+static bool call_closure(VM* vm, uint8_t reg, uint8_t argc) {
+    DenseClosure* closure = AS_CLOSURE(vm->frames[vm->frameCount - 1].regs[reg]);
+    DenseFunction* function = closure->function;
+
+    if(argc != function->arity) {
+        VM_RUNTIME_ERROR(vm, "Expected %x args, got %x", function->arity, argc);
+        return false;
+    }
+
+    if(vm->frameCount == CALLFRAME_STACK_SIZE) {
+        VM_RUNTIME_ERROR(vm, "Stack overflow");
+        return false;
+    }
+
+    CallFrame* frame = &vm->frames[vm->frameCount++];
+    frame->type = FRAME_CLOSURE;
+    frame->callee.closure = closure;
     frame->ip = function->chunk.bytecode;
 
     frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
@@ -887,6 +987,37 @@ static bool call_native(VM* vm, uint8_t reg, uint8_t argc) {
     return true;
 
     #undef FRAME
+}
+
+static DenseUpvalue* upvalue_capture(VM* vm, Value* local) {
+    DenseUpvalue* prev = NULL;
+    DenseUpvalue* upvalue = vm->upvalues;
+
+    while(upvalue != NULL && upvalue->ref > local) {
+        prev = upvalue;
+        upvalue = upvalue->next;
+    }
+
+    if(upvalue != NULL && upvalue->ref == local)
+        return upvalue;
+
+    DenseUpvalue* created = dense_upvalue_create(local);
+    created->next = upvalue;
+
+    if(prev == NULL)
+        vm->upvalues = created;
+    else prev->next = created;
+
+    return created;
+}
+
+static void upvalue_close_from(VM* vm, Value* slot) {
+    while(vm->upvalues != NULL && vm->upvalues->ref >= slot) {
+        DenseUpvalue* head = vm->upvalues;
+        head->closed = *head->ref;
+        head->ref = &head->closed;
+        vm->upvalues = head->next;
+    }
 }
 
 #undef VM_RUNTIME_ERROR

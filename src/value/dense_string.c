@@ -13,7 +13,7 @@ DenseString* dense_string_from(const char* chars, uint32_t length) {
     DenseString* string = MEM_ALLOC(sizeof(DenseString) + length + 1);
 
     string->dense.type = DVAL_STRING;
-    string->dense.next = NULL;
+    string->dense.link = NULL;
     string->length = length;
 
     memcpy(string->chars, chars, length);
@@ -30,7 +30,7 @@ DenseString* dense_string_concat(DenseString* left, DenseString* right) {
     DenseString* string = MEM_ALLOC(sizeof(DenseString) + length + 1);
 
     string->dense.type = DVAL_STRING;
-    string->dense.next = NULL;
+    string->dense.link = NULL;
     string->length = length;
 
     memcpy(string->chars, left->chars, left->length);

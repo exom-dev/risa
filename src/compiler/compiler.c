@@ -6,6 +6,7 @@
 #include "../common/logging.h"
 #include "../lexer/lexer.h"
 
+#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
 
@@ -37,11 +38,14 @@ static void compile_or(Compiler* compiler, bool);
 
 static uint8_t compile_arguments(Compiler* compiler);
 
-static void begin_scope(Compiler* compiler);
-static void end_scope(Compiler* compiler);
+static void scope_begin(Compiler* compiler);
+static void scope_end(Compiler* compiler);
 
 static void    local_add(Compiler* compiler, Token identifier);
 static uint8_t local_resolve(Compiler* compiler, Token* identifier);
+
+static uint8_t upvalue_add(Compiler* compiler, uint8_t index, bool local);
+static uint8_t upvalue_resolve(Compiler* compiler, Token* identifier);
 
 static void     emit_byte(Compiler* compiler, uint8_t byte);
 static void     emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
@@ -55,7 +59,7 @@ static uint32_t emit_blank(Compiler* compiler);
 static uint16_t create_constant(Compiler* compiler, Value value);
 static uint16_t create_identifier_constant(Compiler* compiler);
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
-static uint16_t get_variable_name(Compiler* compiler);
+static uint16_t declare_variable(Compiler* compiler);
 
 static bool register_reserve(Compiler* compiler);
 static void register_free(Compiler* compiler);
@@ -91,7 +95,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS_EQUAL
         { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_LESS_LESS
         { NULL,     compile_binary,    PREC_BITWISE_AND },// TOKEN_AMPERSAND
-        { NULL,     compile_and,    PREC_AND },         // TOKEN_AMPERSAND_AMPERSAND
+        { NULL,     compile_and,    PREC_AND },          // TOKEN_AMPERSAND_AMPERSAND
         { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
         { NULL,     compile_or,    PREC_OR },          // TOKEN_PIPE_PIPE
         { compile_identifier,     NULL,    PREC_NONE },  // TOKEN_IDENTIFIER
@@ -121,8 +125,8 @@ void compiler_init(Compiler* compiler) {
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
-
     compiler->localCount = 0;
+    compiler->upvalueCount = 0;
     compiler->scopeDepth = 0;
 }
 
@@ -200,11 +204,16 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
     uint32_t length = compiler->parser->previous.size - 2;
     uint32_t hash = map_hash(start, length);
 
-    DenseString* interned = map_find(&compiler->strings, start, length, hash);
+    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+
+    while(super->enclosing != NULL)
+        super = super->enclosing;
+
+    DenseString* interned = map_find(&super->strings, start, length, hash);
 
     if(interned == NULL) {
         interned = dense_string_from(start, length);
-        map_set(&compiler->strings, interned, NULL_VALUE);
+        map_set(&super->strings, interned, NULL_VALUE);
     }
 
     emit_constant(compiler, DENSE_VALUE(interned));
@@ -238,16 +247,22 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     uint8_t set;
 
     uint8_t index = local_resolve(compiler, &compiler->parser->previous);
-    bool global = index == 251;
 
-    if(!global) {
+    if(index != 251) {
         get = OP_MOV;
         set = OP_MOV;
     } else {
-        index = create_identifier_constant(compiler);
+        index = upvalue_resolve(compiler, &compiler->parser->previous);
 
-        get = OP_GGLOB;
-        set = OP_SGLOB;
+        if(index != 251) {
+            get = OP_GUPVAL;
+            set = OP_SUPVAL;
+        } else {
+            index = create_identifier_constant(compiler);
+
+            get = OP_GGLOB;
+            set = OP_SGLOB;
+        }
     }
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
@@ -285,7 +300,7 @@ static void compile_declaration(Compiler* compiler) {
 }
 
 static void compile_variable_declaration(Compiler* compiler) {
-    uint16_t index = get_variable_name(compiler);
+    uint16_t index = declare_variable(compiler);
 
     if(compiler->parser->current.type == TOKEN_EQUAL) {
         parser_advance(compiler->parser);
@@ -316,7 +331,7 @@ static void compile_variable_declaration(Compiler* compiler) {
 }
 
 static void compile_function_declaration(Compiler* compiler) {
-    uint16_t index = get_variable_name(compiler);
+    uint16_t index = declare_variable(compiler);
 
     if(compiler->scopeDepth > 0)
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
@@ -344,11 +359,16 @@ static void compile_function(Compiler* compiler) {
     uint32_t length = compiler->parser->previous.size;
     uint32_t hash = map_hash(start, length);
 
-    DenseString* interned = map_find(&compiler->strings, start, length, hash);
+    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+
+    while(super->enclosing != NULL)
+        super = super->enclosing;
+
+    DenseString* interned = map_find(&super->strings, start, length, hash);
 
     if(interned == NULL) {
         interned = dense_string_from(start, length);
-        map_set(&compiler->strings, interned, NULL_VALUE);
+        map_set(&super->strings, interned, NULL_VALUE);
     }
 
     function->name = interned;
@@ -357,7 +377,7 @@ static void compile_function(Compiler* compiler) {
     subcompiler.function = function;
     subcompiler.parser = compiler->parser;
 
-    begin_scope(&subcompiler);
+    scope_begin(&subcompiler);
 
     parser_consume(subcompiler.parser, TOKEN_LEFT_PAREN, "Expected '(' after function name");
 
@@ -369,7 +389,7 @@ static void compile_function(Compiler* compiler) {
                 parser_error_at_current(subcompiler.parser, "Parameter limit exceeded (250)");
             }
 
-            get_variable_name(&subcompiler);
+            declare_variable(&subcompiler);
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
             ++subcompiler.regIndex;
@@ -386,7 +406,23 @@ static void compile_function(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
-    emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+    if(subcompiler.upvalueCount == 0)
+        emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+    else {
+        emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+
+        emit_byte(compiler, OP_CLSR);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, subcompiler.upvalueCount);
+
+        for(uint8_t i = 0; i < subcompiler.upvalueCount; ++i) {
+            emit_byte(compiler, OP_UPVAL);
+            emit_byte(compiler, subcompiler.upvalues[i].index);
+            emit_byte(compiler, subcompiler.upvalues[i].local);
+            emit_byte(compiler, 0);
+        }
+    }
 }
 
 static void compile_statement(Compiler* compiler) {
@@ -405,9 +441,9 @@ static void compile_statement(Compiler* compiler) {
     } else if(compiler->parser->current.type == TOKEN_LEFT_BRACE) {
         parser_advance(compiler->parser);
 
-        begin_scope(compiler);
+        scope_begin(compiler);
         compile_block(compiler);
-        end_scope(compiler);
+        scope_end(compiler);
     } else {
         compile_expression_statement(compiler);
     }
@@ -463,7 +499,7 @@ static void compile_while_statement(Compiler* compiler) {
 }
 
 static void compile_for_statement(Compiler* compiler) {
-    begin_scope(compiler);
+    scope_begin(compiler);
 
     parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
 
@@ -517,7 +553,7 @@ static void compile_for_statement(Compiler* compiler) {
         emit_jump(compiler, exitIndex);
     }
 
-    end_scope(compiler);
+    scope_end(compiler);
 }
 
 static void compile_return_statement(Compiler* compiler) {
@@ -592,6 +628,11 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, functionReg);
     emit_byte(compiler, argc);
     emit_byte(compiler, 0);
+
+    while(argc > 0) {
+        register_free(compiler);
+        --argc;
+    }
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {
@@ -733,14 +774,21 @@ static void compile_or(Compiler* compiler, bool allowAssignment) {
     emit_jump(compiler, index);
 }
 
-static void begin_scope(Compiler* compiler) {
+static void scope_begin(Compiler* compiler) {
     ++compiler->scopeDepth;
 }
 
-static void end_scope(Compiler* compiler) {
+static void scope_end(Compiler* compiler) {
     --compiler->scopeDepth;
 
     while(compiler->localCount > 0 && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
+        if(compiler->locals[compiler->localCount - 1].captured) {
+            emit_byte(compiler, OP_CUPVAL);
+            emit_byte(compiler, compiler->regIndex - 1);
+            emit_byte(compiler, 0);
+            emit_byte(compiler, 0);
+        }
+
         register_free(compiler);
         --compiler->localCount;
     }
@@ -756,6 +804,7 @@ static void local_add(Compiler* compiler, Token identifier) {
     local->identifier = identifier;
     local->depth = -1;
     local->reg = compiler->regIndex;
+    local->captured = false;
 }
 
 static uint8_t local_resolve(Compiler* compiler, Token* identifier) {
@@ -765,6 +814,44 @@ static uint8_t local_resolve(Compiler* compiler, Token* identifier) {
         if(identifier_equals(identifier, &local->identifier) && local->depth > -1)
             return local->reg;
     }
+
+    return 251;
+}
+
+static uint8_t upvalue_add(Compiler* compiler, uint8_t index, bool local) {
+    uint8_t upvalCount = compiler->upvalueCount;
+
+    for(uint8_t i = 0; i < upvalCount; ++i) {
+        Upvalue* upvalue = &compiler->upvalues[i];
+
+        if(upvalue->index == index && upvalue->local == local)
+            return i;
+    }
+
+    if(upvalCount == 250) {
+        parser_error_at_previous(compiler->parser, "Closure variable limit exceeded (250)");
+    }
+
+    compiler->upvalues[upvalCount].local = local;
+    compiler->upvalues[upvalCount].index = index;
+    return compiler->upvalueCount++;
+}
+
+static uint8_t upvalue_resolve(Compiler* compiler, Token* identifier) {
+    if(compiler->enclosing == NULL)
+        return 251;
+
+    uint8_t local = local_resolve(compiler->enclosing, identifier);
+
+    if(local != 251) {
+        compiler->enclosing->locals[local].captured = true;
+        return upvalue_add(compiler, local, true);
+    }
+
+    uint8_t upvalue = upvalue_resolve(compiler->enclosing, identifier);
+
+    if(upvalue != 251)
+        return upvalue_add(compiler, upvalue, false);
 
     return 251;
 }
@@ -869,17 +956,22 @@ static uint16_t create_identifier_constant(Compiler* compiler) {
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length) {
     uint32_t hash = map_hash(start, length);
 
-    DenseString* interned = map_find(&compiler->strings, start, length, hash);
+    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+
+    while(super->enclosing != NULL)
+        super = super->enclosing;
+
+    DenseString* interned = map_find(&super->strings, start, length, hash);
 
     if(interned == NULL) {
         interned = dense_string_from(start, length);
-        map_set(&compiler->strings, interned, NULL_VALUE);
+        map_set(&super->strings, interned, NULL_VALUE);
     }
 
     return create_constant(compiler, DENSE_VALUE(interned));
 }
 
-static uint16_t get_variable_name(Compiler* compiler) {
+static uint16_t declare_variable(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_IDENTIFIER, "Expected identifier");
 
     if(compiler->scopeDepth > 0) {

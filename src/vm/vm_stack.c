@@ -3,6 +3,7 @@
 void  vm_stack_reset(VM* vm) {
     vm->frameCount = 0;
     vm->stackTop = vm->stack;
+    vm->upvalues = NULL;
 }
 
 void  vm_stack_push(VM* vm, Value value) {
