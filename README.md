@@ -2,6 +2,8 @@
 
 **Risa** is an embeddable and modular scripting language.
 
+**This implementation is extremely early, work-in-progress and, therefore, not yet ready for an alpha release.**
+
 # Extended BNF (EBNF) notation
 
 This is the EBNF notation for Risa's grammar.
@@ -97,7 +99,7 @@ DIGIT ::= [0-9] ;
 
 - ~~functions~~
 - ~~closures~~
-- garbage collector
+- ~~garbage collector~~
 - break statement
 - continue statement
 - objects
