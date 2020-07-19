@@ -14,6 +14,8 @@ DenseString* dense_string_from(const char* chars, uint32_t length) {
 
     string->dense.type = DVAL_STRING;
     string->dense.link = NULL;
+    string->dense.marked = false;
+
     string->length = length;
 
     memcpy(string->chars, chars, length);
@@ -31,6 +33,8 @@ DenseString* dense_string_concat(DenseString* left, DenseString* right) {
 
     string->dense.type = DVAL_STRING;
     string->dense.link = NULL;
+    string->dense.marked = false;
+    
     string->length = length;
 
     memcpy(string->chars, left->chars, left->length);

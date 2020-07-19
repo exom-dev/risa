@@ -55,7 +55,9 @@ typedef struct {
 #define AS_CLOSURE(value)  ((DenseClosure*) ((value).as.dense))
 #define AS_NATIVE(value)   ((DenseNative*) ((value).as.dense))
 
-void dense_print(DenseValue* value);
+void   dense_print(DenseValue* dense);
+size_t dense_size(DenseValue* dense);
+void   dense_delete(DenseValue* dense);
 
 uint32_t     dense_string_hash(DenseString* string);
 DenseString* dense_string_from(const char* chars, uint32_t length);

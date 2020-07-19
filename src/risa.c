@@ -28,9 +28,6 @@ RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk) {
 
     RisaExecuteStatus status = risa_execute_function(vm, function);
 
-    dense_function_delete(function);
-    MEM_FREE(function);
-
     return status;
 }
 
@@ -45,6 +42,9 @@ RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
 
     vm->frames[0] = frame;
     vm->frameCount = 1;
+    vm->stackTop += 250;
+
+    vm_register_dense(vm, (DenseValue*) function);
 
     if(vm_execute(vm) == VM_ERROR)
         return RISA_EXECUTE_ERROR;
@@ -71,10 +71,6 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
     VM vm;
     vm_init(&vm);
 
-    for(uint32_t i = 0; i < compiler.function->chunk.constants.size; ++i)
-        if(IS_DENSE(compiler.function->chunk.constants.values[i]))
-            vm_register_value(&vm, AS_DENSE(compiler.function->chunk.constants.values[i]));
-
     for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
         DenseString* string = compiler.strings.entries[i].key;
 
@@ -87,29 +83,24 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
 
     if(string == NULL) {
         string = dense_string_from("print", 5);
-        map_set(&vm.strings, string, NULL_VALUE);
+        vm_register_string(&vm, string);
+        vm_register_dense(&vm, (DenseValue*) string);
     }
 
     map_set(&vm.globals, string, DENSE_VALUE(native));
+    vm_register_dense(&vm, (DenseValue*) native);
 
-    if(risa_execute_chunk(&vm, compiler.function->chunk) == RISA_EXECUTE_ERROR) {
+    if(risa_execute_function(&vm, compiler.function) == RISA_EXECUTE_ERROR) {
         compiler_delete(&compiler);
-        chunk_delete(&compiler.function->chunk);
-        MEM_FREE(compiler.function);
-
-        MEM_FREE(native);
         vm_delete(&vm);
-        chunk_delete(&compiler.function->chunk);
+
+        PRINT("Heap size: %zu\n", vm.heapSize);
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
     compiler_delete(&compiler);
-    chunk_delete(&compiler.function->chunk);
-    MEM_FREE(compiler.function);
-
-    MEM_FREE(native);
     vm_delete(&vm);
-    chunk_delete(&compiler.function->chunk);
 
+    PRINT("Heap size: %zu\n", vm.heapSize);
     return RISA_INTERPRET_OK;
 }

@@ -23,6 +23,7 @@ typedef enum {
 typedef struct DenseValue {
     DenseValueType type;
     struct DenseValue* link;
+    bool marked;
 } DenseValue;
 
 typedef struct {

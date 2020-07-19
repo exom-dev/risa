@@ -40,6 +40,9 @@ typedef struct {
 
     DenseValue* values;
     DenseUpvalue* upvalues;
+
+    size_t heapSize;
+    size_t heapThreshold;
 } VM;
 
 typedef enum {
@@ -54,7 +57,7 @@ VMStatus vm_execute(VM* vm);
 VMStatus vm_run(VM* vm);
 
 void vm_register_string(VM* vm, DenseString* string);
-void vm_register_value(VM* vm, DenseValue* value);
+void vm_register_dense(VM* vm, DenseValue* dense);
 
 void  vm_stack_reset(VM* vm);
 void  vm_stack_push(VM* vm, Value value);

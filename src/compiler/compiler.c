@@ -353,8 +353,6 @@ static void compile_function(Compiler* compiler) {
     Compiler subcompiler;
     compiler_init(&subcompiler);
 
-    DenseFunction* function = dense_function_create();
-
     const char* start = compiler->parser->previous.start;
     uint32_t length = compiler->parser->previous.size;
     uint32_t hash = map_hash(start, length);
@@ -371,10 +369,8 @@ static void compile_function(Compiler* compiler) {
         map_set(&super->strings, interned, NULL_VALUE);
     }
 
-    function->name = interned;
-
+    subcompiler.function->name = interned;
     subcompiler.enclosing = compiler;
-    subcompiler.function = function;
     subcompiler.parser = compiler->parser;
 
     scope_begin(&subcompiler);
@@ -423,6 +419,8 @@ static void compile_function(Compiler* compiler) {
             emit_byte(compiler, 0);
         }
     }
+
+    compiler_delete(&subcompiler);
 }
 
 static void compile_statement(Compiler* compiler) {

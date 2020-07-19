@@ -10,6 +10,7 @@ DenseFunction* dense_function_create() {
 void dense_function_init(DenseFunction* function) {
     function->dense.type = DVAL_FUNCTION;
     function->dense.link = NULL;
+    function->dense.marked = false;
 
     function->arity = 0;
     function->name = NULL;

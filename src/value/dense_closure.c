@@ -8,6 +8,7 @@ DenseClosure* dense_closure_create(DenseFunction* function, uint8_t upvalueCount
     DenseClosure* closure = MEM_ALLOC(sizeof(DenseClosure));
     closure->dense.type = DVAL_CLOSURE;
     closure->dense.link = NULL;
+    closure->dense.marked = false;
 
     closure->function = function;
     closure->upvalues = upvalues;

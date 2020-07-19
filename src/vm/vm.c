@@ -1,5 +1,6 @@
 #include "vm.h"
 
+#include "../memory/gc.h"
 #include "../memory/mem.h"
 #include "../chunk/bytecode.h"
 #include "../common/logging.h"
@@ -27,38 +28,21 @@ void vm_init(VM* vm) {
     map_init(&vm->globals);
 
     vm->values = NULL;
+    vm->heapSize = 0;
+    vm->heapThreshold = 64 * 1024;
 }
 
 void vm_delete(VM* vm) {
     map_delete(&vm->strings);
     map_delete(&vm->globals);
 
-    DenseValue* value = vm->values;
+    DenseValue* dense = vm->values;
 
-    while(value != NULL) {
-        DenseValue* next = value->link;
-        switch(value->type) {
-            case DVAL_STRING:
-                MEM_FREE(value);
-                break;
-            case DVAL_UPVALUE:
-                MEM_FREE(value);
-                break;
-            case DVAL_FUNCTION:
-                chunk_delete(&((DenseFunction*) value)->chunk);
-                MEM_FREE(value);
-                break;
-            case DVAL_CLOSURE: {
-                MEM_FREE(((DenseClosure *) value)->upvalues);
-                MEM_FREE(value);
-                break;
-            }
-            case DVAL_NATIVE:
-                MEM_FREE(value);
-                break;
-        }
-
-        value = next;
+    while(dense != NULL) {
+        DenseValue* next = dense->link;
+        vm->heapSize -= dense_size(dense);
+        dense_delete(dense);
+        dense = next;
     }
 }
 
@@ -125,6 +109,7 @@ VMStatus vm_run(VM* vm) {
             }
             case OP_DGLOB: {
                 map_set(&vm->globals, AS_STRING(LEFT_CONST), DEST_REG);
+                gc_check(vm);
 
                 SKIP(3);
                 break;
@@ -186,6 +171,8 @@ VMStatus vm_run(VM* vm) {
                 DenseFunction* function = (DenseFunction*) AS_DENSE(LEFT_CONST);
                 DenseClosure* closure = dense_closure_create(function, RIGHT);
 
+                vm_register_dense(vm, (DenseValue*) closure);
+
                 DEST_REG = DENSE_VALUE(closure);
 
                 for(uint8_t i = 0; i < RIGHT; ++i) {
@@ -205,6 +192,8 @@ VMStatus vm_run(VM* vm) {
                         closure->upvalues[i] = frame->callee.closure->upvalues[i];
                     }
                 }
+
+                gc_check(vm);
 
                 SKIP(3);
                 break;
@@ -303,9 +292,12 @@ VMStatus vm_run(VM* vm) {
                         if(interned != NULL) {
                             MEM_FREE(result);
                             result = interned;
-                        } else vm_register_value(vm, (DenseValue*) result);
-
-                        DEST_REG = DENSE_VALUE(result);
+                            DEST_REG = DENSE_VALUE(result);
+                        } else {
+                            vm_register_dense(vm, (DenseValue *) result);
+                            DEST_REG = DENSE_VALUE(result);
+                            gc_check(vm);
+                        }
                     } else {
                         VM_RUNTIME_ERROR(vm, "Left operand must be string");
                         return VM_ERROR;
@@ -905,9 +897,47 @@ void vm_register_string(VM* vm, DenseString* string) {
     map_set(&vm->strings, string, NULL_VALUE);
 }
 
-void vm_register_value(VM* vm, DenseValue* value) {
-    value->link = vm->values;
-    vm->values = value;
+void vm_register_dense(VM* vm, DenseValue* dense) {
+    if(dense == NULL)
+        return;
+
+    DenseValue* it = vm->values;
+    bool exists = false;
+
+    while(it != NULL) {
+        if(it == dense) {
+            exists = true;
+            break;
+        }
+
+        it = it->link;
+    }
+
+    if(exists)
+        return;
+
+    dense->link = vm->values;
+    vm->values = dense;
+
+    vm->heapSize += dense_size(dense);
+
+    if(dense->type == DVAL_FUNCTION) {
+        vm_register_dense(vm, (DenseValue*) ((DenseFunction*) dense)->name);
+
+        ValueArray* constants = &((DenseFunction*) dense)->chunk.constants;
+
+        for(uint32_t i = 0; i < constants->size; ++i)
+            if (IS_DENSE(constants->values[i]))
+                vm_register_dense(vm, AS_DENSE(constants->values[i]));
+    } else if(dense->type == DVAL_CLOSURE) {
+        vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
+
+        ValueArray* constants = &((DenseClosure*) dense)->function->chunk.constants;
+
+        for(uint32_t i = 0; i < constants->size; ++i)
+            if (IS_DENSE(constants->values[i]))
+                vm_register_dense(vm, AS_DENSE(constants->values[i]));
+    }
 }
 
 static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
@@ -950,6 +980,8 @@ static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
     frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
     frame->regs = frame->base + 1;
 
+    vm->stackTop += 251;
+
     return true;
 }
 
@@ -974,6 +1006,8 @@ static bool call_closure(VM* vm, uint8_t reg, uint8_t argc) {
 
     frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
     frame->regs = frame->base + 1;
+
+    vm->stackTop += 251;
 
     return true;
 }
@@ -1007,6 +1041,8 @@ static DenseUpvalue* upvalue_capture(VM* vm, Value* local) {
     if(prev == NULL)
         vm->upvalues = created;
     else prev->next = created;
+
+    vm_register_dense(vm, (DenseValue*) created);
 
     return created;
 }
