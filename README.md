@@ -110,3 +110,7 @@ DIGIT ::= [0-9] ;
 This project was created by [The Exom Developers](https://github.com/exom-dev).
 
 The Risa project is licensed under the [MIT](https://github.com/exom-dev/risa/blob/master/LICENSE) license.
+
+## References
+
+[This](https://github.com/munificent/craftinginterpreters) and [this paper](https://www.lua.org/doc/jucs05.pdf).
