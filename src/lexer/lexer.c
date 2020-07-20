@@ -163,6 +163,8 @@ Token next_identifier(Lexer* lexer) {
         ADVANCE(1);
 
     switch(*lexer->start) {
+        case 'b': return lexer_emit(lexer, CLASSIFY(1, 4, "reak", TOKEN_BREAK));
+        case 'c': return lexer_emit(lexer, CLASSIFY(1, 7, "ontinue", TOKEN_CONTINUE));
         case 'e': return lexer_emit(lexer, CLASSIFY(1, 3, "lse", TOKEN_ELSE));
         case 'f':
             if(lexer->current - lexer->start > 1) {

@@ -21,6 +21,12 @@ typedef struct {
     bool local;
 } Upvalue;
 
+typedef struct {
+    uint32_t index;
+    uint8_t depth;
+    bool isBreak;
+} Leap;
+
 typedef struct Compiler {
     struct Compiler* enclosing;
     DenseFunction* function;
@@ -32,9 +38,12 @@ typedef struct Compiler {
 
     Local locals[250];
     Upvalue upvalues[250];
+    Leap leaps[250];
 
     uint8_t localCount;
     uint8_t upvalueCount;
+    uint8_t loopCount;
+    uint8_t leapCount;
 
     int32_t scopeDepth;
 } Compiler;

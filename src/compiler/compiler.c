@@ -25,6 +25,8 @@ static void compile_if_statement(Compiler* compiler);
 static void compile_while_statement(Compiler* compiler);
 static void compile_for_statement(Compiler* compiler);
 static void compile_return_statement(Compiler* compiler);
+static void compile_continue_statement(Compiler* compiler);
+static void compile_break_statement(Compiler* compiler);
 static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
@@ -54,6 +56,7 @@ static void     emit_constant(Compiler* compiler, Value value);
 static void     emit_return(Compiler* compiler);
 static void     emit_jump(Compiler* compiler, uint32_t index);
 static void     emit_backwards_jump(Compiler* compiler, uint32_t index);
+static void     emit_backwards_jump_from(Compiler* compiler, uint32_t from, uint32_t to);
 static uint32_t emit_blank(Compiler* compiler);
 
 static uint16_t create_constant(Compiler* compiler, Value value);
@@ -113,6 +116,8 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,    PREC_NONE },                // TOKEN_VAR
         { NULL,     NULL,    PREC_NONE },                // TOKEN_FUNCTION
         { NULL,     NULL,    PREC_NONE },                // TOKEN_RETURN
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_CONTINUE
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_BREAK
         { NULL,     NULL,    PREC_NONE },                // TOKEN_ERROR
         { NULL,     NULL,    PREC_NONE },                // TOKEN_EOF
 };
@@ -125,8 +130,12 @@ void compiler_init(Compiler* compiler) {
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
+
     compiler->localCount = 0;
     compiler->upvalueCount = 0;
+    compiler->loopCount = 0;
+    compiler->leapCount = 0;
+
     compiler->scopeDepth = 0;
 }
 
@@ -424,18 +433,24 @@ static void compile_function(Compiler* compiler) {
 }
 
 static void compile_statement(Compiler* compiler) {
-    if(compiler->parser->current.type == TOKEN_IF) {
+    if (compiler->parser->current.type == TOKEN_IF) {
         parser_advance(compiler->parser);
         compile_if_statement(compiler);
-    } else if(compiler->parser->current.type == TOKEN_WHILE) {
+    } else if (compiler->parser->current.type == TOKEN_WHILE) {
         parser_advance(compiler->parser);
         compile_while_statement(compiler);
-    } else if(compiler->parser->current.type == TOKEN_FOR) {
+    } else if (compiler->parser->current.type == TOKEN_FOR) {
         parser_advance(compiler->parser);
         compile_for_statement(compiler);
-    } else if(compiler->parser->current.type == TOKEN_RETURN) {
+    } else if (compiler->parser->current.type == TOKEN_RETURN) {
         parser_advance(compiler->parser);
         compile_return_statement(compiler);
+    } else if (compiler->parser->current.type == TOKEN_CONTINUE) {
+        parser_advance(compiler->parser);
+        compile_continue_statement(compiler);
+    } else if (compiler->parser->current.type == TOKEN_BREAK) {
+        parser_advance(compiler->parser);
+        compile_break_statement(compiler);
     } else if(compiler->parser->current.type == TOKEN_LEFT_BRACE) {
         parser_advance(compiler->parser);
 
@@ -491,9 +506,31 @@ static void compile_while_statement(Compiler* compiler) {
 
     uint32_t end = emit_blank(compiler);
 
+    if(compiler->loopCount == 250) {
+        parser_error_at_previous(compiler->parser, "Loop limit exceeded (250)");
+        return;
+    }
+
+    ++compiler->loopCount;
+
+    for(uint8_t i = 0; i < compiler->leapCount; ++i)
+        ++compiler->leaps[i].depth;
+
     compile_statement(compiler);
+
     emit_backwards_jump(compiler, start);
     emit_jump(compiler, end);
+
+    for(uint8_t i = 0; i < compiler->leapCount; ++i) {
+        Leap* leap = &compiler->leaps[i];
+        --leap->depth;
+
+        if(leap->depth == 0) {
+            if(leap->isBreak)
+                emit_jump(compiler, leap->index);
+            else emit_backwards_jump_from(compiler, leap->index, start);
+        }
+    }
 }
 
 static void compile_for_statement(Compiler* compiler) {
@@ -544,11 +581,32 @@ static void compile_for_statement(Compiler* compiler) {
         emit_jump(compiler, bodyJump);
     }
 
+    if(compiler->loopCount == 250) {
+        parser_error_at_previous(compiler->parser, "Loop limit exceeded (250)");
+        return;
+    }
+
+    ++compiler->loopCount;
+
+    for(uint8_t i = 0; i < compiler->leapCount; ++i)
+        ++compiler->leaps[i].depth;
+
     compile_statement(compiler);
     emit_backwards_jump(compiler, start);
 
     if(!infinite) {
         emit_jump(compiler, exitIndex);
+    }
+
+    for(uint8_t i = 0; i < compiler->leapCount; ++i) {
+        Leap* leap = &compiler->leaps[i];
+        --leap->depth;
+
+        if(leap->depth == 0) {
+            if(leap->isBreak)
+                emit_jump(compiler, leap->index);
+            else emit_backwards_jump_from(compiler, leap->index, start);
+        }
     }
 
     scope_end(compiler);
@@ -560,6 +618,7 @@ static void compile_return_statement(Compiler* compiler) {
     }
 
     if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        parser_advance(compiler->parser);
         emit_return(compiler);
     } else {
         compile_expression(compiler);
@@ -572,6 +631,104 @@ static void compile_return_statement(Compiler* compiler) {
 
         register_free(compiler);
     }
+}
+
+static void compile_continue_statement(Compiler* compiler) {
+    if(compiler->loopCount == 0) {
+        parser_error_at_previous(compiler->parser, "Cannot continue outside of loops");
+        return;
+    }
+    if(compiler->leapCount == 250) {
+        parser_error_at_previous(compiler->parser, "Leap limit exceeded (250)");
+        return;
+    }
+
+    Leap leap;
+    leap.isBreak = false;
+    leap.index = compiler->function->chunk.size;
+
+    if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        parser_advance(compiler->parser);
+        leap.depth = 1;
+    } else if(compiler->parser->current.type == TOKEN_INT) {
+        parser_advance(compiler->parser);
+
+        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+
+        if(errno == ERANGE) {
+            parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
+            return;
+        }
+        if(num < 0) {
+            parser_error_at_previous(compiler->parser, "Continue depth cannot be negative");
+            return;
+        }
+        if(num > compiler->loopCount) {
+            parser_error_at_previous(compiler->parser, "Cannot continue from that many loops; consider using 'continue 0;'");
+            return;
+        }
+
+        if(num == 0)
+            leap.depth = compiler->loopCount;
+        else leap.depth = (uint8_t) num;
+
+        parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after continue statement");
+    } else {
+        parser_error_at_previous(compiler->parser, "Expected ';' or number after 'continue'");
+        return;
+    }
+
+    compiler->leaps[compiler->leapCount++] = leap;
+    emit_blank(compiler);
+}
+
+static void compile_break_statement(Compiler* compiler) {
+    if(compiler->loopCount == 0) {
+        parser_error_at_previous(compiler->parser, "Cannot break outside of loops");
+        return;
+    }
+    if(compiler->leapCount == 250) {
+        parser_error_at_previous(compiler->parser, "Leap limit exceeded (250)");
+        return;
+    }
+
+    Leap leap;
+    leap.isBreak = true;
+    leap.index = compiler->function->chunk.size;
+
+    if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        parser_advance(compiler->parser);
+        leap.depth = 1;
+    } else if(compiler->parser->current.type == TOKEN_INT) {
+        parser_advance(compiler->parser);
+
+        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+
+        if(errno == ERANGE) {
+            parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
+            return;
+        }
+        if(num < 0) {
+            parser_error_at_previous(compiler->parser, "Break depth cannot be negative");
+            return;
+        }
+        if(num > compiler->loopCount) {
+            parser_error_at_previous(compiler->parser, "Cannot break from that many loops; consider using 'break 0;'");
+            return;
+        }
+
+        if(num == 0)
+            leap.depth = compiler->loopCount;
+        else leap.depth = (uint8_t) num;
+
+        parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after break statement");
+    } else {
+        parser_error_at_previous(compiler->parser, "Expected ';' or number after 'break'");
+        return;
+    }
+
+    compiler->leaps[compiler->leapCount++] = leap;
+    emit_blank(compiler);
 }
 
 static void compile_block(Compiler* compiler) {
@@ -601,6 +758,7 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
 
     if(prefix == NULL) {
         parser_error_at_previous(compiler->parser, "Expected expression");
+        return;
     }
 
     bool allowAssignment = precedence <= PREC_ASSIGNMENT;
@@ -916,20 +1074,35 @@ static void emit_jump(Compiler* compiler, uint32_t index) {
     }
 }
 
-static void emit_backwards_jump(Compiler* compiler, uint32_t index) {
-    uint32_t diff = (compiler->function->chunk.size - index) / 4;
+static void emit_backwards_jump(Compiler* compiler, uint32_t to) {
+    emit_backwards_jump_from(compiler, compiler->function->chunk.size, to);
+}
+
+static void emit_backwards_jump_from(Compiler* compiler, uint32_t from, uint32_t to) {
+    uint32_t diff = (from - to) / 4;
 
     if(diff <= UINT8_MAX) {
-        emit_byte(compiler, OP_BJMP);
-        emit_byte(compiler, (uint8_t) diff);
-        emit_byte(compiler, 0);
-        emit_byte(compiler, 0);
+        if(from == compiler->function->chunk.size) {
+            emit_byte(compiler, OP_BJMP);
+            emit_byte(compiler, (uint8_t) diff);
+            emit_byte(compiler, 0);
+            emit_byte(compiler, 0);
+        } else {
+            compiler->function->chunk.bytecode[from] = OP_BJMP;
+            compiler->function->chunk.bytecode[from + 1] = (uint8_t) diff;
+        }
     } else if(diff <= UINT16_MAX) {
         uint16_t word = (uint16_t) diff;
 
-        emit_byte(compiler, OP_BJMPW);
-        emit_word(compiler, word);
-        emit_byte(compiler, 0);
+        if(from == compiler->function->chunk.size) {
+            emit_byte(compiler, OP_BJMPW);
+            emit_word(compiler, word);
+            emit_byte(compiler, 0);
+        }
+
+        compiler->function->chunk.bytecode[from] = OP_BJMPW;
+        compiler->function->chunk.bytecode[from + 1] = ((uint8_t*) &word)[0];
+        compiler->function->chunk.bytecode[from + 2] = ((uint8_t*) &word)[1];
     } else {
         parser_error_at_previous(compiler->parser, "Jump limit exceeded (65535)");
         return;
