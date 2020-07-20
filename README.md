@@ -26,14 +26,18 @@ stmt ::= exprStmt
        | whileStmt
        | forStmt
        | returnStmt
+       | continueStmt
+       | breakStmt
        | block ;
 
-exprStmt   ::= expr ";" space ;
-ifStmt     ::= "if" space "(" expr ")" space stmt space ( space "else" space stmt space )? ;
-whileStmt  ::= "while" space "(" expr ")" space stmt ;
-forStmt    ::= "for" "(" ( varDec | exprStmt | ";" ) expr? ";" expr? ")" space stmt ;
-returnStmt ::= space "return" expr? ";" ;
-block      ::= space "{" declaration* "}" ;
+exprStmt     ::= expr ";" space ;
+ifStmt       ::= "if" space "(" expr ")" space stmt space ( space "else" space stmt space )? ;
+whileStmt    ::= "while" space "(" expr ")" space stmt ;
+forStmt      ::= "for" "(" ( varDec | exprStmt | ";" ) expr? ";" expr? ")" space stmt ;
+returnStmt   ::= space "return" expr? ";" ;
+continueStmt ::= space "continue" INTEGER? ";" ;
+breakStmt    ::= space "break" INTEGER? ";" ;
+block        ::= space "{" declaration* "}" ;
 
 expr ::= space assignment space ;
 
