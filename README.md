@@ -104,8 +104,8 @@ DIGIT ::= [0-9] ;
 - ~~functions~~
 - ~~closures~~
 - ~~garbage collector~~
-- break statement
-- continue statement
+- ~~break statement~~
+- ~~continue statement~~
 - objects
 - arrays
 - compiler optimizations
