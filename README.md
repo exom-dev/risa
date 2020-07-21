@@ -108,6 +108,9 @@ DIGIT ::= [0-9] ;
 - ~~continue statement~~
 - objects
 - arrays
+- ternary operator
+- function arrow body
+- lambda expressions
 - compiler optimizations
 - assembler + inline assembly
 
