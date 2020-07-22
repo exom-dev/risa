@@ -44,7 +44,7 @@ expr ::= space assignment space ;
 assignment ::= ( call space "." space )? IDENTIFIER space "=" space assignment
              | ternary ;
 
-ternary ::= or space "?" space or space ":" space or ;
+ternary ::= or space "?" expr ":" expr ;
 
 or  ::= and ( "||" and)* ;
 and ::= bitwiseOr ( "&&" bitwiseOr )* ;
