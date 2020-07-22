@@ -35,6 +35,7 @@ static void compile_call(Compiler* compiler, bool);
 static void compile_grouping(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
+static void compile_ternary(Compiler* compiler, bool);
 static void compile_and(Compiler* compiler, bool);
 static void compile_or(Compiler* compiler, bool);
 
@@ -55,7 +56,7 @@ static void     emit_word(Compiler* compiler, uint16_t word);
 static void     emit_constant(Compiler* compiler, Value value);
 static void     emit_return(Compiler* compiler);
 static void     emit_jump(Compiler* compiler, uint32_t index);
-static void     emit_backwards_jump(Compiler* compiler, uint32_t index);
+static void     emit_backwards_jump(Compiler* compiler, uint32_t to);
 static void     emit_backwards_jump_from(Compiler* compiler, uint32_t from, uint32_t to);
 static uint32_t emit_blank(Compiler* compiler);
 
@@ -87,6 +88,7 @@ Rule EXPRESSION_RULES[] = {
         { compile_unary,     NULL,    PREC_NONE },       // TOKEN_TILDE
         { NULL,     compile_binary,    PREC_BITWISE_XOR },// TOKEN_AMPERSAND
         { NULL,     compile_binary,    PREC_FACTOR },     // TOKEN_PERCENT
+        { NULL,     compile_ternary,    PREC_TERNARY },   // TOKEN_QUESTION
         { compile_unary,     NULL,    PREC_NONE },       // TOKEN_BANG
         { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_BANG_EQUAL
         { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL
@@ -960,6 +962,31 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
 
     register_free(compiler);
     emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
+}
+
+static void compile_ternary(Compiler* compiler, bool allowAssignment) {
+    emit_byte(compiler, OP_TEST);
+    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    register_free(compiler);
+
+    uint32_t first = emit_blank(compiler);
+
+    compile_expression(compiler);
+
+    parser_consume(compiler->parser, TOKEN_COLON, "Expected ':' after ternary operator expression");
+
+    register_free(compiler);
+
+    uint32_t second = emit_blank(compiler);
+
+    emit_jump(compiler, first);
+
+    compile_expression(compiler);
+
+    emit_jump(compiler, second);
 }
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {

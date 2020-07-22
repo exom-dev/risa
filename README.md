@@ -108,7 +108,7 @@ DIGIT ::= [0-9] ;
 - ~~continue statement~~
 - objects
 - arrays
-- ternary operator
+- ~~ternary operator~~
 - function arrow body
 - lambda expressions
 - ~~string escape sequences~~
