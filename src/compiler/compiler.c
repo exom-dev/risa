@@ -211,6 +211,66 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
 
     const char* start = compiler->parser->previous.start + 1;
     uint32_t length = compiler->parser->previous.size - 2;
+
+    const char* ptr = start;
+    const char* end = start + length;
+
+    uint32_t escapeCount = 0;
+
+    while(ptr < end)
+        if(*(ptr++) == '\\')
+            ++escapeCount;
+
+    char* str = (char*) MEM_ALLOC(length + 1 - escapeCount);
+    uint32_t index = 0;
+
+    for(uint32_t i = 0; i < length; ++i) {
+        if(start[i] == '\\') {
+            if(i < length) {
+                switch(start[i + 1]) {
+                    case 'a':
+                        str[index++] = '\a';
+                        break;
+                    case 'b':
+                        str[index++] = '\b';
+                        break;
+                    case 'f':
+                        str[index++] = '\f';
+                        break;
+                    case 'n':
+                        str[index++] = '\n';
+                        break;
+                    case 'r':
+                        str[index++] = '\r';
+                        break;
+                    case 't':
+                        str[index++] = '\t';
+                        break;
+                    case 'v':
+                        str[index++] = '\v';
+                        break;
+                    case '\\':
+                        str[index++] = '\\';
+                        break;
+                    case '\'':
+                        str[index++] = '\'';
+                        break;
+                    case '\"':
+                        str[index++] = '\"';
+                        break;
+                    default:
+                        WARNING("Invalid escape sequence at index %d", compiler->parser->previous.index + 1 + i);
+                        break;
+                }
+                ++i;
+            }
+        } else str[index++] = start[i];
+    }
+
+    str[index] = '\0';
+
+    start = str;
+    length = index;
     uint32_t hash = map_hash(start, length);
 
     Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
@@ -224,6 +284,8 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         interned = dense_string_from(start, length);
         map_set(&super->strings, interned, NULL_VALUE);
     }
+
+    MEM_FREE(str);
 
     emit_constant(compiler, DENSE_VALUE(interned));
 }
