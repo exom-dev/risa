@@ -39,7 +39,9 @@ continueStmt ::= space "continue" INTEGER? ";" ;
 breakStmt    ::= space "break" INTEGER? ";" ;
 block        ::= space "{" declaration* "}" ;
 
-expr ::= space assignment space ;
+expr ::= space comma space ;
+
+comma ::= assignment space "," space assignment ;
 
 assignment ::= ( call space "." space )? IDENTIFIER space "=" space assignment
              | ternary ;
@@ -114,6 +116,7 @@ DIGIT ::= [0-9] ;
 - ~~function arrow body~~
 - lambda expressions
 - ~~string escape sequences~~
+- ~~comma operator~~
 - compiler optimizations
 - assembler + inline assembly
 

@@ -55,6 +55,7 @@ typedef enum {
 
 typedef enum {
     PREC_NONE,
+    PREC_COMMA,       // ,
     PREC_ASSIGNMENT,  // =
     PREC_TERNARY,     // ?:
     PREC_OR,          // ||

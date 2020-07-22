@@ -38,6 +38,7 @@ static void compile_binary(Compiler* compiler, bool);
 static void compile_ternary(Compiler* compiler, bool);
 static void compile_and(Compiler* compiler, bool);
 static void compile_or(Compiler* compiler, bool);
+static void compile_comma(Compiler* compiler, bool);
 
 static uint8_t compile_arguments(Compiler* compiler);
 
@@ -77,7 +78,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACKET
         { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACE
         { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_COMMA
+        { NULL,     compile_comma,    PREC_COMMA },      // TOKEN_COMMA
         { NULL,     NULL,    PREC_NONE },                // TOKEN_DOT
         { compile_unary,    compile_binary,  PREC_TERM },// TOKEN_MINUS
         { NULL,     compile_binary,  PREC_TERM },        // TOKEN_PLUS
@@ -819,7 +820,7 @@ static void compile_expression_statement(Compiler* compiler) {
 }
 
 static void compile_expression(Compiler* compiler) {
-    compile_expression_precedence(compiler, PREC_ASSIGNMENT);
+    compile_expression_precedence(compiler, PREC_COMMA);
 }
 
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence) {
@@ -1024,6 +1025,12 @@ static void compile_or(Compiler* compiler, bool allowAssignment) {
     compile_expression_precedence(compiler, PREC_OR);
 
     emit_jump(compiler, index);
+}
+
+static void compile_comma(Compiler* compiler, bool allowAssignment) {
+    register_free(compiler);
+
+    compile_expression_precedence(compiler, PREC_COMMA);
 }
 
 static void scope_begin(Compiler* compiler) {
