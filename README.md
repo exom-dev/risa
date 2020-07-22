@@ -111,7 +111,7 @@ DIGIT ::= [0-9] ;
 - ternary operator
 - function arrow body
 - lambda expressions
-- string escape support
+- ~~string escape sequences~~
 - compiler optimizations
 - assembler + inline assembly
 
