@@ -18,7 +18,7 @@ declaration ::= fnDecl
 fnDecl  ::= "function" space fn ;
 varDecl ::= "var" space IDENTIFIER ( space "=" expr)? ";" ;
 
-fn     ::= IDENTIFIER space "(" space params? space ")" block ;
+fn     ::= IDENTIFIER space "(" space params? space ")" ( block | "=>" expr );
 params ::= IDENTIFIER ( "," space IDENTIFIER )* ;
 
 stmt ::= exprStmt
