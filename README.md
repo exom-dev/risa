@@ -42,7 +42,9 @@ block        ::= space "{" declaration* "}" ;
 expr ::= space assignment space ;
 
 assignment ::= ( call space "." space )? IDENTIFIER space "=" space assignment
-             | or ;
+             | ternary ;
+
+ternary ::= or space "?" space or ":" space or ;
 
 or  ::= and ( "||" and)* ;
 and ::= bitwiseOr ( "&&" bitwiseOr )* ;
