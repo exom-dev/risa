@@ -93,6 +93,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_BANG_EQUAL
         { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL
         { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_EQUAL_EQUAL
+        { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL_GREATER
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER
         { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER_EQUAL
         { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_GREATER_GREATER
@@ -466,11 +467,17 @@ static void compile_function(Compiler* compiler) {
     }
 
     parser_consume(subcompiler.parser, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
-    parser_consume(subcompiler.parser, TOKEN_LEFT_BRACE, "Expected '{' before function body");
 
-    compile_block(&subcompiler);
+    if(subcompiler.parser->current.type == TOKEN_EQUAL_GREATER) {
+        parser_advance(subcompiler.parser);
+        compile_return_statement(&subcompiler);
+    } else {
+        parser_consume(subcompiler.parser, TOKEN_LEFT_BRACE, "Expected '{' before function body");
 
-    emit_return(&subcompiler);
+        compile_block(&subcompiler);
+
+        emit_return(&subcompiler);
+    }
 
     if(!register_reserve(compiler))
         return;

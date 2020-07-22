@@ -106,7 +106,8 @@ Token lexer_next(Lexer* lexer) {
         case '%': return lexer_emit(lexer, TOKEN_PERCENT);
         case '?': return lexer_emit(lexer, TOKEN_QUESTION);
         case '!': return lexer_emit(lexer, MATCH('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-        case '=': return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+        case '=': return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL :
+                                           MATCH('>') ? TOKEN_EQUAL_GREATER : TOKEN_EQUAL);
         case '<': return lexer_emit(lexer, MATCH('=') ? TOKEN_LESS_EQUAL :
                                            MATCH('<') ? TOKEN_LESS_LESS : TOKEN_LESS);
         case '>': return lexer_emit(lexer, MATCH('=') ? TOKEN_GREATER_EQUAL :

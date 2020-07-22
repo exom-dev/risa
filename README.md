@@ -111,7 +111,7 @@ DIGIT ::= [0-9] ;
 - objects
 - arrays
 - ~~ternary operator~~
-- function arrow body
+- ~~function arrow body~~
 - lambda expressions
 - ~~string escape sequences~~
 - compiler optimizations
