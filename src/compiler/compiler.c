@@ -31,8 +31,10 @@ static void compile_block(Compiler* compiler);
 static void compile_expression_statement(Compiler* compiler);
 static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
+static void compile_return_expression(Compiler* compiler);
 static void compile_call(Compiler* compiler, bool);
-static void compile_grouping(Compiler* compiler, bool);
+static void compile_grouping_or_lambda(Compiler* compiler, bool);
+static void compile_lambda(Compiler* compiler);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
 static void compile_ternary(Compiler* compiler, bool);
@@ -72,13 +74,13 @@ static void register_free(Compiler* compiler);
 static void finalize_compilation(Compiler* compiler);
 
 Rule EXPRESSION_RULES[] = {
-        { compile_grouping, compile_call,    PREC_CALL },// TOKEN_LEFT_PAREN
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_PAREN
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACKET
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACKET
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_LEFT_BRACE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_RIGHT_BRACE
-        { NULL,     compile_comma,    PREC_COMMA },      // TOKEN_COMMA
+        {compile_grouping_or_lambda, compile_call,  PREC_CALL },// TOKEN_LEFT_PAREN
+        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_PAREN
+        { NULL,     NULL,                           PREC_NONE },// TOKEN_LEFT_BRACKET
+        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACKET
+        { NULL,     NULL,                           PREC_NONE },// TOKEN_LEFT_BRACE
+        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACE
+        { NULL,                      compile_comma, PREC_COMMA },// TOKEN_COMMA
         { NULL,     NULL,    PREC_NONE },                // TOKEN_DOT
         { compile_unary,    compile_binary,  PREC_TERM },// TOKEN_MINUS
         { NULL,     compile_binary,  PREC_TERM },        // TOKEN_PLUS
@@ -705,6 +707,25 @@ static void compile_return_statement(Compiler* compiler) {
     }
 }
 
+static void compile_return_expression(Compiler* compiler) {
+    if(compiler->function->name == NULL) {
+        parser_error_at_previous(compiler->parser, "Cannot return from top-level scope");
+    }
+
+    if(compiler->parser->current.type == TOKEN_SEMICOLON) {
+        emit_return(compiler);
+    } else {
+        compile_expression(compiler);
+
+        emit_byte(compiler, OP_RET);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+
+        register_free(compiler);
+    }
+}
+
 static void compile_continue_statement(Compiler* compiler) {
     if(compiler->loopCount == 0) {
         parser_error_at_previous(compiler->parser, "Cannot continue outside of loops");
@@ -868,7 +889,7 @@ static uint8_t compile_arguments(Compiler* compiler) {
 
     if(compiler->parser->current.type != TOKEN_RIGHT_PAREN) {
         do {
-            compile_expression(compiler);
+            compile_expression_precedence(compiler, PREC_COMMA + 1);
 
             if(argc == 255)
                 parser_error_at_previous(compiler->parser, "Argument limit exceeded (255)");
@@ -881,9 +902,96 @@ static uint8_t compile_arguments(Compiler* compiler) {
     return argc;
 }
 
-static void compile_grouping(Compiler* compiler, bool allowAssignment) {
+static void compile_grouping_or_lambda(Compiler* compiler, bool allowAssignment) {
+    uint32_t backupSize = compiler->function->chunk.size;
+    Parser backupParser = *compiler->parser;
+
     compile_expression(compiler);
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
+
+    // Lambda.
+    if(compiler->parser->current.type == TOKEN_EQUAL_GREATER) {
+        register_free(compiler);
+
+        compiler->function->chunk.size = backupSize;
+        memcpy(compiler->parser, &backupParser, sizeof(Parser));
+
+        compile_lambda(compiler);
+    }
+}
+
+static void compile_lambda(Compiler* compiler) {
+    Compiler subcompiler;
+    compiler_init(&subcompiler);
+
+    const char* start = "lambda";
+    uint32_t length = 6;
+    uint32_t hash = map_hash(start, length);
+
+    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+
+    while(super->enclosing != NULL)
+        super = super->enclosing;
+
+    DenseString* interned = map_find(&super->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = dense_string_from(start, length);
+        map_set(&super->strings, interned, NULL_VALUE);
+    }
+
+    subcompiler.function->name = interned;
+    subcompiler.enclosing = compiler;
+    subcompiler.parser = compiler->parser;
+
+    scope_begin(&subcompiler);
+
+    if(subcompiler.parser->current.type != TOKEN_RIGHT_PAREN) {
+        do {
+            ++subcompiler.function->arity;
+
+            if (subcompiler.function->arity > 250) {
+                parser_error_at_current(subcompiler.parser, "Parameter limit exceeded (250)");
+            }
+
+            declare_variable(&subcompiler);
+            subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
+
+            ++subcompiler.regIndex;
+        } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
+    }
+
+    parser_consume(subcompiler.parser, TOKEN_RIGHT_PAREN, "Expected ')' after lambda parameters");
+    parser_consume(subcompiler.parser, TOKEN_EQUAL_GREATER, "Expected '=>' after lambda parameters");
+
+    if(subcompiler.parser->current.type == TOKEN_LEFT_BRACE) {
+        parser_advance(subcompiler.parser);
+        compile_block(&subcompiler);
+        emit_return(&subcompiler);
+    } else compile_return_expression(&subcompiler);
+
+    if(!register_reserve(compiler))
+        return;
+
+    if(subcompiler.upvalueCount == 0)
+        emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+    else {
+        emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+
+        emit_byte(compiler, OP_CLSR);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, subcompiler.upvalueCount);
+
+        for(uint8_t i = 0; i < subcompiler.upvalueCount; ++i) {
+            emit_byte(compiler, OP_UPVAL);
+            emit_byte(compiler, subcompiler.upvalues[i].index);
+            emit_byte(compiler, subcompiler.upvalues[i].local);
+            emit_byte(compiler, 0);
+        }
+    }
+
+    compiler_delete(&subcompiler);
 }
 
 static void compile_unary(Compiler* compiler, bool allowAssignment) {
