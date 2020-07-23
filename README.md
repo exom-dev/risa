@@ -71,7 +71,10 @@ primary ::= "null"
           | NUMBER
           | STRING
           | IDENTIFIER
-          | "(" expr ")" ;
+          | "(" expr ")" 
+          | lambda;
+
+lambda ::= "(" args? ")" space "=>" ( expr | block )
 
 space ::= ""
         | " "
@@ -114,7 +117,7 @@ DIGIT ::= [0-9] ;
 - arrays
 - ~~ternary operator~~
 - ~~function arrow body~~
-- lambda expressions
+- ~~lambda expressions~~
 - ~~string escape sequences~~
 - ~~comma operator~~
 - compiler optimizations
