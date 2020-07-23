@@ -906,8 +906,21 @@ static void compile_grouping_or_lambda(Compiler* compiler, bool allowAssignment)
     uint32_t backupSize = compiler->function->chunk.size;
     Parser backupParser = *compiler->parser;
 
-    compile_expression(compiler);
-    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
+    if(compiler->parser->current.type != TOKEN_RIGHT_PAREN) {
+        compile_expression(compiler);
+        parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
+    } else {
+        if(parser_advance(compiler->parser), compiler->parser->current.type != TOKEN_EQUAL_GREATER) {
+            parser_error_at_previous(compiler->parser, "Unexpected empty parentheses group");
+            return;
+        }
+
+        compiler->function->chunk.size = backupSize;
+        memcpy(compiler->parser, &backupParser, sizeof(Parser));
+
+        compile_lambda(compiler);
+        return;
+    }
 
     // Lambda.
     if(compiler->parser->current.type == TOKEN_EQUAL_GREATER) {
