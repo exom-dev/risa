@@ -58,6 +58,7 @@ static void     emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uin
 static void     emit_word(Compiler* compiler, uint16_t word);
 static void     emit_constant(Compiler* compiler, Value value);
 static void     emit_return(Compiler* compiler);
+static void     emit_mov(Compiler* compiler, uint8_t dest, uint8_t src);
 static void     emit_jump(Compiler* compiler, uint32_t index);
 static void     emit_backwards_jump(Compiler* compiler, uint32_t to);
 static void     emit_backwards_jump_from(Compiler* compiler, uint32_t from, uint32_t to);
@@ -68,8 +69,9 @@ static uint16_t create_identifier_constant(Compiler* compiler);
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
 static uint16_t declare_variable(Compiler* compiler);
 
-static bool register_reserve(Compiler* compiler);
-static void register_free(Compiler* compiler);
+static bool    register_reserve(Compiler* compiler);
+static uint8_t register_find(Compiler* compiler, RegType type, Token token);
+static void    register_free(Compiler* compiler);
 
 static void finalize_compilation(Compiler* compiler);
 
@@ -136,6 +138,8 @@ void compiler_init(Compiler* compiler) {
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
+    compiler->lastReg = 0;
+    compiler->lastRegNew = false;
 
     compiler->localCount = 0;
     compiler->upvalueCount = 0;
@@ -170,153 +174,208 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
 }
 
 static void compile_byte(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
+    uint8_t reg = register_find(compiler, REG_CONSTANT, compiler->parser->previous);
 
-    int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+    if(reg == 251) {
+        if (!register_reserve(compiler))
+            return;
 
-    if(errno == ERANGE || num > 256) {
-        parser_error_at_previous(compiler->parser, "Number is too large for type 'byte'");
-        return;
+        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+
+        if (errno == ERANGE || num > 256) {
+            parser_error_at_previous(compiler->parser, "Number is too large for type 'byte'");
+            return;
+        }
+
+        emit_constant(compiler, BYTE_VALUE(num));
+
+        compiler->lastReg = compiler->regIndex - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->lastRegNew = true;
+    } else  {
+        compiler->lastReg = reg;
+        compiler->lastRegNew = false;
     }
-
-    emit_constant(compiler, BYTE_VALUE(num));
 }
 
 static void compile_int(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
+    uint8_t reg = register_find(compiler, REG_CONSTANT, compiler->parser->previous);
 
-    int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+    if(reg == 251) {
+        if(!register_reserve(compiler))
+            return;
 
-    if(errno == ERANGE) {
-        parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
-        return;
+        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+
+        if(errno == ERANGE) {
+            parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
+            return;
+        }
+
+        emit_constant(compiler, INT_VALUE(num));
+
+        compiler->lastReg = compiler->regIndex - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->lastRegNew = true;
+    } else {
+        compiler->lastReg = reg;
+        compiler->lastRegNew = false;
     }
-
-    emit_constant(compiler, INT_VALUE(num));
 }
 
 static void compile_float(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
+    uint8_t reg = register_find(compiler, REG_CONSTANT, compiler->parser->previous);
 
-    double num = strtod(compiler->parser->previous.start, NULL);
+    if(reg == 251) {
+        if(!register_reserve(compiler))
+            return;
 
-    if(errno == ERANGE) {
-        parser_error_at_previous(compiler->parser, "Number is too small or too large for type 'float'");
-        return;
+        double num = strtod(compiler->parser->previous.start, NULL);
+
+        if(errno == ERANGE) {
+            parser_error_at_previous(compiler->parser, "Number is too small or too large for type 'float'");
+            return;
+        }
+
+        emit_constant(compiler, FLOAT_VALUE(num));
+
+        compiler->lastReg = compiler->regIndex - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->lastRegNew = true;
+    } else {
+        compiler->lastReg = reg;
+        compiler->lastRegNew = false;
     }
-
-    emit_constant(compiler, FLOAT_VALUE(num));
 }
 
 static void compile_string(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
+    uint8_t reg = register_find(compiler, REG_CONSTANT, compiler->parser->previous);
 
-    const char* start = compiler->parser->previous.start + 1;
-    uint32_t length = compiler->parser->previous.size - 2;
+    if(reg == 251) {
+        if (!register_reserve(compiler))
+            return;
 
-    const char* ptr = start;
-    const char* end = start + length;
+        const char *start = compiler->parser->previous.start + 1;
+        uint32_t length = compiler->parser->previous.size - 2;
 
-    uint32_t escapeCount = 0;
+        const char *ptr = start;
+        const char *end = start + length;
 
-    while(ptr < end)
-        if(*(ptr++) == '\\')
-            ++escapeCount;
+        uint32_t escapeCount = 0;
 
-    char* str = (char*) MEM_ALLOC(length + 1 - escapeCount);
-    uint32_t index = 0;
+        while (ptr < end)
+            if (*(ptr++) == '\\')
+                ++escapeCount;
 
-    for(uint32_t i = 0; i < length; ++i) {
-        if(start[i] == '\\') {
-            if(i < length) {
-                switch(start[i + 1]) {
-                    case 'a':
-                        str[index++] = '\a';
-                        break;
-                    case 'b':
-                        str[index++] = '\b';
-                        break;
-                    case 'f':
-                        str[index++] = '\f';
-                        break;
-                    case 'n':
-                        str[index++] = '\n';
-                        break;
-                    case 'r':
-                        str[index++] = '\r';
-                        break;
-                    case 't':
-                        str[index++] = '\t';
-                        break;
-                    case 'v':
-                        str[index++] = '\v';
-                        break;
-                    case '\\':
-                        str[index++] = '\\';
-                        break;
-                    case '\'':
-                        str[index++] = '\'';
-                        break;
-                    case '\"':
-                        str[index++] = '\"';
-                        break;
-                    default:
-                        WARNING("Invalid escape sequence at index %d", compiler->parser->previous.index + 1 + i);
-                        break;
+        char *str = (char *) MEM_ALLOC(length + 1 - escapeCount);
+        uint32_t index = 0;
+
+        for (uint32_t i = 0; i < length; ++i) {
+            if (start[i] == '\\') {
+                if (i < length) {
+                    switch (start[i + 1]) {
+                        case 'a':
+                            str[index++] = '\a';
+                            break;
+                        case 'b':
+                            str[index++] = '\b';
+                            break;
+                        case 'f':
+                            str[index++] = '\f';
+                            break;
+                        case 'n':
+                            str[index++] = '\n';
+                            break;
+                        case 'r':
+                            str[index++] = '\r';
+                            break;
+                        case 't':
+                            str[index++] = '\t';
+                            break;
+                        case 'v':
+                            str[index++] = '\v';
+                            break;
+                        case '\\':
+                            str[index++] = '\\';
+                            break;
+                        case '\'':
+                            str[index++] = '\'';
+                            break;
+                        case '\"':
+                            str[index++] = '\"';
+                            break;
+                        default:
+                            WARNING("Invalid escape sequence at index %d", compiler->parser->previous.index + 1 + i);
+                            break;
+                    }
+                    ++i;
                 }
-                ++i;
-            }
-        } else str[index++] = start[i];
+            } else str[index++] = start[i];
+        }
+
+        str[index] = '\0';
+
+        start = str;
+        length = index;
+        uint32_t hash = map_hash(start, length);
+
+        Compiler *super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+
+        while (super->enclosing != NULL)
+            super = super->enclosing;
+
+        DenseString *interned = map_find(&super->strings, start, length, hash);
+
+        if (interned == NULL) {
+            interned = dense_string_from(start, length);
+            map_set(&super->strings, interned, NULL_VALUE);
+        }
+
+        MEM_FREE(str);
+
+        emit_constant(compiler, DENSE_VALUE(interned));
+
+        compiler->lastReg = compiler->regIndex - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->lastRegNew = true;
+    } else {
+        compiler->lastReg = reg;
+        compiler->lastRegNew = false;
     }
-
-    str[index] = '\0';
-
-    start = str;
-    length = index;
-    uint32_t hash = map_hash(start, length);
-
-    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
-
-    while(super->enclosing != NULL)
-        super = super->enclosing;
-
-    DenseString* interned = map_find(&super->strings, start, length, hash);
-
-    if(interned == NULL) {
-        interned = dense_string_from(start, length);
-        map_set(&super->strings, interned, NULL_VALUE);
-    }
-
-    MEM_FREE(str);
-
-    emit_constant(compiler, DENSE_VALUE(interned));
 }
 
 static void compile_literal(Compiler* compiler, bool allowAssignment) {
-    if(!register_reserve(compiler))
-        return;
+    uint8_t reg = register_find(compiler, REG_CONSTANT, compiler->parser->previous);
 
-    switch(compiler->parser->previous.type) {
-        case TOKEN_NULL:
-            emit_byte(compiler, OP_NULL);
-            break;
-        case TOKEN_TRUE:
-            emit_byte(compiler, OP_TRUE);
-            break;
-        case TOKEN_FALSE:
-            emit_byte(compiler, OP_FALSE);
-            break;
-        default:
+    if(reg == 251) {
+        if (!register_reserve(compiler))
             return;
-    }
 
-    emit_byte(compiler, compiler->regIndex - 1);
-    emit_byte(compiler, 0);
-    emit_byte(compiler, 0);
+        switch (compiler->parser->previous.type) {
+            case TOKEN_NULL:
+                emit_byte(compiler, OP_NULL);
+                break;
+            case TOKEN_TRUE:
+                emit_byte(compiler, OP_TRUE);
+                break;
+            case TOKEN_FALSE:
+                emit_byte(compiler, OP_FALSE);
+                break;
+            default:
+                return;
+        }
+
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+
+        compiler->lastReg = compiler->regIndex - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->lastRegNew = true;
+    } else {
+        compiler->lastReg = reg;
+        compiler->lastRegNew = false;
+    }
 }
 
 static void compile_identifier(Compiler* compiler, bool allowAssignment) {
@@ -344,22 +403,49 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
         parser_advance(compiler->parser);
+
+        uint32_t chunkSize = compiler->function->chunk.size;
         compile_expression(compiler);
 
-        emit_byte(compiler, set);
-        emit_byte(compiler, index);
-        emit_byte(compiler, compiler->regIndex - 1);
-        emit_byte(compiler, 0);
+        if(index != 251) {
+            if(chunkSize == compiler->function->chunk.size)
+                emit_mov(compiler, index, compiler->lastReg);
+            else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
+        } else {
+            emit_byte(compiler, set);
+            emit_byte(compiler, index);
+            emit_byte(compiler, compiler->regIndex - 1);
+            emit_byte(compiler, 0);
+        }
 
         //register_free(compiler);
     } else {
-        if(!register_reserve(compiler))
-            return;
+        uint8_t reg = register_find(compiler, get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous);
 
-        emit_byte(compiler, get);
-        emit_byte(compiler, compiler->regIndex - 1);
-        emit_byte(compiler, index);
-        emit_byte(compiler, 0);
+        if(reg == 251) {
+            Chunk *chunk = &compiler->function->chunk;
+
+            if (chunk->size > 0 && chunk->bytecode[chunk->size - 4] == OP_DGLOB)
+                if (chunk->bytecode[chunk->size - 2] == index)
+                    reg = chunk->bytecode[chunk->size - 3];
+        }
+
+        if(reg == 251) {
+            if (!register_reserve(compiler))
+                return;
+
+            emit_byte(compiler, get);
+            emit_byte(compiler, compiler->regIndex - 1);
+            emit_byte(compiler, index);
+            emit_byte(compiler, 0);
+
+            compiler->lastReg = compiler->regIndex - 1;
+            compiler->regs[compiler->lastReg] = (RegInfo) { get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous };
+            compiler->lastRegNew = true;
+        } else {
+            compiler->lastReg = reg;
+            compiler->lastRegNew = false;
+        }
     }
 }
 
@@ -378,6 +464,8 @@ static void compile_declaration(Compiler* compiler) {
 
 static void compile_variable_declaration(Compiler* compiler) {
     uint16_t index = declare_variable(compiler);
+    uint32_t chunkSize = compiler->function->chunk.size;
+    Token lastRegToken = compiler->parser->previous;
 
     if(compiler->parser->current.type == TOKEN_EQUAL) {
         parser_advance(compiler->parser);
@@ -395,14 +483,23 @@ static void compile_variable_declaration(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
 
     if(compiler->scopeDepth > 0) {
+        if(chunkSize == compiler->function->chunk.size)
+            emit_mov(compiler, compiler->localCount - 1, compiler->lastReg);
+        else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->localCount - 1;
+
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+
+        compiler->lastReg = compiler->localCount - 1;
+        compiler->regs[compiler->lastReg] = (RegInfo) { REG_LOCAL, lastRegToken };
+        compiler->lastRegNew = true;
         return;
     }
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     emit_byte(compiler, OP_DGLOB);
-    emit_byte(compiler, compiler->regIndex);
+    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, index);
     emit_byte(compiler, 0);
 }
@@ -460,6 +557,7 @@ static void compile_function(Compiler* compiler) {
 
             if (subcompiler.function->arity > 250) {
                 parser_error_at_current(subcompiler.parser, "Parameter limit exceeded (250)");
+                return;
             }
 
             declare_variable(&subcompiler);
@@ -476,9 +574,7 @@ static void compile_function(Compiler* compiler) {
         compile_return_statement(&subcompiler);
     } else {
         parser_consume(subcompiler.parser, TOKEN_LEFT_BRACE, "Expected '{' before function body");
-
         compile_block(&subcompiler);
-
         emit_return(&subcompiler);
     }
 
@@ -870,7 +966,12 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
 }
 
 static void compile_call(Compiler* compiler, bool allowAssignment) {
-    uint8_t functionReg = compiler->regIndex - 1;
+    uint8_t functionReg = compiler->lastReg;
+
+    if(compiler->regIndex <= functionReg)
+        if(!register_reserve(compiler))
+            return;
+
     uint8_t argc = compile_arguments(compiler);
 
     emit_byte(compiler, OP_CALL);
@@ -882,6 +983,9 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
         register_free(compiler);
         --argc;
     }
+
+    compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
+    compiler->lastRegNew = true;
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {
@@ -889,10 +993,23 @@ static uint8_t compile_arguments(Compiler* compiler) {
 
     if(compiler->parser->current.type != TOKEN_RIGHT_PAREN) {
         do {
+            uint32_t chunkSize = compiler->function->chunk.size;
+            uint8_t regIndex = compiler->regIndex;
+
             compile_expression_precedence(compiler, PREC_COMMA + 1);
 
-            if(argc == 255)
+            if(regIndex == compiler->regIndex)
+                if(!register_reserve(compiler))
+                    return 255;
+
+            if(chunkSize == compiler->function->chunk.size)
+                emit_mov(compiler, compiler->regIndex - 1, compiler->lastReg);
+            else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
+
+            if(argc == 255) {
                 parser_error_at_previous(compiler->parser, "Argument limit exceeded (255)");
+                return 255;
+            }
 
             ++argc;
         } while(compiler->parser->current.type == TOKEN_COMMA && (parser_advance(compiler->parser), true));
@@ -980,7 +1097,10 @@ static void compile_lambda(Compiler* compiler) {
     if(subcompiler.parser->current.type == TOKEN_LEFT_BRACE) {
         parser_advance(subcompiler.parser);
         compile_block(&subcompiler);
-        emit_return(&subcompiler);
+
+        Chunk* chunk = &compiler->function->chunk;
+        if(chunk->size > 0 && chunk->bytecode[chunk->size - 4] != OP_RET)
+            emit_return(&subcompiler);
     } else compile_return_expression(&subcompiler);
 
     if(!register_reserve(compiler))
@@ -1014,15 +1134,15 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
 
     switch(operator) {
         case TOKEN_BANG:
-            emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->lastReg);
             emit_byte(compiler, 0);
             break;
         case TOKEN_TILDE:
-            emit_bytes(compiler, OP_BNOT, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_bytes(compiler, OP_BNOT, compiler->regIndex - 1, compiler->lastReg);
             emit_byte(compiler, 0);
             break;
         case TOKEN_MINUS:
-            emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->regIndex - 1);
+            emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->lastReg);
             emit_byte(compiler, 0);
             break;
         default:
@@ -1031,6 +1151,9 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_binary(Compiler* compiler, bool allowAssignment) {
+    uint8_t leftReg = compiler->lastReg;
+    bool isLeftNew = compiler->lastRegNew;
+
     TokenType operatorType = compiler->parser->previous.type;
 
     Rule* rule = &EXPRESSION_RULES[operatorType];
@@ -1089,8 +1212,24 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
             return;
     }
 
-    register_free(compiler);
-    emit_bytes(compiler, compiler->regIndex - 1, compiler->regIndex - 1, compiler->regIndex);
+    uint8_t destReg;
+
+    if(compiler->lastRegNew) {
+        destReg = compiler->lastReg;
+
+        if(isLeftNew)
+            register_free(compiler);
+    } else if(isLeftNew && leftReg != compiler->lastReg) {
+        destReg = leftReg;
+    } else {
+        register_reserve(compiler);
+        destReg = compiler->regIndex - 1;
+    }
+
+    emit_bytes(compiler, destReg, leftReg, compiler->lastReg);
+    compiler->regs[destReg] = (RegInfo) { REG_TEMP };
+    compiler->lastReg = destReg;
+    compiler->lastRegNew = true;
 }
 
 static void compile_ternary(Compiler* compiler, bool allowAssignment) {
@@ -1271,6 +1410,13 @@ static void emit_return(Compiler* compiler) {
     emit_byte(compiler, 0);
 }
 
+static void emit_mov(Compiler* compiler, uint8_t dest, uint8_t src) {
+    emit_byte(compiler, OP_MOV);
+    emit_byte(compiler, dest);
+    emit_byte(compiler, src);
+    emit_byte(compiler, 0);
+}
+
 static uint32_t emit_blank(Compiler* compiler) {
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
@@ -1397,9 +1543,21 @@ static bool register_reserve(Compiler* compiler) {
         return false;
     }
     else {
+        compiler->regs[compiler->regIndex] = (RegInfo) { REG_TEMP + 1, { TOKEN_ERROR, NULL, 0, 0 } };
         ++compiler->regIndex;
         return true;
     }
+}
+
+static uint8_t register_find(Compiler* compiler, RegType type, Token token) {
+    if(compiler->regIndex == 0)
+        return 251;
+
+    for(int16_t i = compiler->regIndex - 1; i >= 0; --i)
+        if(compiler->regs[i].type == type)
+            if(compiler->regs[i].token.size == token.size && memcmp(compiler->regs[i].token.start, token.start, token.size) == 0)
+                return i;
+    return 251;
 }
 
 static void register_free(Compiler* compiler) {

@@ -8,6 +8,20 @@
 #include "../data/map.h"
 #include "../common/def.h"
 
+typedef enum {
+    REG_CONSTANT,
+    REG_LOCAL,
+    REG_UPVAL,
+    REG_GLOBAL,
+    REG_TEMP,
+    REG_EMPTY
+} RegType;
+
+typedef struct {
+    RegType type;
+    Token token;
+} RegInfo;
+
 typedef struct {
     Token identifier;
     int32_t depth;
@@ -34,7 +48,10 @@ typedef struct Compiler {
     Parser* parser;
     Map strings;
 
+    RegInfo regs[250];
     uint8_t regIndex;
+    uint8_t lastReg;
+    bool lastRegNew;
 
     Local locals[250];
     Upvalue upvalues[250];
