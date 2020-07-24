@@ -599,6 +599,7 @@ static void compile_function(Compiler* compiler) {
         }
     }
 
+    compiler->lastRegNew = true;
     compiler_delete(&subcompiler);
 }
 
@@ -638,11 +639,12 @@ static void compile_if_statement(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     uint32_t ifEnd = emit_blank(compiler);
 
@@ -668,11 +670,12 @@ static void compile_while_statement(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     uint32_t end = emit_blank(compiler);
 
@@ -727,11 +730,12 @@ static void compile_for_statement(Compiler* compiler) {
         parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
 
         emit_byte(compiler, OP_TEST);
-        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, compiler->lastReg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        register_free(compiler);
+        if(compiler->lastRegNew)
+            register_free(compiler);
 
         exitIndex = emit_blank(compiler);
         infinite = false;
@@ -795,11 +799,12 @@ static void compile_return_statement(Compiler* compiler) {
         parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after return expression");
 
         emit_byte(compiler, OP_RET);
-        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, compiler->lastReg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        register_free(compiler);
+        if(compiler->lastRegNew)
+            register_free(compiler);
     }
 }
 
@@ -814,11 +819,12 @@ static void compile_return_expression(Compiler* compiler) {
         compile_expression(compiler);
 
         emit_byte(compiler, OP_RET);
-        emit_byte(compiler, compiler->regIndex - 1);
+        emit_byte(compiler, compiler->lastReg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        register_free(compiler);
+        if(compiler->lastRegNew)
+            register_free(compiler);
     }
 }
 
@@ -930,10 +936,10 @@ static void compile_block(Compiler* compiler) {
 
 static void compile_expression_statement(Compiler* compiler) {
     compile_expression(compiler);
-
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 }
 
 static void compile_expression(Compiler* compiler) {
@@ -962,10 +968,17 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
         parser_error_at_previous(compiler->parser, "Invalid assignment target");
+        return;
     }
 }
 
 static void compile_call(Compiler* compiler, bool allowAssignment) {
+    if(!compiler->lastRegNew) {
+        if(!register_reserve(compiler))
+            return;
+        emit_mov(compiler, compiler->regIndex - 1,  compiler->lastReg);
+    }
+
     uint8_t functionReg = compiler->lastReg;
 
     if(compiler->regIndex <= functionReg)
@@ -1041,7 +1054,8 @@ static void compile_grouping_or_lambda(Compiler* compiler, bool allowAssignment)
 
     // Lambda.
     if(compiler->parser->current.type == TOKEN_EQUAL_GREATER) {
-        register_free(compiler);
+        if(compiler->lastRegNew)
+            register_free(compiler);
 
         compiler->function->chunk.size = backupSize;
         memcpy(compiler->parser, &backupParser, sizeof(Parser));
@@ -1106,9 +1120,9 @@ static void compile_lambda(Compiler* compiler) {
     if(!register_reserve(compiler))
         return;
 
-    if(subcompiler.upvalueCount == 0)
+    if(subcompiler.upvalueCount == 0) {
         emit_constant(compiler, DENSE_VALUE(subcompiler.function));
-    else {
+    } else {
         emit_constant(compiler, DENSE_VALUE(subcompiler.function));
 
         emit_byte(compiler, OP_CLSR);
@@ -1124,6 +1138,7 @@ static void compile_lambda(Compiler* compiler) {
         }
     }
 
+    compiler->lastRegNew = true;
     compiler_delete(&subcompiler);
 }
 
@@ -1131,6 +1146,12 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
     TokenType operator = compiler->parser->previous.type;
 
     compile_expression_precedence(compiler, PREC_UNARY);
+
+    if(!compiler->lastRegNew) {
+        if(!register_reserve(compiler))
+            return;
+        compiler->lastReg = compiler->regIndex - 1;
+    }
 
     switch(operator) {
         case TOKEN_BANG:
@@ -1243,27 +1264,24 @@ static void compile_ternary(Compiler* compiler, bool allowAssignment) {
     uint32_t first = emit_blank(compiler);
 
     compile_expression(compiler);
-
     parser_consume(compiler->parser, TOKEN_COLON, "Expected ':' after ternary operator expression");
-
     register_free(compiler);
 
     uint32_t second = emit_blank(compiler);
 
     emit_jump(compiler, first);
-
     compile_expression(compiler);
-
     emit_jump(compiler, second);
 }
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     uint16_t index = emit_blank(compiler);
 
@@ -1274,11 +1292,12 @@ static void compile_and(Compiler* compiler, bool allowAssignment) {
 
 static void compile_or(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, OP_NTEST);
-    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     uint16_t index = emit_blank(compiler);
 
@@ -1288,7 +1307,8 @@ static void compile_or(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_comma(Compiler* compiler, bool allowAssignment) {
-    register_free(compiler);
+    if(compiler->lastRegNew)
+        register_free(compiler);
 
     compile_expression_precedence(compiler, PREC_COMMA);
 }
@@ -1324,6 +1344,8 @@ static void local_add(Compiler* compiler, Token identifier) {
     local->depth = -1;
     local->reg = compiler->regIndex;
     local->captured = false;
+
+    compiler->regs[local->reg] = (RegInfo) { REG_LOCAL, identifier };
 }
 
 static uint8_t local_resolve(Compiler* compiler, Token* identifier) {
@@ -1526,11 +1548,11 @@ static uint16_t declare_variable(Compiler* compiler) {
 
             if(identifier_equals(identifier, &local->identifier)) {
                 parser_error_at_previous(compiler->parser, "Variable already declared in this scope");
+                return -1;
             }
         }
 
         local_add(compiler, *identifier);
-
         return 0;
     }
 
