@@ -42,7 +42,7 @@ typedef struct {
 } Leap;
 
 typedef struct Compiler {
-    struct Compiler* enclosing;
+    struct Compiler* super;
     DenseFunction* function;
 
     Parser* parser;
@@ -50,8 +50,12 @@ typedef struct Compiler {
 
     RegInfo regs[250];
     uint8_t regIndex;
-    uint8_t lastReg;
-    bool lastRegNew;
+
+    struct {
+        uint8_t reg;
+        bool isNew;
+        bool isConst;
+    } last;
 
     Local locals[250];
     Upvalue upvalues[250];

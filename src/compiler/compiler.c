@@ -131,15 +131,16 @@ Rule EXPRESSION_RULES[] = {
 };
 
 void compiler_init(Compiler* compiler) {
-    compiler->enclosing = NULL;
+    compiler->super = NULL;
     compiler->function = dense_function_create();
 
     chunk_init(&compiler->function->chunk);
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
-    compiler->lastReg = 0;
-    compiler->lastRegNew = false;
+    compiler->last.reg = 0;
+    compiler->last.isNew = false;
+    compiler->last.isConst = false;
 
     compiler->localCount = 0;
     compiler->upvalueCount = 0;
@@ -189,12 +190,14 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
 
         emit_constant(compiler, BYTE_VALUE(num));
 
-        compiler->lastReg = compiler->regIndex - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->regIndex - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isNew = true;
+        compiler->last.isConst = true;
     } else  {
-        compiler->lastReg = reg;
-        compiler->lastRegNew = false;
+        compiler->last.reg = reg;
+        compiler->last.isNew = false;
+        compiler->last.isConst = false;
     }
 }
 
@@ -214,12 +217,14 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
 
         emit_constant(compiler, INT_VALUE(num));
 
-        compiler->lastReg = compiler->regIndex - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->regIndex - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isNew = true;
+        compiler->last.isConst = true;
     } else {
-        compiler->lastReg = reg;
-        compiler->lastRegNew = false;
+        compiler->last.reg = reg;
+        compiler->last.isNew = false;
+        compiler->last.isConst = false;
     }
 }
 
@@ -239,12 +244,14 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
 
         emit_constant(compiler, FLOAT_VALUE(num));
 
-        compiler->lastReg = compiler->regIndex - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->regIndex - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isNew = true;
+        compiler->last.isConst = true;
     } else {
-        compiler->lastReg = reg;
-        compiler->lastRegNew = false;
+        compiler->last.reg = reg;
+        compiler->last.isNew = false;
+        compiler->last.isConst = false;
     }
 }
 
@@ -319,10 +326,10 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         length = index;
         uint32_t hash = map_hash(start, length);
 
-        Compiler *super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+        Compiler *super = compiler->super == NULL ? compiler : compiler->super;
 
-        while (super->enclosing != NULL)
-            super = super->enclosing;
+        while (super->super != NULL)
+            super = super->super;
 
         DenseString *interned = map_find(&super->strings, start, length, hash);
 
@@ -335,12 +342,14 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
 
         emit_constant(compiler, DENSE_VALUE(interned));
 
-        compiler->lastReg = compiler->regIndex - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->regIndex - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isNew = true;
+        compiler->last.isConst = true;
     } else {
-        compiler->lastReg = reg;
-        compiler->lastRegNew = false;
+        compiler->last.reg = reg;
+        compiler->last.isNew = false;
+        compiler->last.isConst = false;
     }
 }
 
@@ -369,12 +378,14 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        compiler->lastReg = compiler->regIndex - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->regIndex - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isNew = true;
+        compiler->last.isConst = true;
     } else {
-        compiler->lastReg = reg;
-        compiler->lastRegNew = false;
+        compiler->last.reg = reg;
+        compiler->last.isNew = false;
+        compiler->last.isConst = false;
     }
 }
 
@@ -409,7 +420,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
 
         if(index != 251) {
             if(chunkSize == compiler->function->chunk.size)
-                emit_mov(compiler, index, compiler->lastReg);
+                emit_mov(compiler, index, compiler->last.reg);
             else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
         } else {
             emit_byte(compiler, set);
@@ -422,12 +433,13 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     } else {
         uint8_t reg = register_find(compiler, get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous);
 
+        // Eliminate SGLOB after DGLOB
         if(reg == 251) {
             Chunk *chunk = &compiler->function->chunk;
 
             if (chunk->size > 0 && chunk->bytecode[chunk->size - 4] == OP_DGLOB)
-                if (chunk->bytecode[chunk->size - 2] == index)
-                    reg = chunk->bytecode[chunk->size - 3];
+                if (chunk->bytecode[chunk->size - 3] == index)
+                    reg = chunk->bytecode[chunk->size - 2];
         }
 
         if(reg == 251) {
@@ -439,14 +451,16 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             emit_byte(compiler, index);
             emit_byte(compiler, 0);
 
-            compiler->lastReg = compiler->regIndex - 1;
-            compiler->regs[compiler->lastReg] = (RegInfo) { get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous };
-            compiler->lastRegNew = true;
+            compiler->last.reg = compiler->regIndex - 1;
+            compiler->regs[compiler->last.reg] = (RegInfo) { get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous };
+            compiler->last.isNew = true;
         } else {
-            compiler->lastReg = reg;
-            compiler->lastRegNew = false;
+            compiler->last.reg = reg;
+            compiler->last.isNew = false;
         }
     }
+
+    compiler->last.isConst = false;
 }
 
 static void compile_declaration(Compiler* compiler) {
@@ -478,29 +492,35 @@ static void compile_variable_declaration(Compiler* compiler) {
         emit_byte(compiler, compiler->regIndex - 1);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
+
+        compiler->last.isNew = true;
+        compiler->last.isConst = false;
     }
 
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
 
     if(compiler->scopeDepth > 0) {
         if(chunkSize == compiler->function->chunk.size)
-            emit_mov(compiler, compiler->localCount - 1, compiler->lastReg);
+            emit_mov(compiler, compiler->localCount - 1, compiler->last.reg);
         else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->localCount - 1;
+
+        if(compiler->last.isNew)
+            register_free(compiler);
 
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
 
-        compiler->lastReg = compiler->localCount - 1;
-        compiler->regs[compiler->lastReg] = (RegInfo) { REG_LOCAL, lastRegToken };
-        compiler->lastRegNew = true;
+        compiler->last.reg = compiler->localCount - 1;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_LOCAL, lastRegToken };
+        compiler->last.isNew = true;
         return;
     }
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     emit_byte(compiler, OP_DGLOB);
-    emit_byte(compiler, compiler->lastReg);
     emit_byte(compiler, index);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
 }
 
@@ -515,12 +535,23 @@ static void compile_function_declaration(Compiler* compiler) {
     if(compiler->scopeDepth > 0)
         return;
 
+    Chunk* chunk = &compiler->function->chunk;
+    if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
+        compiler->last.reg = chunk->bytecode[chunk->size - 2];
+        compiler->last.isConst = true;
+        chunk->size -= 4;
+    } else compiler->last.reg = compiler->regIndex - 1;
+
     register_free(compiler);
 
-    emit_byte(compiler, OP_DGLOB);
-    emit_byte(compiler, compiler->regIndex);
+    #define L_TYPE (compiler->last.isConst * 0x80)
+
+    emit_byte(compiler, OP_DGLOB | L_TYPE);
     emit_byte(compiler, index);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
+
+    #undef L_TYPE
 }
 
 static void compile_function(Compiler* compiler) {
@@ -531,10 +562,10 @@ static void compile_function(Compiler* compiler) {
     uint32_t length = compiler->parser->previous.size;
     uint32_t hash = map_hash(start, length);
 
-    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+    Compiler* super = compiler->super == NULL ? compiler : compiler->super;
 
-    while(super->enclosing != NULL)
-        super = super->enclosing;
+    while(super->super != NULL)
+        super = super->super;
 
     DenseString* interned = map_find(&super->strings, start, length, hash);
 
@@ -544,11 +575,10 @@ static void compile_function(Compiler* compiler) {
     }
 
     subcompiler.function->name = interned;
-    subcompiler.enclosing = compiler;
+    subcompiler.super = compiler;
     subcompiler.parser = compiler->parser;
 
     scope_begin(&subcompiler);
-
     parser_consume(subcompiler.parser, TOKEN_LEFT_PAREN, "Expected '(' after function name");
 
     if(subcompiler.parser->current.type != TOKEN_RIGHT_PAREN) {
@@ -563,7 +593,7 @@ static void compile_function(Compiler* compiler) {
             declare_variable(&subcompiler);
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
-            ++subcompiler.regIndex;
+            //++subcompiler.regIndex;
         } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
     }
 
@@ -578,12 +608,13 @@ static void compile_function(Compiler* compiler) {
         emit_return(&subcompiler);
     }
 
-    if(!register_reserve(compiler))
-        return;
+    if(compiler->scopeDepth == 0)
+        if(!register_reserve(compiler))
+            return;
 
-    if(subcompiler.upvalueCount == 0)
+    if(subcompiler.upvalueCount == 0) {
         emit_constant(compiler, DENSE_VALUE(subcompiler.function));
-    else {
+    } else {
         emit_constant(compiler, DENSE_VALUE(subcompiler.function));
 
         emit_byte(compiler, OP_CLSR);
@@ -599,7 +630,8 @@ static void compile_function(Compiler* compiler) {
         }
     }
 
-    compiler->lastRegNew = true;
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
     compiler_delete(&subcompiler);
 }
 
@@ -639,11 +671,11 @@ static void compile_if_statement(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->lastReg);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     uint32_t ifEnd = emit_blank(compiler);
@@ -670,11 +702,11 @@ static void compile_while_statement(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->lastReg);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     uint32_t end = emit_blank(compiler);
@@ -730,11 +762,11 @@ static void compile_for_statement(Compiler* compiler) {
         parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
 
         emit_byte(compiler, OP_TEST);
-        emit_byte(compiler, compiler->lastReg);
+        emit_byte(compiler, compiler->last.reg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        if(compiler->lastRegNew)
+        if(compiler->last.isNew)
             register_free(compiler);
 
         exitIndex = emit_blank(compiler);
@@ -799,11 +831,11 @@ static void compile_return_statement(Compiler* compiler) {
         parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after return expression");
 
         emit_byte(compiler, OP_RET);
-        emit_byte(compiler, compiler->lastReg);
+        emit_byte(compiler, compiler->last.reg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        if(compiler->lastRegNew)
+        if(compiler->last.isNew)
             register_free(compiler);
     }
 }
@@ -819,11 +851,11 @@ static void compile_return_expression(Compiler* compiler) {
         compile_expression(compiler);
 
         emit_byte(compiler, OP_RET);
-        emit_byte(compiler, compiler->lastReg);
+        emit_byte(compiler, compiler->last.reg);
         emit_byte(compiler, 0);
         emit_byte(compiler, 0);
 
-        if(compiler->lastRegNew)
+        if(compiler->last.isNew)
             register_free(compiler);
     }
 }
@@ -938,7 +970,7 @@ static void compile_expression_statement(Compiler* compiler) {
     compile_expression(compiler);
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 }
 
@@ -973,13 +1005,14 @@ static void compile_expression_precedence(Compiler* compiler, Precedence precede
 }
 
 static void compile_call(Compiler* compiler, bool allowAssignment) {
-    if(!compiler->lastRegNew) {
+    if(!compiler->last.isNew) {
         if(!register_reserve(compiler))
             return;
-        emit_mov(compiler, compiler->regIndex - 1,  compiler->lastReg);
+        emit_mov(compiler, compiler->regIndex - 1,  compiler->last.reg);
+        compiler->last.reg = compiler->regIndex - 1;
     }
 
-    uint8_t functionReg = compiler->lastReg;
+    uint8_t functionReg = compiler->last.reg;
 
     if(compiler->regIndex <= functionReg)
         if(!register_reserve(compiler))
@@ -998,7 +1031,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     }
 
     compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
-    compiler->lastRegNew = true;
+    compiler->last.isNew = true;
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {
@@ -1016,7 +1049,7 @@ static uint8_t compile_arguments(Compiler* compiler) {
                     return 255;
 
             if(chunkSize == compiler->function->chunk.size)
-                emit_mov(compiler, compiler->regIndex - 1, compiler->lastReg);
+                emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
             else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
 
             if(argc == 255) {
@@ -1054,7 +1087,7 @@ static void compile_grouping_or_lambda(Compiler* compiler, bool allowAssignment)
 
     // Lambda.
     if(compiler->parser->current.type == TOKEN_EQUAL_GREATER) {
-        if(compiler->lastRegNew)
+        if(compiler->last.isNew)
             register_free(compiler);
 
         compiler->function->chunk.size = backupSize;
@@ -1072,10 +1105,10 @@ static void compile_lambda(Compiler* compiler) {
     uint32_t length = 6;
     uint32_t hash = map_hash(start, length);
 
-    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+    Compiler* super = compiler->super == NULL ? compiler : compiler->super;
 
-    while(super->enclosing != NULL)
-        super = super->enclosing;
+    while(super->super != NULL)
+        super = super->super;
 
     DenseString* interned = map_find(&super->strings, start, length, hash);
 
@@ -1085,7 +1118,7 @@ static void compile_lambda(Compiler* compiler) {
     }
 
     subcompiler.function->name = interned;
-    subcompiler.enclosing = compiler;
+    subcompiler.super = compiler;
     subcompiler.parser = compiler->parser;
 
     scope_begin(&subcompiler);
@@ -1101,7 +1134,7 @@ static void compile_lambda(Compiler* compiler) {
             declare_variable(&subcompiler);
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
-            ++subcompiler.regIndex;
+            //++subcompiler.regIndex;
         } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
     }
 
@@ -1111,10 +1144,7 @@ static void compile_lambda(Compiler* compiler) {
     if(subcompiler.parser->current.type == TOKEN_LEFT_BRACE) {
         parser_advance(subcompiler.parser);
         compile_block(&subcompiler);
-
-        Chunk* chunk = &compiler->function->chunk;
-        if(chunk->size > 0 && chunk->bytecode[chunk->size - 4] != OP_RET)
-            emit_return(&subcompiler);
+        emit_return(&subcompiler);
     } else compile_return_expression(&subcompiler);
 
     if(!register_reserve(compiler))
@@ -1138,7 +1168,7 @@ static void compile_lambda(Compiler* compiler) {
         }
     }
 
-    compiler->lastRegNew = true;
+    compiler->last.isNew = true;
     compiler_delete(&subcompiler);
 }
 
@@ -1147,87 +1177,121 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
 
     compile_expression_precedence(compiler, PREC_UNARY);
 
-    if(!compiler->lastRegNew) {
+    uint8_t destReg;
+
+    if(compiler->last.isConst) {
+        //register_free(compiler);
+        destReg = compiler->last.reg;
+        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+        compiler->function->chunk.size -= 4;
+    } else if(compiler->regs[compiler->last.reg].type != REG_TEMP) {
         if(!register_reserve(compiler))
             return;
-        compiler->lastReg = compiler->regIndex - 1;
-    }
+        destReg = compiler->regIndex - 1;
+    } else destReg = compiler->last.reg;
+
+    #define L_TYPE (compiler->last.isConst * 0x80)
 
     switch(operator) {
         case TOKEN_BANG:
-            emit_bytes(compiler, OP_NOT, compiler->regIndex - 1, compiler->lastReg);
+            emit_bytes(compiler, OP_NOT | L_TYPE, destReg, compiler->last.reg);
             emit_byte(compiler, 0);
             break;
         case TOKEN_TILDE:
-            emit_bytes(compiler, OP_BNOT, compiler->regIndex - 1, compiler->lastReg);
+            emit_bytes(compiler, OP_BNOT | L_TYPE, destReg, compiler->last.reg);
             emit_byte(compiler, 0);
             break;
         case TOKEN_MINUS:
-            emit_bytes(compiler, OP_NEG, compiler->regIndex - 1, compiler->lastReg);
+            emit_bytes(compiler, OP_NEG | L_TYPE, destReg, compiler->last.reg);
             emit_byte(compiler, 0);
             break;
         default:
             return;
     }
+
+    compiler->last.isNew = true;
+    compiler->regs[destReg] = (RegInfo) { REG_TEMP };
+    compiler->last.reg = destReg;
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+
+    #undef L_TYPE
 }
 
 static void compile_binary(Compiler* compiler, bool allowAssignment) {
-    uint8_t leftReg = compiler->lastReg;
-    bool isLeftNew = compiler->lastRegNew;
+    uint8_t leftReg = compiler->last.reg;
+    bool isLeftNew = compiler->last.isNew;
+    bool isLeftConst = compiler->last.isConst;
+
+    if(isLeftConst) {
+        register_free(compiler);
+        leftReg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+        compiler->function->chunk.size -= 4;
+        isLeftNew = false;
+    }
 
     TokenType operatorType = compiler->parser->previous.type;
 
     Rule* rule = &EXPRESSION_RULES[operatorType];
     compile_expression_precedence(compiler, (Precedence) (rule->precedence + 1));
 
+    if(compiler->last.isConst) {
+        register_free(compiler);
+        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+        compiler->function->chunk.size -= 4;
+        compiler->last.isNew = false;
+    }
+
+    #define LR_TYPES ((isLeftConst * 0x80) | (compiler->last.isConst * 0x40))
+
     switch(operatorType) {
         case TOKEN_PLUS:
-            emit_byte(compiler, OP_ADD);
+            emit_byte(compiler, OP_ADD | LR_TYPES);
             break;
         case TOKEN_MINUS:
-            emit_byte(compiler, OP_SUB);
+            emit_byte(compiler, OP_SUB | LR_TYPES);
             break;
         case TOKEN_STAR:
-            emit_byte(compiler, OP_MUL);
+            emit_byte(compiler, OP_MUL | LR_TYPES);
             break;
         case TOKEN_SLASH:
-            emit_byte(compiler, OP_DIV);
+            emit_byte(compiler, OP_DIV | LR_TYPES);
             break;
         case TOKEN_PERCENT:
-            emit_byte(compiler, OP_MOD);
+            emit_byte(compiler, OP_MOD | LR_TYPES);
             break;
         case TOKEN_LESS_LESS:
-            emit_byte(compiler, OP_SHL);
+            emit_byte(compiler, OP_SHL | LR_TYPES);
             break;
         case TOKEN_GREATER_GREATER:
-            emit_byte(compiler, OP_SHR);
+            emit_byte(compiler, OP_SHR | LR_TYPES);
             break;
         case TOKEN_GREATER:
-            emit_byte(compiler, OP_GT);
+            emit_byte(compiler, OP_GT | LR_TYPES);
             break;
         case TOKEN_GREATER_EQUAL:
-            emit_byte(compiler, OP_GTE);
+            emit_byte(compiler, OP_GTE | LR_TYPES);
             break;
         case TOKEN_LESS:
-            emit_byte(compiler, OP_LT);
+            emit_byte(compiler, OP_LT | LR_TYPES);
             break;
         case TOKEN_LESS_EQUAL:
-            emit_byte(compiler, OP_LTE);
+            emit_byte(compiler, OP_LTE | LR_TYPES);
             break;
         case TOKEN_EQUAL_EQUAL:
-            emit_byte(compiler, OP_EQ);
+            emit_byte(compiler, OP_EQ | LR_TYPES);
             break;
         case TOKEN_BANG_EQUAL:
-            emit_byte(compiler, OP_NEQ);
+            emit_byte(compiler, OP_NEQ | LR_TYPES);
             break;
         case TOKEN_AMPERSAND:
-            emit_byte(compiler, OP_BAND);
+            emit_byte(compiler, OP_BAND | LR_TYPES);
             break;
         case TOKEN_CARET:
-            emit_byte(compiler, OP_BXOR);
+            emit_byte(compiler, OP_BXOR | LR_TYPES);
             break;
         case TOKEN_PIPE:
-            emit_byte(compiler, OP_BOR);
+            emit_byte(compiler, OP_BOR | LR_TYPES);
             break;
         default:
             return;
@@ -1235,22 +1299,26 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
 
     uint8_t destReg;
 
-    if(compiler->lastRegNew) {
-        destReg = compiler->lastReg;
+    if(compiler->regs[compiler->last.reg].type == REG_TEMP) {
+        destReg = compiler->last.reg;
 
         if(isLeftNew)
             register_free(compiler);
-    } else if(isLeftNew && leftReg != compiler->lastReg) {
+    } else if(compiler->regs[leftReg].type == REG_TEMP) {
         destReg = leftReg;
     } else {
         register_reserve(compiler);
         destReg = compiler->regIndex - 1;
     }
 
-    emit_bytes(compiler, destReg, leftReg, compiler->lastReg);
+    emit_bytes(compiler, destReg, leftReg, compiler->last.reg);
+
     compiler->regs[destReg] = (RegInfo) { REG_TEMP };
-    compiler->lastReg = destReg;
-    compiler->lastRegNew = true;
+    compiler->last.reg = destReg;
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+
+    #undef LR_TYPES
 }
 
 static void compile_ternary(Compiler* compiler, bool allowAssignment) {
@@ -1276,11 +1344,11 @@ static void compile_ternary(Compiler* compiler, bool allowAssignment) {
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->lastReg);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     uint16_t index = emit_blank(compiler);
@@ -1292,11 +1360,11 @@ static void compile_and(Compiler* compiler, bool allowAssignment) {
 
 static void compile_or(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, OP_NTEST);
-    emit_byte(compiler, compiler->lastReg);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     uint16_t index = emit_blank(compiler);
@@ -1307,7 +1375,7 @@ static void compile_or(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_comma(Compiler* compiler, bool allowAssignment) {
-    if(compiler->lastRegNew)
+    if(compiler->last.isNew)
         register_free(compiler);
 
     compile_expression_precedence(compiler, PREC_COMMA);
@@ -1334,15 +1402,18 @@ static void scope_end(Compiler* compiler) {
 }
 
 static void local_add(Compiler* compiler, Token identifier) {
-    if(compiler->localCount > 250) {
+    if(compiler->localCount == 250) {
         parser_error_at_previous(compiler->parser, "Local variable limit exceeded (250)");
         return;
     }
 
+    if(!register_reserve(compiler))
+        return;
+
     Local* local = &compiler->locals[compiler->localCount++];
     local->identifier = identifier;
     local->depth = -1;
-    local->reg = compiler->regIndex;
+    local->reg = compiler->regIndex - 1;
     local->captured = false;
 
     compiler->regs[local->reg] = (RegInfo) { REG_LOCAL, identifier };
@@ -1379,17 +1450,17 @@ static uint8_t upvalue_add(Compiler* compiler, uint8_t index, bool local) {
 }
 
 static uint8_t upvalue_resolve(Compiler* compiler, Token* identifier) {
-    if(compiler->enclosing == NULL)
+    if(compiler->super == NULL)
         return 251;
 
-    uint8_t local = local_resolve(compiler->enclosing, identifier);
+    uint8_t local = local_resolve(compiler->super, identifier);
 
     if(local != 251) {
-        compiler->enclosing->locals[local].captured = true;
+        compiler->super->locals[local].captured = true;
         return upvalue_add(compiler, local, true);
     }
 
-    uint8_t upvalue = upvalue_resolve(compiler->enclosing, identifier);
+    uint8_t upvalue = upvalue_resolve(compiler->super, identifier);
 
     if(upvalue != 251)
         return upvalue_add(compiler, upvalue, false);
@@ -1426,17 +1497,22 @@ static void emit_constant(Compiler* compiler, Value value) {
 }
 
 static void emit_return(Compiler* compiler) {
-    emit_byte(compiler, OP_RET);
-    emit_byte(compiler, 251);
-    emit_byte(compiler, 0);
-    emit_byte(compiler, 0);
+    Chunk* chunk = &compiler->function->chunk;
+    if(chunk->size > 0 && chunk->bytecode[chunk->size - 4] != OP_RET) {
+        emit_byte(compiler, OP_RET);
+        emit_byte(compiler, 251);
+        emit_byte(compiler, 0);
+        emit_byte(compiler, 0);
+    }
 }
 
 static void emit_mov(Compiler* compiler, uint8_t dest, uint8_t src) {
-    emit_byte(compiler, OP_MOV);
-    emit_byte(compiler, dest);
-    emit_byte(compiler, src);
-    emit_byte(compiler, 0);
+    if(dest != src) {
+        emit_byte(compiler, OP_MOV);
+        emit_byte(compiler, dest);
+        emit_byte(compiler, src);
+        emit_byte(compiler, 0);
+    }
 }
 
 static uint32_t emit_blank(Compiler* compiler) {
@@ -1519,10 +1595,10 @@ static uint16_t create_identifier_constant(Compiler* compiler) {
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length) {
     uint32_t hash = map_hash(start, length);
 
-    Compiler* super = compiler->enclosing == NULL ? compiler : compiler->enclosing;
+    Compiler* super = compiler->super == NULL ? compiler : compiler->super;
 
-    while(super->enclosing != NULL)
-        super = super->enclosing;
+    while(super->super != NULL)
+        super = super->super;
 
     DenseString* interned = map_find(&super->strings, start, length, hash);
 
@@ -1565,7 +1641,7 @@ static bool register_reserve(Compiler* compiler) {
         return false;
     }
     else {
-        compiler->regs[compiler->regIndex] = (RegInfo) { REG_TEMP + 1, { TOKEN_ERROR, NULL, 0, 0 } };
+        compiler->regs[compiler->regIndex] = (RegInfo) { REG_TEMP };
         ++compiler->regIndex;
         return true;
     }

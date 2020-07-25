@@ -53,6 +53,9 @@ VMStatus vm_execute(VM* vm) {
 VMStatus vm_run(VM* vm) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
 
+    #define TYPE_MASK 0xC0
+    #define INSTRUCTION_MASK 0x3F
+
     #define NEXT_BYTE() (*frame->ip++)
     #define NEXT_CONSTANT() (FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
 
@@ -69,6 +72,12 @@ VMStatus vm_run(VM* vm) {
     #define DEST_REG  (frame->regs[DEST])
     #define LEFT_REG  (frame->regs[LEFT])
     #define RIGHT_REG (frame->regs[RIGHT])
+
+    #define LEFT_TYPE_MASK 0x80
+    #define RIGHT_TYPE_MASK 0x40
+
+    #define LEFT_BY_TYPE  (types & LEFT_TYPE_MASK ? LEFT_CONST : LEFT_REG)
+    #define RIGHT_BY_TYPE (types & RIGHT_TYPE_MASK ? RIGHT_CONST : RIGHT_REG)
 
     #define SKIP(count) (frame->ip += count)
     #define BSKIP(count) (frame->ip -= count)
@@ -87,6 +96,8 @@ VMStatus vm_run(VM* vm) {
         #endif
 
         uint8_t instruction = NEXT_BYTE();
+        uint8_t types = instruction & TYPE_MASK;
+        instruction &= INSTRUCTION_MASK;
 
         switch(instruction) {
             case OP_CNST: {
@@ -108,7 +119,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_DGLOB: {
-                map_set(&vm->globals, AS_STRING(LEFT_CONST), DEST_REG);
+                map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE);
                 gc_check(vm);
 
                 SKIP(3);
@@ -217,16 +228,18 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_NOT: {
-                DEST_REG = BOOL_VALUE(value_is_falsy(LEFT_REG));
+                DEST_REG = BOOL_VALUE(value_is_falsy(LEFT_BY_TYPE));
 
                 SKIP(3);
                 break;
             }
             case OP_BNOT: {
-                if(IS_BYTE(LEFT_REG))
-                    DEST_REG = BYTE_VALUE(~AS_BYTE(LEFT_REG));
-                else if(IS_INT(LEFT_REG))
-                    DEST_REG = INT_VALUE(~AS_INT(LEFT_REG));
+                Value left = LEFT_BY_TYPE;
+
+                if(IS_BYTE(left))
+                    DEST_REG = BYTE_VALUE(~AS_BYTE(left));
+                else if(IS_INT(left))
+                    DEST_REG = INT_VALUE(~AS_INT(left));
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte or int");
                     return VM_ERROR;
@@ -236,12 +249,14 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_NEG: {
-                if(IS_BYTE(LEFT_REG))
-                    DEST_REG = INT_VALUE(-((int64_t) AS_BYTE(LEFT_REG)));
-                else if(IS_INT(LEFT_REG))
-                    DEST_REG = INT_VALUE(-AS_INT(LEFT_REG));
-                else if(IS_FLOAT(LEFT_REG))
-                    DEST_REG = FLOAT_VALUE(-AS_FLOAT(LEFT_REG));
+                Value left = LEFT_BY_TYPE;
+
+                if(IS_BYTE(left))
+                    DEST_REG = INT_VALUE(-((int64_t) AS_BYTE(left)));
+                else if(IS_INT(left))
+                    DEST_REG = INT_VALUE(-AS_INT(left));
+                else if(IS_FLOAT(left))
+                    DEST_REG = FLOAT_VALUE(-AS_FLOAT(left));
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
                     return VM_ERROR;
@@ -251,42 +266,45 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_ADD: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) + AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) + AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_BYTE(LEFT_REG) + AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) + AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) + AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_BYTE(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) + AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) + AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_INT(LEFT_REG) + AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) + AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) + AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_INT(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) + AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) + AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) + AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) + AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) + AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
-                    if(value_is_dense_of_type(RIGHT_REG, DVAL_STRING)) {
-                        DenseString* result = dense_string_concat(AS_STRING(LEFT_REG), AS_STRING(RIGHT_REG));
+                } else if(value_is_dense_of_type(left, DVAL_STRING)) {
+                    if(value_is_dense_of_type(right, DVAL_STRING)) {
+                        DenseString* result = dense_string_concat(AS_STRING(left), AS_STRING(right));
                         DenseString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
 
                         if(interned != NULL) {
@@ -311,35 +329,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_SUB: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) - AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) - AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_BYTE(LEFT_REG) - AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) - AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) - AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_BYTE(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) - AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) - AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_INT(LEFT_REG) - AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) - AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) - AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_INT(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) - AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) - AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) - AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) - AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) - AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
@@ -353,35 +374,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_MUL: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) * AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) * AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_BYTE(LEFT_REG) * AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) * AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) * AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_BYTE(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) * AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) * AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_INT(LEFT_REG) * AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) * AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) * AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_INT(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) * AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) * AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) * AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) * AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) * AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
@@ -395,35 +419,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_DIV: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) / AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) / AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_BYTE(LEFT_REG) / AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) / AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) / AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_BYTE(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) / AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) / AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_INT(LEFT_REG) / AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) / AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) / AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_INT(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) / AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) / AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) / AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) / AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) / AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
                         return VM_ERROR;
@@ -437,20 +464,23 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_MOD: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) % AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) % AS_INT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) % AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) % AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_INT(LEFT_REG) % AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) % AS_INT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_INT(left) % AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) % AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
@@ -464,35 +494,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_SHL: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) << AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        if(AS_INT(RIGHT_REG) < 0) {
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) << AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift left with a negative amount");
                             return VM_ERROR;
                         }
 
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) << AS_INT(RIGHT_REG));
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) << AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(AS_INT(LEFT_REG) < 0) {
+                } else if(IS_INT(left)) {
+                    if(AS_INT(left) < 0) {
                         VM_RUNTIME_ERROR(vm, "Cannot shift negative numbers");
                         return VM_ERROR;
                     }
 
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) << AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        if(AS_INT(RIGHT_REG) < 0) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) << AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift left with a negative amount");
                             return VM_ERROR;
                         }
 
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) << AS_INT(RIGHT_REG));
+                        DEST_REG = INT_VALUE(AS_INT(left) << AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
@@ -506,35 +539,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_SHR: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) >> AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        if(AS_INT(RIGHT_REG) < 0) {
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) >> AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift right with a negative amount");
                             return VM_ERROR;
                         }
 
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) >> AS_INT(RIGHT_REG));
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) >> AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(AS_INT(LEFT_REG) < 0) {
+                } else if(IS_INT(left)) {
+                    if(AS_INT(left) < 0) {
                         VM_RUNTIME_ERROR(vm, "Cannot shift negative numbers");
                         return VM_ERROR;
                     }
 
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) >> AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        if(AS_INT(RIGHT_REG) < 0) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) >> AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift right with a negative amount");
                             return VM_ERROR;
                         }
 
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) >> AS_INT(RIGHT_REG));
+                        DEST_REG = INT_VALUE(AS_INT(left) >> AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
@@ -548,35 +584,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_GT: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) > AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) > AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) > AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) > AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) > AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) > AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) > AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) > AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) > AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) > AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) > AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) > AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) > AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) > AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = FLOAT_VALUE(AS_FLOAT(LEFT_REG) > AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) > AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) > AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = FLOAT_VALUE(AS_FLOAT(left) > AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
@@ -590,35 +629,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_GTE: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) >= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) >= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) >= AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) >= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) >= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) >= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) >= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) >= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) >= AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) >= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) >= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) >= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) >= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) >= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) >= AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) >= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) >= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) >= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
@@ -632,35 +674,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_LT: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) < AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) < AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) < AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) < AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) < AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) < AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) < AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) < AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) < AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) < AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) < AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) < AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) < AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) < AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) < AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
@@ -674,35 +719,38 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_LTE: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) <= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) <= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_BYTE(LEFT_REG) <= AS_FLOAT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) <= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) <= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_BYTE(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) <= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) <= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_INT(LEFT_REG) <= AS_FLOAT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) <= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) <= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_INT(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
                     }
-                } else if(IS_FLOAT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) <= AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) <= AS_INT(RIGHT_REG));
-                    } else if(IS_FLOAT(RIGHT_REG)) {
-                        DEST_REG = BOOL_VALUE(AS_FLOAT(LEFT_REG) <= AS_FLOAT(RIGHT_REG));
+                } else if(IS_FLOAT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) <= AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) <= AS_INT(right));
+                    } else if(IS_FLOAT(right)) {
+                        DEST_REG = BOOL_VALUE(AS_FLOAT(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
                         return VM_ERROR;
@@ -716,32 +764,41 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_EQ: {
-                DEST_REG = BOOL_VALUE(value_equals(LEFT_REG, RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                DEST_REG = BOOL_VALUE(value_equals(left, right));
 
                 SKIP(3);
                 break;
             }
             case OP_NEQ: {
-                DEST_REG = BOOL_VALUE(!value_equals(LEFT_REG, RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                DEST_REG = BOOL_VALUE(!value_equals(left, right));
 
                 SKIP(3);
                 break;
             }
             case OP_BAND: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) & AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) & AS_INT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) & AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) & AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) & AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) & AS_INT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) & AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) & AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
@@ -755,20 +812,23 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_BXOR: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) ^ AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) ^ AS_INT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) ^ AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) ^ AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) ^ AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) ^ AS_INT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) ^ AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) ^ AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
@@ -782,20 +842,23 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_BOR: {
-                if(IS_BYTE(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = BYTE_VALUE(AS_BYTE(LEFT_REG) | AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_BYTE(LEFT_REG) | AS_INT(RIGHT_REG));
+                Value left = LEFT_BY_TYPE;
+                Value right = RIGHT_BY_TYPE;
+
+                if(IS_BYTE(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = BYTE_VALUE(AS_BYTE(left) | AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_BYTE(left) | AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
                     }
-                } else if(IS_INT(LEFT_REG)) {
-                    if(IS_BYTE(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) | AS_BYTE(RIGHT_REG));
-                    } else if(IS_INT(RIGHT_REG)) {
-                        DEST_REG = INT_VALUE(AS_INT(LEFT_REG) | AS_INT(RIGHT_REG));
+                } else if(IS_INT(left)) {
+                    if(IS_BYTE(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) | AS_BYTE(right));
+                    } else if(IS_INT(right)) {
+                        DEST_REG = INT_VALUE(AS_INT(left) | AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
                         return VM_ERROR;
