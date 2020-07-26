@@ -139,7 +139,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_SGLOB: {
-                if(map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_REG)) {
+                if(map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE)) {
                     map_erase(&vm->globals, AS_STRING(DEST_CONST));
 
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(DEST_CONST));

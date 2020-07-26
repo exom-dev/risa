@@ -18,7 +18,7 @@ size_t disassemble_mov_instruction(const char* name, Chunk* chunk, size_t offset
 size_t disassemble_call_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_global_define_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_global_get_instruction(const char* name, Chunk* chunk, size_t offset);
-size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_global_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_upvalue_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_upvalue_get_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_upvalue_set_instruction(const char* name, Chunk* chunk, size_t offset);
@@ -45,7 +45,7 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_GGLOB:
             return disassemble_global_get_instruction("GGLOB", chunk, offset);
         case OP_SGLOB:
-            return disassemble_global_set_instruction("SGLOB", chunk, offset);
+            return disassemble_global_set_instruction("SGLOB", types, chunk, offset);
         case OP_UPVAL:
             return disassemble_upvalue_instruction("UPVAL", chunk, offset);
         case OP_GUPVAL:
@@ -193,8 +193,8 @@ size_t disassemble_global_get_instruction(const char* name, Chunk* chunk, size_t
     return offset + 4;
 }
 
-size_t disassemble_global_set_instruction(const char* name, Chunk* chunk, size_t offset) {
-    PRINT("%-16s %4d %4d    '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
+size_t disassemble_global_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d%c    '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], (types & LEFT_TYPE_MASK ? 'c' : 'r'));
     value_print(chunk->constants.values[chunk->bytecode[offset + 1]]);
     PRINT("'\n");
 

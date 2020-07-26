@@ -423,9 +423,22 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                 emit_mov(compiler, index, compiler->last.reg);
             else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
         } else {
+            if(set == OP_SGLOB) {
+                Chunk* chunk = &compiler->function->chunk;
+                if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
+                    compiler->last.reg = chunk->bytecode[chunk->size - 2];
+                    compiler->last.isConst = true;
+                    chunk->size -= 4;
+                }
+
+                #define L_TYPE (compiler->last.isConst * 0x80)
+                set |= L_TYPE;
+                #undef L_TYPE
+            }
+
             emit_byte(compiler, set);
             emit_byte(compiler, index);
-            emit_byte(compiler, compiler->regIndex - 1);
+            emit_byte(compiler, compiler->last.reg); // compiler->regIndex - 1;
             emit_byte(compiler, 0);
         }
 
