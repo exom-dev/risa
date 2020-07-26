@@ -418,7 +418,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
         uint32_t chunkSize = compiler->function->chunk.size;
         compile_expression(compiler);
 
-        if(index != 251) {
+        if(set == OP_MOV) {
             if(chunkSize == compiler->function->chunk.size)
                 emit_mov(compiler, index, compiler->last.reg);
             else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
@@ -518,10 +518,21 @@ static void compile_variable_declaration(Compiler* compiler) {
     if(compiler->last.isNew)
         register_free(compiler);
 
-    emit_byte(compiler, OP_DGLOB);
+    Chunk* chunk = &compiler->function->chunk;
+    if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
+        compiler->last.reg = chunk->bytecode[chunk->size - 2];
+        compiler->last.isConst = true;
+        chunk->size -= 4;
+    }
+
+    #define L_TYPE (compiler->last.isConst * 0x80)
+
+    emit_byte(compiler, OP_DGLOB | L_TYPE);
     emit_byte(compiler, index);
     emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
+
+    #undef L_TYPE
 }
 
 static void compile_function_declaration(Compiler* compiler) {
@@ -1299,12 +1310,12 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
 
     uint8_t destReg;
 
-    if(compiler->regs[compiler->last.reg].type == REG_TEMP) {
+    if(compiler->last.isNew/*compiler->regs[compiler->last.reg].type == REG_TEMP*/) {
         destReg = compiler->last.reg;
 
         if(isLeftNew)
             register_free(compiler);
-    } else if(compiler->regs[leftReg].type == REG_TEMP) {
+    } else if(isLeftNew/*compiler->regs[leftReg].type == REG_TEMP*/) {
         destReg = leftReg;
     } else {
         register_reserve(compiler);
