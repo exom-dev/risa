@@ -995,8 +995,7 @@ void vm_register_dense(VM* vm, DenseValue* dense) {
             if (IS_DENSE(constants->values[i]))
                 vm_register_dense(vm, AS_DENSE(constants->values[i]));
     } else if(dense->type == DVAL_CLOSURE) {
-        if(((DenseClosure*) dense)->function->name != NULL)
-            vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
+        vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
 
         ValueArray* constants = &((DenseClosure*) dense)->function->chunk.constants;
 
