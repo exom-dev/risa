@@ -120,7 +120,8 @@ DIGIT ::= [0-9] ;
 - ~~lambda expressions~~
 - ~~string escape sequences~~
 - ~~comma operator~~
-- compiler optimizations
+- prefix/postfix inc/dec
+- ~~compiler optimizations~~
 - assembler + inline assembly
 
 # License <a href="https://github.com/exom-dev/risa/blob/master/LICENSE"><img align="right" src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
