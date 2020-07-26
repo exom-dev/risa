@@ -176,10 +176,12 @@ VMStatus vm_run(VM* vm) {
             }
             case OP_CUPVAL: {
                 upvalue_close_from(vm, &DEST_REG);
+
+                SKIP(3);
                 break;
             }
             case OP_CLSR: {
-                DenseFunction* function = (DenseFunction*) AS_DENSE(LEFT_CONST);
+                DenseFunction* function = (DenseFunction*) AS_DENSE(LEFT_REG);
                 DenseClosure* closure = dense_closure_create(function, RIGHT);
 
                 vm_register_dense(vm, (DenseValue*) closure);
@@ -993,7 +995,8 @@ void vm_register_dense(VM* vm, DenseValue* dense) {
             if (IS_DENSE(constants->values[i]))
                 vm_register_dense(vm, AS_DENSE(constants->values[i]));
     } else if(dense->type == DVAL_CLOSURE) {
-        vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
+        if(((DenseClosure*) dense)->function->name != NULL)
+            vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
 
         ValueArray* constants = &((DenseClosure*) dense)->function->chunk.constants;
 
