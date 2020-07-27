@@ -121,6 +121,7 @@ DIGIT ::= [0-9] ;
 - ~~string escape sequences~~
 - ~~comma operator~~
 - prefix/postfix inc/dec
+- extra equal operators
 - ~~compiler optimizations~~
 - assembler + inline assembly
 - REPL compilation option
