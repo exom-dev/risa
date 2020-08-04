@@ -6,6 +6,15 @@ void dense_print(DenseValue* dense) {
         case DVAL_STRING:
             PRINT("%s", ((DenseString*) dense)->chars);
             break;
+        case DVAL_ARRAY:
+            PRINT("[");
+            for(uint32_t i = 0; i < ((DenseArray*) dense)->data.size; ++i) {
+                value_print(((DenseArray *) dense)->data.values[i]);
+                if(i < ((DenseArray*) dense)->data.size - 1)
+                    PRINT(", ");
+            }
+            PRINT("]");
+            break;
         case DVAL_UPVALUE:
             PRINT("<upval>");
             break;
@@ -31,6 +40,8 @@ size_t dense_size(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
             return sizeof(DenseString) + ((DenseString*) dense)->length + 1;
+        case DVAL_ARRAY:
+            return sizeof(DenseArray);
         case DVAL_UPVALUE:
             return sizeof(DenseUpvalue);
         case DVAL_FUNCTION:
@@ -46,6 +57,9 @@ size_t dense_size(DenseValue* dense) {
 void dense_delete(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
+            MEM_FREE(dense);
+            break;
+        case DVAL_ARRAY:
             MEM_FREE(dense);
             break;
         case DVAL_UPVALUE:

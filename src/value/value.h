@@ -14,6 +14,7 @@ typedef enum {
 
 typedef enum {
     DVAL_STRING,
+    DVAL_ARRAY,
     DVAL_UPVALUE,
     DVAL_FUNCTION,
     DVAL_CLOSURE,
@@ -38,6 +39,13 @@ typedef struct {
     } as;
 } Value;
 
+typedef struct {
+    size_t size;
+    size_t capacity;
+
+    Value* values;
+} ValueArray;
+
 #define NULL_VALUE         ((Value) { VAL_NULL, { .integer = 0 } })
 #define BOOL_VALUE(value)  ((Value) { VAL_BOOL, { .boolean = value} })
 #define BYTE_VALUE(value)  ((Value) { VAL_BYTE, { .byte = value } })
@@ -57,13 +65,6 @@ typedef struct {
 #define IS_INT(value)   ((value).type == VAL_INT)
 #define IS_FLOAT(value) ((value).type == VAL_FLOAT)
 #define IS_DENSE(value) ((value).type == VAL_DENSE)
-
-typedef struct {
-    size_t size;
-    size_t capacity;
-
-    Value* values;
-} ValueArray;
 
 void value_print(Value value);
 bool value_is_falsy(Value value);

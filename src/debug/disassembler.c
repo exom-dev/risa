@@ -24,6 +24,9 @@ size_t disassemble_upvalue_get_instruction(const char* name, Chunk* chunk, size_
 size_t disassemble_upvalue_set_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_upvalue_close_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t offset);
+size_t disassemble_array_push_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
+size_t disassemble_array_get_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
+size_t disassemble_array_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_return_instruction(const char* name, Chunk* chunk, size_t offset);
 
 size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
@@ -56,6 +59,14 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_upvalue_close_instruction("CUPVAL", chunk, offset);
         case OP_CLSR:
             return disassemble_closure_instruction("CLSR", chunk, offset);
+        case OP_ARR:
+            return disassemble_byte_instruction("ARR", chunk, offset);
+        case OP_PARR:
+            return disassemble_array_push_instruction("PARR", types, chunk, offset);
+        case OP_GARR:
+            return disassemble_array_get_instruction("GARR", types, chunk, offset);
+        case OP_SARR:
+            return disassemble_array_set_instruction("SARR", types, chunk, offset);
         case OP_NULL:
             return disassemble_byte_instruction("NULL", chunk, offset);
         case OP_TRUE:
@@ -229,6 +240,24 @@ size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t of
     PRINT("%-16s %4d %4d %4d   '", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], chunk->bytecode[offset + 3]);
     value_print(chunk->constants.values[chunk->bytecode[offset + 2]]);
     PRINT("'\n");
+
+    return offset + 4;
+}
+
+size_t disassemble_array_push_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d%c\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], (types & LEFT_TYPE_MASK ? 'c' : 'r'));
+
+    return offset + 4;
+}
+
+size_t disassemble_array_get_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d %4d%c\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], chunk->bytecode[offset + 3], (types & RIGHT_TYPE_MASK ? 'c' : 'r'));
+
+    return offset + 4;
+}
+
+size_t disassemble_array_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d%c %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], types & LEFT_TYPE_MASK ? 'c' : 'r', chunk->bytecode[offset + 3]);
 
     return offset + 4;
 }

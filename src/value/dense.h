@@ -16,6 +16,12 @@ typedef struct {
     char chars[];
 } DenseString;
 
+typedef struct {
+    DenseValue dense;
+
+    ValueArray data;
+} DenseArray;
+
 typedef struct DenseUpvalue {
     DenseValue dense;
 
@@ -50,6 +56,7 @@ typedef struct {
 } DenseNative;
 
 #define AS_STRING(value)   ((DenseString*) ((value).as.dense))
+#define AS_ARRAY(value)    ((DenseArray*) ((value).as.dense))
 #define AS_CSTRING(value)  (((DenseString*) ((value).as.dense))->chars)
 #define AS_FUNCTION(value) ((DenseFunction*) ((value).as.dense))
 #define AS_CLOSURE(value)  ((DenseClosure*) ((value).as.dense))
@@ -62,6 +69,12 @@ void   dense_delete(DenseValue* dense);
 uint32_t     dense_string_hash(DenseString* string);
 DenseString* dense_string_from(const char* chars, uint32_t length);
 DenseString* dense_string_concat(DenseString* left, DenseString* right);
+
+DenseArray* dense_array_create();
+void        dense_array_init(DenseArray* array);
+void        dense_array_delete(DenseArray* array);
+Value       dense_array_get(DenseArray* array, uint32_t index);
+void        dense_array_set(DenseArray* array, uint32_t index, Value value);
 
 DenseUpvalue* dense_upvalue_create(Value* value);
 

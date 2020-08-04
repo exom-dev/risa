@@ -211,6 +211,87 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
+            case OP_ARR: {
+                DEST_REG = DENSE_VALUE(dense_array_create());
+                vm_register_dense(vm, AS_DENSE(DEST_REG));
+                gc_check(vm);
+
+                SKIP(3);
+                break;
+            }
+            case OP_PARR: {
+                if(!value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
+                    VM_RUNTIME_ERROR(vm, "Destination must be an array");
+                    return VM_ERROR;
+                }
+
+                DenseArray* array = AS_ARRAY(DEST_REG);
+
+                if(array->data.size == UINT32_MAX) {
+                    VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
+                    return VM_ERROR;
+                }
+
+                value_array_write(&array->data, LEFT_BY_TYPE);
+                gc_check(vm);
+
+                SKIP(3);
+                break;
+            }
+            case OP_GARR: {
+                if(!value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
+                    VM_RUNTIME_ERROR(vm, "Left operand must be an array");
+                    return VM_ERROR;
+                }
+
+                if(!IS_INT(RIGHT_BY_TYPE)) {
+                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                    return VM_ERROR;
+                }
+
+                DenseArray* array = AS_ARRAY(LEFT_REG);
+                uint32_t index = AS_INT(RIGHT_BY_TYPE);
+
+                if(index >= array->data.size) {
+                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                    return VM_ERROR;
+                }
+
+                DEST_REG = dense_array_get(array, index);
+
+                SKIP(3);
+                break;
+            }
+            case OP_SARR: {
+                if(!value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
+                    VM_RUNTIME_ERROR(vm, "Left operand must be an array");
+                    return VM_ERROR;
+                }
+
+                if(!IS_INT(LEFT_BY_TYPE)) {
+                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                    return VM_ERROR;
+                }
+
+                DenseArray* array = AS_ARRAY(DEST_REG);
+                uint32_t index = AS_INT(LEFT_BY_TYPE);
+
+                if(index > array->data.size) {
+                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                    return VM_ERROR;
+                } else if(index == array->data.size) {
+                    if(array->data.size == UINT32_MAX) {
+                        VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
+                        return VM_ERROR;
+                    }
+
+                    value_array_write(&array->data, RIGHT_BY_TYPE);
+                    gc_check(vm);
+                } else dense_array_set(array, index, RIGHT_BY_TYPE);
+
+                SKIP(3);
+                break;
+            }
             case OP_NULL: {
                 DEST_REG = NULL_VALUE;
 
