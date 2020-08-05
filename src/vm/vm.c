@@ -238,7 +238,7 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_GARR: {
+            case OP_GET: {
                 if(!value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
                     VM_RUNTIME_ERROR(vm, "Left operand must be an array");
                     return VM_ERROR;
@@ -262,7 +262,7 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_SARR: {
+            case OP_SET: {
                 if(!value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
                     VM_RUNTIME_ERROR(vm, "Left operand must be an array");
                     return VM_ERROR;

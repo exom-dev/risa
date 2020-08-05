@@ -36,6 +36,7 @@ static void compile_return_expression(Compiler* compiler);
 static void compile_call(Compiler* compiler, bool);
 static void compile_grouping_or_lambda(Compiler* compiler, bool);
 static void compile_lambda(Compiler* compiler);
+static void compile_accessor(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
 static void compile_ternary(Compiler* compiler, bool);
@@ -79,7 +80,7 @@ static void finalize_compilation(Compiler* compiler);
 Rule EXPRESSION_RULES[] = {
         {compile_grouping_or_lambda, compile_call,  PREC_CALL },// TOKEN_LEFT_PAREN
         { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_PAREN
-        { compile_array,     NULL,                  PREC_NONE },// TOKEN_LEFT_BRACKET
+        { compile_array,     compile_accessor,      PREC_CALL },// TOKEN_LEFT_BRACKET
         { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACKET
         { NULL,     NULL,                           PREC_NONE },// TOKEN_LEFT_BRACE
         { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACE
@@ -1249,6 +1250,73 @@ static void compile_lambda(Compiler* compiler) {
     compiler->last.isConst = true;
 
     compiler_delete(&subcompiler);
+}
+
+static void compile_accessor(Compiler* compiler, bool allowAssignment) {
+    uint8_t leftReg = compiler->last.reg;
+    bool isLeftNew = compiler->last.isNew;
+    bool isLeftConst = compiler->last.isConst;
+
+    compile_expression(compiler);
+    parser_consume(compiler->parser, TOKEN_RIGHT_BRACKET, "Expected ']' after expression");
+
+    if(compiler->last.isConst) {
+        register_free(compiler);
+        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+        compiler->function->chunk.size -= 4;
+        compiler->last.isNew = false;
+    }
+
+    if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
+        uint8_t rightReg = compiler->last.reg;
+        bool isRightConst = compiler->last.isConst;
+        bool isRightNew = compiler->last.isNew;
+
+        parser_advance(compiler->parser);
+        compile_expression(compiler);
+
+        #define L_TYPE (isRightConst * 0x80)
+
+        emit_byte(compiler, OP_SET | L_TYPE);
+        emit_byte(compiler, leftReg);
+        emit_byte(compiler, rightReg);
+        emit_byte(compiler, compiler->last.reg);
+
+        #undef L_TYPE
+
+        if(isLeftNew)
+            register_free(compiler);
+        if(isRightNew)
+            register_free(compiler);
+    } else {
+        uint8_t destReg;
+
+        if(compiler->last.isNew) {
+            destReg = compiler->last.reg;
+
+            if(isLeftNew)
+                register_free(compiler);
+        } else if(isLeftNew) {
+            destReg = leftReg;
+        } else {
+            register_reserve(compiler);
+            destReg = compiler->regIndex - 1;
+        }
+
+        #define R_TYPE (compiler->last.isConst * 0x40)
+
+        emit_byte(compiler, OP_GET | R_TYPE);
+        emit_byte(compiler, destReg);
+        emit_byte(compiler, leftReg);
+        emit_byte(compiler, compiler->last.reg);
+
+        #undef R_TYPE
+
+        compiler->last.reg = destReg;
+        compiler->last.isNew = true;
+        compiler->last.isConst = false;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+    }
 }
 
 static void compile_unary(Compiler* compiler, bool allowAssignment) {
