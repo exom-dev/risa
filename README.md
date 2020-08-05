@@ -62,7 +62,7 @@ addition       ::= multiplication ( ( "+" | "-" ) multiplication )* ;
 multiplication ::= unary ( ( "*" | "/" | "%" ) unary )* ;
 
 unary ::= space ( ( "!" | "-" | "~" ) unary | call ) space ;
-call  ::= primary ( "(" args? ")" | "." IDENTIFIER )* ;
+call  ::= primary ( "(" args? ")" | "[" expr "]" | "." IDENTIFIER )* ;
 args  ::= expr ( "," expr )* ;
 
 primary ::= "null"
@@ -72,9 +72,12 @@ primary ::= "null"
           | STRING
           | IDENTIFIER
           | "(" expr ")" 
-          | lambda;
+          | lambda
+          | array ;
 
-lambda ::= "(" args? ")" space "=>" ( expr | block )
+lambda ::= "(" args? ")" space "=>" ( expr | block ) ;
+
+array ::= "[" args? "]" ;
 
 space ::= ""
         | " "
