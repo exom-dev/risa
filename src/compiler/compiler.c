@@ -1645,12 +1645,11 @@ static void emit_constant(Compiler* compiler, Value value) {
 
 static void emit_return(Compiler* compiler) {
     Chunk* chunk = &compiler->function->chunk;
-    if(chunk->size > 0 && chunk->bytecode[chunk->size - 4] != OP_RET) {
-        emit_byte(compiler, OP_RET);
-        emit_byte(compiler, 251);
-        emit_byte(compiler, 0);
-        emit_byte(compiler, 0);
-    }
+
+    emit_byte(compiler, OP_RET);
+    emit_byte(compiler, 251);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
 }
 
 static void emit_mov(Compiler* compiler, uint8_t dest, uint8_t src) {
