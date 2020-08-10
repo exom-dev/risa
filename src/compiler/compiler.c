@@ -1108,6 +1108,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
 
     compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = true;
+    compiler->last.isConst = false;
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {
