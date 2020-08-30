@@ -25,6 +25,7 @@ size_t disassemble_upvalue_set_instruction(const char* name, Chunk* chunk, size_
 size_t disassemble_upvalue_close_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_array_push_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
+size_t disassemble_array_length_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_get_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_return_instruction(const char* name, Chunk* chunk, size_t offset);
@@ -63,6 +64,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_byte_instruction("ARR", chunk, offset);
         case OP_PARR:
             return disassemble_array_push_instruction("PARR", types, chunk, offset);
+        case OP_LEN:
+            return disassemble_array_length_instruction("LEN", chunk, offset);
         case OP_GET:
             return disassemble_get_instruction("GET", types, chunk, offset);
         case OP_SET:
@@ -246,6 +249,12 @@ size_t disassemble_closure_instruction(const char* name, Chunk* chunk, size_t of
 
 size_t disassemble_array_push_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d%c\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], (types & LEFT_TYPE_MASK ? 'c' : 'r'));
+
+    return offset + 4;
+}
+
+size_t disassemble_array_length_instruction(const char* name, Chunk* chunk, size_t offset) {
+    PRINT("%-16s %4d %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2]);
 
     return offset + 4;
 }

@@ -211,6 +211,17 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
+            case OP_LEN: {
+                if(!value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
+                    VM_RUNTIME_ERROR(vm, "Cannot get length of non-array type");
+                    return VM_ERROR;
+                }
+
+                DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
+
+                SKIP(3);
+                break;
+            }
             case OP_ARR: {
                 DEST_REG = DENSE_VALUE(dense_array_create());
                 vm_register_dense(vm, AS_DENSE(DEST_REG));

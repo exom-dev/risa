@@ -15,6 +15,7 @@ typedef enum {
     OP_CLSR,
     OP_ARR,
     OP_PARR,
+    OP_LEN,
     OP_GET,
     OP_SET,
     OP_NULL,

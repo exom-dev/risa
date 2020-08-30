@@ -34,6 +34,7 @@ static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
 static void compile_return_expression(Compiler* compiler);
 static void compile_call(Compiler* compiler, bool);
+static void compile_dot(Compiler* compiler, bool);
 static void compile_grouping_or_lambda(Compiler* compiler, bool);
 static void compile_lambda(Compiler* compiler);
 static void compile_accessor(Compiler* compiler, bool);
@@ -85,7 +86,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     NULL,                           PREC_NONE },// TOKEN_LEFT_BRACE
         { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACE
         { NULL,                      compile_comma, PREC_COMMA },// TOKEN_COMMA
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_DOT
+        { NULL,     compile_dot,    PREC_CALL },                // TOKEN_DOT
         { compile_unary,    compile_binary,  PREC_TERM },// TOKEN_MINUS
         { NULL,     compile_binary,  PREC_TERM },        // TOKEN_PLUS
         { NULL,     NULL,    PREC_NONE },                // TOKEN_COLON
@@ -576,7 +577,12 @@ static void compile_variable_declaration(Compiler* compiler) {
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_LOCAL, lastRegToken };
         compiler->last.isNew = true;
 
-        register_reserve(compiler);
+        if(compiler->regIndex == 249) {
+            parser_error_at_current(compiler->parser, "Register limit exceeded (250)");
+            return;
+        }
+
+        ++compiler->regIndex;
         return;
     }
 
@@ -1094,6 +1100,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
         if(!register_reserve(compiler))
             return;
 
+    // TODO: Global variables occupy a register, that should be returned to the temp value.
     uint8_t argc = compile_arguments(compiler);
 
     emit_byte(compiler, OP_CALL);
@@ -1107,6 +1114,39 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     }
 
     compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+}
+
+static void compile_dot(Compiler* compiler, bool allowAssignment) {
+    uint8_t instanceReg = compiler->last.reg;
+
+    if(compiler->parser->current.type != TOKEN_IDENTIFIER) {
+        parser_error_at_current(compiler->parser, "Expected identifier");
+        return;
+    }
+
+    Token prop = compiler->parser->current;
+    parser_advance(compiler->parser);
+
+    uint8_t destReg;
+
+    if(compiler->regs[instanceReg].type != REG_TEMP) {
+        if(!register_reserve(compiler))
+            return;
+        destReg = compiler->regIndex - 1;
+    } else destReg = compiler->last.reg;
+
+    if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+        emit_byte(compiler, OP_LEN);
+        emit_byte(compiler, destReg);
+        emit_byte(compiler, instanceReg);
+        emit_byte(compiler, 0);
+    } else {
+        parser_error_at_previous(compiler->parser, "Invalid property");
+    }
+
+    compiler->regs[instanceReg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = true;
     compiler->last.isConst = false;
 }
