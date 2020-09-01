@@ -1131,7 +1131,9 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
 
     uint8_t destReg;
 
-    if(compiler->regs[instanceReg].type != REG_TEMP) {
+    if(compiler->last.isNew) {
+        destReg = compiler->last.reg;
+    } else if(compiler->regs[instanceReg].type != REG_TEMP) {
         if(!register_reserve(compiler))
             return;
         destReg = compiler->regIndex - 1;
@@ -1372,6 +1374,8 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
         destReg = compiler->last.reg;
         compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
         compiler->function->chunk.size -= 4;
+    } else if(compiler->last.isNew) {
+        destReg = compiler->last.reg;
     } else if(compiler->regs[compiler->last.reg].type != REG_TEMP) {
         if(!register_reserve(compiler))
             return;
