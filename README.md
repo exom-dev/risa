@@ -117,7 +117,7 @@ DIGIT ::= [0-9] ;
 - ~~break statement~~
 - ~~continue statement~~
 - objects
-- arrays
+- ~~arrays~~
 - ~~ternary operator~~
 - ~~function arrow body~~
 - ~~lambda expressions~~

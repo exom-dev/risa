@@ -359,6 +359,40 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
+            case OP_INC: {
+                Value dest = DEST_REG;
+
+                if(IS_BYTE(dest))
+                    ++AS_BYTE(DEST_REG);
+                else if(IS_INT(dest))
+                    ++AS_INT(DEST_REG);
+                else if(IS_FLOAT(dest))
+                    ++AS_FLOAT(DEST_REG);
+                else {
+                    VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
+                    return VM_ERROR;
+                }
+
+                SKIP(3);
+                break;
+            }
+            case OP_DEC: {
+                Value dest = DEST_REG;
+
+                if(IS_BYTE(dest))
+                    --AS_BYTE(DEST_REG);
+                else if(IS_INT(dest))
+                    --AS_INT(DEST_REG);
+                else if(IS_FLOAT(dest))
+                    --AS_FLOAT(DEST_REG);
+                else {
+                    VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
+                    return VM_ERROR;
+                }
+
+                SKIP(3);
+                break;
+            }
             case OP_ADD: {
                 Value left = LEFT_BY_TYPE;
                 Value right = RIGHT_BY_TYPE;

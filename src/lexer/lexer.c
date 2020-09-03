@@ -97,8 +97,8 @@ Token lexer_next(Lexer* lexer) {
         case ';': return lexer_emit(lexer, TOKEN_SEMICOLON);
         case ',': return lexer_emit(lexer, TOKEN_COMMA);
         case '.': return lexer_emit(lexer, TOKEN_DOT);
-        case '-': return lexer_emit(lexer, TOKEN_MINUS);
-        case '+': return lexer_emit(lexer, TOKEN_PLUS);
+        case '-': return lexer_emit(lexer, MATCH('-') ? TOKEN_MINUS_MINUS : TOKEN_MINUS);
+        case '+': return lexer_emit(lexer, MATCH('+') ? TOKEN_PLUS_PLUS : TOKEN_PLUS);
         case '/': return lexer_emit(lexer, TOKEN_SLASH);
         case '*': return lexer_emit(lexer, TOKEN_STAR);
         case '~': return lexer_emit(lexer, TOKEN_TILDE);

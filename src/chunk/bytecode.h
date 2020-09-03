@@ -24,6 +24,8 @@ typedef enum {
     OP_NOT,
     OP_BNOT,
     OP_NEG,
+    OP_INC,
+    OP_DEC,
     OP_ADD,
     OP_SUB,
     OP_MUL,

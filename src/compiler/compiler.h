@@ -55,6 +55,32 @@ typedef struct Compiler {
         uint8_t reg;
         bool isNew;
         bool isConst;
+        bool isLvalue;
+
+        struct {
+            enum LValType {
+                LVAL_LOCAL,
+                LVAL_GLOBAL,
+                LVAL_UPVAL,
+                LVAL_LOCAL_PROP,
+                LVAL_GLOBAL_PROP,
+                LVAL_UPVAL_PROP
+            } type;
+
+            uint16_t global;
+            uint8_t globalReg;
+            uint8_t propOrigin;
+            uint8_t upval;
+
+            struct {
+                union {
+                    uint8_t reg;
+                    uint16_t cnst;
+                } as;
+
+                bool isConst;
+            } propIndex;
+        } lvalMeta;
     } last;
 
     Local locals[250];
@@ -89,8 +115,8 @@ typedef enum {
     PREC_SHIFT,       // << >>
     PREC_TERM,        // + -
     PREC_FACTOR,      // * / %
-    PREC_UNARY,       // ! - ~
-    PREC_CALL,        // . () []
+    PREC_UNARY,       // ! - ~ ++pre
+    PREC_CALL,        // . () [] post++
     PREC_PRIMARY
 } Precedence;
 
@@ -98,7 +124,7 @@ typedef void (*RuleHandler)(Compiler*, bool);
 
 typedef struct {
     RuleHandler prefix;
-    RuleHandler infix;
+    RuleHandler inpostfix;
 
     Precedence precedence;
 } Rule;

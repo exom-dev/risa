@@ -82,6 +82,10 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_unary_instruction("BNOT", types, chunk, offset);
         case OP_NEG:
             return disassemble_unary_instruction("NEG", types, chunk, offset);
+        case OP_INC:
+            return disassemble_byte_instruction("INC", chunk, offset);
+        case OP_DEC:
+            return disassemble_byte_instruction("DEC", chunk, offset);
         case OP_ADD:
             return disassemble_binary_instruction("ADD", types, chunk, offset);
         case OP_SUB:
