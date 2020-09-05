@@ -149,6 +149,7 @@ void compiler_init(Compiler* compiler) {
     compiler->last.isNew = false;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.canOverwrite = true;
     compiler->last.lvalMeta.type = LVAL_LOCAL;
     compiler->last.lvalMeta.global = 0;
     compiler->last.lvalMeta.globalReg = 0;
@@ -491,7 +492,12 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             compiler->last.isNew = true;
         } else {
             compiler->last.reg = reg;
-            compiler->last.isNew = false;
+
+            if(reg == compiler->regIndex) {
+                if (!register_reserve(compiler))
+                    return;
+                compiler->last.isNew = true;
+            } else compiler->last.isNew = false;
         }
 
         switch(get) {
@@ -501,7 +507,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             case OP_GGLOB:
                 compiler->last.lvalMeta.type = LVAL_GLOBAL;
                 compiler->last.lvalMeta.global = index;
-                compiler->last.lvalMeta.globalReg = compiler->regIndex - 1;
+                compiler->last.lvalMeta.globalReg = reg == 251 ? compiler->regIndex - 1 : reg;
                 break;
             case OP_GUPVAL:
                 compiler->last.lvalMeta.type = LVAL_UPVAL;
@@ -1101,11 +1107,14 @@ static void compile_block(Compiler* compiler) {
 }
 
 static void compile_expression_statement(Compiler* compiler) {
+    size_t regIndex = compiler->regIndex;
+    size_t localCount = compiler->localCount;
+
     compile_expression(compiler);
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
 
-    if(compiler->last.isNew)
-        register_free(compiler);
+    if(compiler->regIndex - regIndex != compiler->localCount - localCount)
+        compiler->regIndex = regIndex;
 }
 
 static void compile_expression(Compiler* compiler) {
@@ -1372,6 +1381,13 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         bool isRightConst = compiler->last.isConst;
         bool isRightNew = compiler->last.isNew;
 
+        if(!compiler->last.canOverwrite || compiler->last.lvalMeta.type == LVAL_GLOBAL) {
+            if(!register_reserve(compiler))
+                return;
+
+            leftReg = compiler->regIndex - 1;
+        }
+
         parser_advance(compiler->parser);
         compile_expression(compiler);
 
@@ -1388,7 +1404,12 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
             register_free(compiler);
         if(isRightNew)
             register_free(compiler);
+        if(!compiler->last.canOverwrite || compiler->last.lvalMeta.type == LVAL_GLOBAL)
+            register_free(compiler);
 
+        compiler->last.reg = leftReg;
+        compiler->last.isNew = true;
+        compiler->last.isConst = false;
         compiler->last.isLvalue = false;
     } else {
         uint8_t destReg;
@@ -1398,7 +1419,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
 
             if(isLeftNew)
                 register_free(compiler);
-        } else if(isLeftNew) {
+        } else if(compiler->last.canOverwrite && isLeftNew) {
             destReg = leftReg;
         } else {
             register_reserve(compiler);
@@ -1620,7 +1641,11 @@ static void compile_ternary(Compiler* compiler, bool allowAssignment) {
 static void compile_prefix(Compiler* compiler, bool allowAssignment) {
     TokenType operator = compiler->parser->previous.type;
 
+    compiler->last.canOverwrite = false;
+
     compile_expression_precedence(compiler, PREC_UNARY);
+
+    compiler->last.canOverwrite = true;
 
     if(!compiler->last.isLvalue) {
         parser_error_at_current(compiler->parser, "Cannot increment non-lvalue");

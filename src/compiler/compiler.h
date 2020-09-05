@@ -56,6 +56,7 @@ typedef struct Compiler {
         bool isNew;
         bool isConst;
         bool isLvalue;
+        bool canOverwrite;
 
         struct {
             enum LValType {
