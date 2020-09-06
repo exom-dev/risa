@@ -1,6 +1,8 @@
 #ifndef RISA_BYTECODE_H_GUARD
 #define RISA_BYTECODE_H_GUARD
 
+#include <stdbool.h>
+
 typedef enum {
     OP_CNST,
     OP_CNSTW,
@@ -51,5 +53,7 @@ typedef enum {
     OP_CALL,
     OP_RET
 } OpCode;
+
+bool op_has_direct_dest(OpCode op);
 
 #endif

@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#define INSTRUCTION_MASK 0x3F
+
 static void compile_byte(Compiler* compiler, bool);
 static void compile_int(Compiler* compiler, bool);
 static void compile_float(Compiler* compiler, bool);
@@ -149,7 +151,8 @@ void compiler_init(Compiler* compiler) {
     compiler->last.isNew = false;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
-    compiler->last.canOverwrite = true;
+    compiler->last.isPostIncrement = false;
+    compiler->last.canOverwrite = false; // true
     compiler->last.lvalMeta.type = LVAL_LOCAL;
     compiler->last.lvalMeta.global = 0;
     compiler->last.lvalMeta.globalReg = 0;
@@ -181,7 +184,13 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     parser_advance(compiler->parser);
 
     while(compiler->parser->current.type != TOKEN_EOF) {
+        size_t regIndex = compiler->regIndex;
+        size_t localCount = compiler->localCount;
+
         compile_declaration(compiler);
+
+        if(compiler->regIndex - regIndex != compiler->localCount - localCount)
+            compiler->regIndex = regIndex;
     }
 
     finalize_compilation(compiler);
@@ -210,11 +219,13 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     } else  {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     }
 }
 
@@ -239,11 +250,13 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     }
 }
 
@@ -267,10 +280,12 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_CONSTANT, compiler->parser->previous };
         compiler->last.isNew = true;
         compiler->last.isConst = true;
+        compiler->last.isPostIncrement = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
+        compiler->last.isPostIncrement = false;
     }
 }
 
@@ -366,11 +381,13 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     }
 }
 
@@ -404,11 +421,13 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
     }
 }
 
@@ -520,6 +539,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
 
     compiler->last.isConst = false;
     compiler->last.isLvalue = true;
+    compiler->last.isPostIncrement = false;
 }
 
 static void compile_array(Compiler* compiler, bool allowAssignment) {
@@ -567,6 +587,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
@@ -609,13 +630,74 @@ static void compile_variable_declaration(Compiler* compiler) {
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
 
     if(compiler->scopeDepth > 0) {
-        if((chunkSize == compiler->function->chunk.size)                  // Register found.
-        || (chunkSize + 4 == compiler->function->chunk.size               // Only one OP.
-          && (compiler->function->chunk.bytecode[chunkSize] == OP_INC     // OP is INC.
-          || (compiler->function->chunk.bytecode[chunkSize] == OP_DEC)))) // OP is DEC.
+        Chunk chunk = compiler->function->chunk;
+
+        if((chunkSize == chunk.size)                  // Register reference; no new OPs.
+        || (chunkSize + 4 == chunk.size               // Only one OP.
+          && (chunk.bytecode[chunkSize] == OP_INC     // OP is INC.
+          || (chunk.bytecode[chunkSize] == OP_DEC)))) // OP is DEC.
             emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the origin.
 
-        //else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->localCount - 1;
+        else if(compiler->last.isPostIncrement) {
+            int32_t incOffset = 4;
+
+            while(chunk.size - incOffset >= chunkSize && chunk.bytecode[chunk.size - incOffset] != OP_INC && chunk.bytecode[chunk.size - incOffset] != OP_DEC)
+                incOffset += 4;
+
+            if(chunk.size - incOffset < chunkSize) {
+                parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix when it isn't (report this to the developers)");
+                return;
+            }
+
+            if(chunk.size - incOffset - 4 < chunkSize || chunk.bytecode[chunk.size - incOffset - 4] != OP_MOV) {
+                parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not MOV (report this to the developers)");
+                return;
+            }
+
+            if(chunk.bytecode[chunk.size - incOffset + 1] == compiler->localCount - 1) { // The INC target interferes with the local register.
+                uint8_t dest = compiler->localCount - 1;
+                uint8_t tmp = chunk.bytecode[chunk.size - incOffset - 4 + 1]; // Original MOV target.
+
+                chunk.bytecode[chunk.size - incOffset - 4 + 2] = tmp;  // MOV source.
+                chunk.bytecode[chunk.size - incOffset - 4 + 1] = dest; // MOV target.
+                chunk.bytecode[chunk.size - incOffset + 1] = tmp;      // INC target.
+
+                incOffset += 8; // Jump over MOV.
+
+                if(chunk.size - incOffset >= chunkSize) {
+                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_GET) {
+                        parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not GET (report this to the developers)");
+                        return;
+                    }
+
+                    chunk.bytecode[chunk.size - incOffset + 1] = tmp;
+                }
+
+                incOffset -= 4 + 8;
+
+                if(incOffset > 0) {
+                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SET) {
+                        parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC successor is not SET (report this to the developers)");
+                        return;
+                    }
+
+                    chunk.bytecode[chunk.size - incOffset + 3] = tmp;
+                }
+
+                incOffset -= 4;
+
+                if(incOffset > 0) {
+                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SGLOB) {
+                        parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but SET successor is not SGLOB (report this to the developers)");
+                        return;
+                    }
+
+                    chunk.bytecode[chunk.size - incOffset + 2] = tmp;
+                }
+            } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
+        } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)) { // Can directly assign to local.
+            chunk.bytecode[chunk.size - 4 + 1] = compiler->localCount - 1;  // Do it.
+        }
 
         if(compiler->last.isNew)
             register_free(compiler);
@@ -626,6 +708,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_LOCAL, lastRegToken };
         compiler->last.isNew = true;
         compiler->last.isLvalue = false;
+        compiler->last.isPostIncrement = false;
 
         if(compiler->regIndex == 249) {
             parser_error_at_current(compiler->parser, "Register limit exceeded (250)");
@@ -656,6 +739,7 @@ static void compile_variable_declaration(Compiler* compiler) {
     #undef L_TYPE
 
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 }
 
 static void compile_function_declaration(Compiler* compiler) {
@@ -691,6 +775,7 @@ static void compile_function_declaration(Compiler* compiler) {
     #undef L_TYPE
 
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 }
 
 static void compile_function(Compiler* compiler) {
@@ -772,6 +857,8 @@ static void compile_function(Compiler* compiler) {
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
+
     compiler_delete(&subcompiler);
 }
 
@@ -1107,14 +1194,8 @@ static void compile_block(Compiler* compiler) {
 }
 
 static void compile_expression_statement(Compiler* compiler) {
-    size_t regIndex = compiler->regIndex;
-    size_t localCount = compiler->localCount;
-
     compile_expression(compiler);
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after expression");
-
-    if(compiler->regIndex - regIndex != compiler->localCount - localCount)
-        compiler->regIndex = regIndex;
 }
 
 static void compile_expression(Compiler* compiler) {
@@ -1161,8 +1242,11 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
         if(!register_reserve(compiler))
             return;
 
-    // TODO: Global variables occupy a register, that should be returned to the temp value.
+    compiler->last.canOverwrite = true;
+
     uint8_t argc = compile_arguments(compiler);
+
+    compiler->last.canOverwrite = false;
 
     emit_byte(compiler, OP_CALL);
     emit_byte(compiler, functionReg);
@@ -1178,6 +1262,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 }
 
 static void compile_dot(Compiler* compiler, bool allowAssignment) {
@@ -1216,6 +1301,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
     compiler->last.reg = destReg;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
+    compiler->last.isPostIncrement = false;
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {
@@ -1357,6 +1443,7 @@ static void compile_lambda(Compiler* compiler) {
     compiler->last.isNew = true;
     compiler->last.isConst = true;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 
     compiler_delete(&subcompiler);
 }
@@ -1460,6 +1547,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = false;
         compiler->last.isLvalue = true;
+        compiler->last.isPostIncrement = false;
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     }
 }
@@ -1509,6 +1597,7 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 
     #undef L_TYPE
 }
@@ -1613,6 +1702,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
 
     #undef LR_TYPES
 }
@@ -1645,7 +1735,7 @@ static void compile_prefix(Compiler* compiler, bool allowAssignment) {
 
     compile_expression_precedence(compiler, PREC_UNARY);
 
-    compiler->last.canOverwrite = true;
+    compiler->last.canOverwrite = false; // true
 
     if(!compiler->last.isLvalue) {
         parser_error_at_current(compiler->parser, "Cannot increment non-lvalue");
@@ -1703,10 +1793,91 @@ static void compile_prefix(Compiler* compiler, bool allowAssignment) {
     }
 
     #undef L_TYPE
+
+    /* Currently, this will give you 13:
+     *
+     * var a = 5;
+     * var b = ++a + a++;
+     *
+     * If you want to get a more natural response (12), uncomment this line.
+     * However, doing so will disable some register_find optimizations.
+     * It's not really worth it.
+     */
+    // compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
 
 static void compile_postfix(Compiler* compiler, bool allowAssignment) {
+    TokenType operator = compiler->parser->previous.type;
 
+    if(!compiler->last.isLvalue) {
+        parser_error_at_current(compiler->parser, "Cannot increment non-lvalue");
+        return;
+    }
+
+    uint8_t destReg = compiler->last.reg;
+
+    if(!register_reserve(compiler))
+        return;
+
+    emit_bytes(compiler, OP_MOV, compiler->regIndex - 1, destReg);
+    emit_byte(compiler, 0);
+
+    switch(operator) {
+        case TOKEN_MINUS_MINUS:
+            emit_bytes(compiler, OP_DEC, destReg, 0);
+            emit_byte(compiler, 0);
+            break;
+        case TOKEN_PLUS_PLUS:
+            emit_bytes(compiler, OP_INC, destReg, 0);
+            emit_byte(compiler, 0);
+            break;
+        default:
+            return;
+    }
+
+    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
+
+    switch(compiler->last.lvalMeta.type) {
+        case LVAL_LOCAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+            break;
+        case LVAL_GLOBAL:
+            emit_bytes(compiler, OP_SGLOB, compiler->last.lvalMeta.global, destReg);
+            emit_byte(compiler, 0);
+            break;
+        case LVAL_GLOBAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+
+            emit_bytes(compiler, OP_SGLOB, compiler->last.lvalMeta.global, compiler->last.lvalMeta.propOrigin);
+            emit_byte(compiler, 0);
+            break;
+        case LVAL_UPVAL:
+            emit_bytes(compiler, OP_SUPVAL, compiler->last.lvalMeta.upval, destReg);
+            emit_byte(compiler, 0);
+        case LVAL_UPVAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+
+            emit_bytes(compiler, OP_SUPVAL, compiler->last.lvalMeta.upval, compiler->last.lvalMeta.propOrigin);
+            emit_byte(compiler, 0);
+            break;
+        default:
+            break;
+    }
+
+    #undef L_TYPE
+
+    compiler->last.reg = compiler->regIndex - 1;
+    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+    compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = true;
 }
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {
@@ -2031,3 +2202,5 @@ static void register_free(Compiler* compiler) {
 static void finalize_compilation(Compiler* compiler) {
     emit_return(compiler);
 }
+
+#undef INSTRUCTION_MASK
