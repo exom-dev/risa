@@ -7,6 +7,7 @@
 #include "../lexer/lexer.h"
 #include "../data/map.h"
 #include "../common/def.h"
+#include "../value/dense.h"
 
 typedef enum {
     REG_CONSTANT,

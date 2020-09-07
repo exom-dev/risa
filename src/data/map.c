@@ -1,5 +1,6 @@
 #include "map.h"
 #include "../memory/mem.h"
+#include "../value/dense.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 #define MAP_MAX_LOAD 0.75
 #define MAP_START_SIZE 8
 
-static Entry* map_find_bucket(Entry* entries, int capacity, DenseString* key);
+static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key);
 static void map_adjust_capacity(Map* map);
 
 void map_init(Map* map) {
@@ -32,7 +33,7 @@ uint32_t map_hash(const char* chars, uint32_t length) {
     return hash;
 }
 
-bool map_get(Map* map, DenseString *key, Value* value) {
+bool map_get(Map* map, DenseStringPtr key, Value* value) {
     if(map->count == 0)
         return false;
 
@@ -45,7 +46,7 @@ bool map_get(Map* map, DenseString *key, Value* value) {
     return true;
 }
 
-bool map_set(Map* map, DenseString *key, Value value) {
+bool map_set(Map* map, DenseStringPtr key, Value value) {
     map_adjust_capacity(map);
 
     Entry* entry = map_find_bucket(map->entries, map->capacity, key);
@@ -60,7 +61,7 @@ bool map_set(Map* map, DenseString *key, Value value) {
     return isNewKey;
 }
 
-bool map_erase(Map* map, DenseString *key) {
+bool map_erase(Map* map, DenseStringPtr key) {
     if(map->count == 0)
         return false;
 
@@ -82,7 +83,7 @@ void map_copy(Map* map, Map* from) {
     }
 }
 
-DenseString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
+DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash) {
     if(map->count == 0)
         return NULL;
 
@@ -94,9 +95,9 @@ DenseString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
         if(entry->key == NULL) {
             if(IS_NULL(entry->value))
                 return NULL;
-        } else if(entry->key->length == length
-               && entry->key->hash == hash
-               && memcmp(entry->key->chars, chars, length) == 0) {
+        } else if(((DenseString*) (entry->key))->length == length
+               && ((DenseString*) (entry->key))->hash == hash
+               && memcmp(((DenseString*) (entry->key))->chars, chars, length) == 0) {
             return entry->key;
         }
 
@@ -104,8 +105,8 @@ DenseString* map_find(Map* map, const char* chars, int length, uint32_t hash) {
     }
 }
 
-static Entry* map_find_bucket(Entry* entries, int capacity, DenseString* key) {
-    uint32_t index = key->hash & (capacity - 1);
+static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key) {
+    uint32_t index = ((DenseString*) key)->hash & (capacity - 1);
     Entry* tombstone = NULL;
 
     while(1) {

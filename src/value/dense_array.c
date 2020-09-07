@@ -16,6 +16,7 @@ void dense_array_init(DenseArray* array) {
 }
 
 void dense_array_delete(DenseArray* array) {
+    value_array_delete(&array->data);
     dense_array_init(array);
 }
 

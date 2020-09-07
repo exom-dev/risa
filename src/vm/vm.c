@@ -249,56 +249,93 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
+            case OP_OBJ: {
+                DEST_REG = DENSE_VALUE(dense_object_create());
+                vm_register_dense(vm, AS_DENSE(DEST_REG));
+                gc_check(vm);
+
+                SKIP(3);
+                break;
+            }
             case OP_GET: {
-                if(!value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
-                    VM_RUNTIME_ERROR(vm, "Left operand must be an array");
+                if(value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
+                    if(!IS_INT(RIGHT_BY_TYPE)) {
+                        VM_RUNTIME_ERROR(vm, "Index must be int");
+                        return VM_ERROR;
+                    }
+
+                    DenseArray* array = AS_ARRAY(LEFT_REG);
+                    uint32_t index = AS_INT(RIGHT_BY_TYPE);
+
+                    if(index >= array->data.size) {
+                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                        return VM_ERROR;
+                    }
+
+                    DEST_REG = dense_array_get(array, index);
+                } else if(value_is_dense_of_type(LEFT_REG, DVAL_OBJECT)) {
+                    if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
+                        VM_RUNTIME_ERROR(vm, "Object key must be string");
+                        return VM_ERROR;
+                    }
+
+                    DenseObject* object = AS_OBJECT(LEFT_REG);
+                    DenseString* key = AS_STRING(RIGHT_BY_TYPE);
+
+                    Value value;
+
+                    if(!dense_object_get(object, key, &value)) {
+                        VM_RUNTIME_ERROR(vm, "Object property does not exist");
+                        return VM_ERROR;
+                    }
+
+                    DEST_REG = value;
+                } else {
+                    VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
                     return VM_ERROR;
                 }
-
-                if(!IS_INT(RIGHT_BY_TYPE)) {
-                    VM_RUNTIME_ERROR(vm, "Index must be int");
-                    return VM_ERROR;
-                }
-
-                DenseArray* array = AS_ARRAY(LEFT_REG);
-                uint32_t index = AS_INT(RIGHT_BY_TYPE);
-
-                if(index >= array->data.size) {
-                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                    return VM_ERROR;
-                }
-
-                DEST_REG = dense_array_get(array, index);
 
                 SKIP(3);
                 break;
             }
             case OP_SET: {
-                if(!value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
-                    VM_RUNTIME_ERROR(vm, "Left operand must be an array");
-                    return VM_ERROR;
-                }
-
-                if(!IS_INT(LEFT_BY_TYPE)) {
-                    VM_RUNTIME_ERROR(vm, "Index must be int");
-                    return VM_ERROR;
-                }
-
-                DenseArray* array = AS_ARRAY(DEST_REG);
-                uint32_t index = AS_INT(LEFT_BY_TYPE);
-
-                if(index > array->data.size) {
-                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                    return VM_ERROR;
-                } else if(index == array->data.size) {
-                    if(array->data.size == UINT32_MAX) {
-                        VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
+                if(value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
+                    if(!IS_INT(LEFT_BY_TYPE)) {
+                        VM_RUNTIME_ERROR(vm, "Index must be int");
                         return VM_ERROR;
                     }
 
-                    value_array_write(&array->data, RIGHT_BY_TYPE);
+                    DenseArray* array = AS_ARRAY(DEST_REG);
+                    uint32_t index = AS_INT(LEFT_BY_TYPE);
+
+                    if(index > array->data.size) {
+                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                        return VM_ERROR;
+                    } else if(index == array->data.size) {
+                        if(array->data.size == UINT32_MAX) {
+                            VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
+                            return VM_ERROR;
+                        }
+
+                        value_array_write(&array->data, RIGHT_BY_TYPE);
+                        gc_check(vm);
+                    } else dense_array_set(array, index, RIGHT_BY_TYPE);
+                } else if(value_is_dense_of_type(DEST_REG, DVAL_OBJECT)) {
+                    if(!value_is_dense_of_type(LEFT_BY_TYPE, DVAL_STRING)) {
+                        VM_RUNTIME_ERROR(vm, "Object key must be string");
+                        return VM_ERROR;
+                    }
+
+                    DenseObject* object = AS_OBJECT(DEST_REG);
+                    DenseString* key = AS_STRING(LEFT_BY_TYPE);
+
+                    dense_object_set(object, key, RIGHT_BY_TYPE);
+
                     gc_check(vm);
-                } else dense_array_set(array, index, RIGHT_BY_TYPE);
+                } else {
+                    VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
+                    return VM_ERROR;
+                }
 
                 SKIP(3);
                 break;

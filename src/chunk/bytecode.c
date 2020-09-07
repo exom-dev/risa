@@ -7,6 +7,7 @@ bool op_has_direct_dest(OpCode op) {
         case OP_GUPVAL:
         case OP_ARR:
         case OP_LEN:
+        case OP_OBJ:
         case OP_GET:
         case OP_NULL:
         case OP_TRUE:

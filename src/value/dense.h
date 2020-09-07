@@ -4,6 +4,7 @@
 #include "../common/headers.h"
 #include "../chunk/chunk.h"
 #include "../memory/mem.h"
+#include "../data/map.h"
 
 typedef Value (*NativeFunction)(void* vm, uint8_t argc, Value* args);
 
@@ -21,6 +22,12 @@ typedef struct {
 
     ValueArray data;
 } DenseArray;
+
+typedef struct {
+    DenseValue dense;
+
+    Map data;
+} DenseObject;
 
 typedef struct DenseUpvalue {
     DenseValue dense;
@@ -57,6 +64,7 @@ typedef struct {
 
 #define AS_STRING(value)   ((DenseString*) ((value).as.dense))
 #define AS_ARRAY(value)    ((DenseArray*) ((value).as.dense))
+#define AS_OBJECT(value)   ((DenseObject*) ((value).as.dense))
 #define AS_CSTRING(value)  (((DenseString*) ((value).as.dense))->chars)
 #define AS_FUNCTION(value) ((DenseFunction*) ((value).as.dense))
 #define AS_CLOSURE(value)  ((DenseClosure*) ((value).as.dense))
@@ -75,6 +83,12 @@ void        dense_array_init(DenseArray* array);
 void        dense_array_delete(DenseArray* array);
 Value       dense_array_get(DenseArray* array, uint32_t index);
 void        dense_array_set(DenseArray* array, uint32_t index, Value value);
+
+DenseObject* dense_object_create();
+void         dense_object_init(DenseObject* object);
+void         dense_object_delete(DenseObject* object);
+bool         dense_object_get(DenseObject* object, DenseString* key, Value* value);
+void         dense_object_set(DenseObject* object, DenseString* key, Value value);
 
 DenseUpvalue* dense_upvalue_create(Value* value);
 

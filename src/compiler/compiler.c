@@ -19,6 +19,7 @@ static void compile_string(Compiler* compiler, bool);
 static void compile_literal(Compiler* compiler, bool);
 static void compile_identifier(Compiler* compiler, bool);
 static void compile_array(Compiler* compiler, bool);
+static void compile_object(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_function_declaration(Compiler* compiler);
@@ -76,6 +77,8 @@ static uint16_t create_identifier_constant(Compiler* compiler);
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
 static uint16_t declare_variable(Compiler* compiler);
 
+static uint16_t identifier_to_constant(Compiler* compiler, Token identifier);
+
 static bool    register_reserve(Compiler* compiler);
 static uint8_t register_find(Compiler* compiler, RegType type, Token token);
 static void    register_free(Compiler* compiler);
@@ -83,60 +86,60 @@ static void    register_free(Compiler* compiler);
 static void finalize_compilation(Compiler* compiler);
 
 Rule EXPRESSION_RULES[] = {
-        {compile_grouping_or_lambda, compile_call,  PREC_CALL },// TOKEN_LEFT_PAREN
-        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_PAREN
-        { compile_array,     compile_accessor,      PREC_CALL },// TOKEN_LEFT_BRACKET
-        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACKET
-        { NULL,     NULL,                           PREC_NONE },// TOKEN_LEFT_BRACE
-        { NULL,     NULL,                           PREC_NONE },// TOKEN_RIGHT_BRACE
-        { NULL,                      compile_comma, PREC_COMMA },// TOKEN_COMMA
-        { NULL,     compile_dot,    PREC_CALL },                // TOKEN_DOT
-        { compile_unary,    compile_binary,  PREC_TERM },// TOKEN_MINUS
-        { compile_prefix,    compile_postfix,  PREC_CALL },// TOKEN_MINUS_MINUS
-        { NULL,     compile_binary,  PREC_TERM },        // TOKEN_PLUS
-        { compile_prefix,     compile_postfix,  PREC_CALL },// TOKEN_PLUS_PLUS
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_COLON
-        { NULL,     NULL,  PREC_NONE },                  // TOKEN_SEMICOLON
-        { NULL,     compile_binary,  PREC_FACTOR },      // TOKEN_SLASH
-        { NULL,     compile_binary,    PREC_FACTOR },    // TOKEN_STAR
-        { compile_unary,     NULL,    PREC_NONE },       // TOKEN_TILDE
-        { NULL,     compile_binary,    PREC_BITWISE_XOR },// TOKEN_AMPERSAND
-        { NULL,     compile_binary,    PREC_FACTOR },     // TOKEN_PERCENT
-        { NULL,     compile_ternary,    PREC_TERNARY },   // TOKEN_QUESTION
-        { compile_unary,     NULL,    PREC_NONE },       // TOKEN_BANG
-        { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_BANG_EQUAL
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL
-        { NULL,     compile_binary,    PREC_EQUALITY },  // TOKEN_EQUAL_EQUAL
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_EQUAL_GREATER
-        { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER
-        { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_GREATER_EQUAL
-        { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_GREATER_GREATER
-        { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS
-        { NULL,     compile_binary,    PREC_COMPARISON },// TOKEN_LESS_EQUAL
-        { NULL,     compile_binary,    PREC_SHIFT },     // TOKEN_LESS_LESS
-        { NULL,     compile_binary,    PREC_BITWISE_AND },// TOKEN_AMPERSAND
-        { NULL,     compile_and,    PREC_AND },          // TOKEN_AMPERSAND_AMPERSAND
-        { NULL,     compile_binary,    PREC_BITWISE_OR },// TOKEN_PIPE
-        { NULL,     compile_or,    PREC_OR },          // TOKEN_PIPE_PIPE
-        { compile_identifier,     NULL,    PREC_NONE },  // TOKEN_IDENTIFIER
-        { compile_string,     NULL,    PREC_NONE },      // TOKEN_STRING
-        { compile_byte,     NULL,    PREC_NONE },        // TOKEN_BYTE
-        { compile_int,     NULL,    PREC_NONE },         // TOKEN_INT
-        { compile_float,     NULL,    PREC_NONE },       // TOKEN_FLOAT
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_IF
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_ELSE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_WHILE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_FOR
-        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_TRUE
-        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_FALSE
-        { compile_literal,     NULL,    PREC_NONE },     // TOKEN_NULL
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_VAR
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_FUNCTION
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_RETURN
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_CONTINUE
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_BREAK
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_ERROR
-        { NULL,     NULL,    PREC_NONE },                // TOKEN_EOF
+        {compile_grouping_or_lambda, compile_call,  PREC_CALL },        // TOKEN_LEFT_PAREN
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_RIGHT_PAREN
+        { compile_array,     compile_accessor,      PREC_CALL },        // TOKEN_LEFT_BRACKET
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_RIGHT_BRACKET
+        { compile_object,     NULL,                 PREC_NONE },        // TOKEN_LEFT_BRACE
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_RIGHT_BRACE
+        { NULL,     compile_comma,                  PREC_COMMA },       // TOKEN_COMMA
+        { NULL,     compile_dot,                    PREC_CALL },        // TOKEN_DOT
+        { compile_unary,    compile_binary,         PREC_TERM },        // TOKEN_MINUS
+        { compile_prefix,    compile_postfix,       PREC_CALL },        // TOKEN_MINUS_MINUS
+        { NULL,     compile_binary,                 PREC_TERM },        // TOKEN_PLUS
+        { compile_prefix,     compile_postfix,      PREC_CALL },        // TOKEN_PLUS_PLUS
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_COLON
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_SEMICOLON
+        { NULL,     compile_binary,                 PREC_FACTOR },      // TOKEN_SLASH
+        { NULL,     compile_binary,                 PREC_FACTOR },      // TOKEN_STAR
+        { compile_unary,     NULL,                  PREC_NONE },        // TOKEN_TILDE
+        { NULL,     compile_binary,                 PREC_BITWISE_XOR }, // TOKEN_AMPERSAND
+        { NULL,     compile_binary,                 PREC_FACTOR },      // TOKEN_PERCENT
+        { NULL,     compile_ternary,                PREC_TERNARY },     // TOKEN_QUESTION
+        { compile_unary,     NULL,                  PREC_NONE },        // TOKEN_BANG
+        { NULL,     compile_binary,                 PREC_EQUALITY },    // TOKEN_BANG_EQUAL
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_EQUAL
+        { NULL,     compile_binary,                 PREC_EQUALITY },    // TOKEN_EQUAL_EQUAL
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_EQUAL_GREATER
+        { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_GREATER
+        { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_GREATER_EQUAL
+        { NULL,     compile_binary,                 PREC_SHIFT },       // TOKEN_GREATER_GREATER
+        { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_LESS
+        { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_LESS_EQUAL
+        { NULL,     compile_binary,                 PREC_SHIFT },       // TOKEN_LESS_LESS
+        { NULL,     compile_binary,                 PREC_BITWISE_AND }, // TOKEN_AMPERSAND
+        { NULL,     compile_and,                    PREC_AND },         // TOKEN_AMPERSAND_AMPERSAND
+        { NULL,     compile_binary,                 PREC_BITWISE_OR },  // TOKEN_PIPE
+        { NULL,     compile_or,                     PREC_OR },          // TOKEN_PIPE_PIPE
+        { compile_identifier,     NULL,             PREC_NONE },        // TOKEN_IDENTIFIER
+        { compile_string,     NULL,                 PREC_NONE },        // TOKEN_STRING
+        { compile_byte,     NULL,                   PREC_NONE },        // TOKEN_BYTE
+        { compile_int,     NULL,                    PREC_NONE },        // TOKEN_INT
+        { compile_float,     NULL,                  PREC_NONE },        // TOKEN_FLOAT
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_IF
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_ELSE
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_WHILE
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_FOR
+        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_TRUE
+        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_FALSE
+        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_NULL
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_VAR
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_FUNCTION
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_RETURN
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_CONTINUE
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_BREAK
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_ERROR
+        { NULL,     NULL,                           PREC_NONE },         // TOKEN_EOF
 };
 
 void compiler_init(Compiler* compiler) {
@@ -582,6 +585,56 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
     }
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACKET, "Expected ']' after array contents");
+
+    compiler->last.reg = reg;
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+    compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
+
+    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+}
+
+static void compile_object(Compiler* compiler, bool allowAssignment) {
+    if(!register_reserve(compiler))
+        return;
+
+    uint8_t reg = compiler->regIndex - 1;
+
+    emit_byte(compiler, OP_OBJ);
+    emit_byte(compiler, reg);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
+
+    if(compiler->parser->current.type != TOKEN_RIGHT_BRACE) {
+        while (1) {
+            compile_expression_precedence(compiler, PREC_COMMA + 1);
+
+            if (compiler->last.isNew)
+                register_free(compiler);
+
+            if (compiler->last.isConst) {
+                compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+                compiler->function->chunk.size -= 4;
+            }
+
+            #define L_TYPE (compiler->last.isConst * 0x80)
+
+            emit_byte(compiler, OP_PARR | L_TYPE);
+            emit_byte(compiler, reg);
+            emit_byte(compiler, compiler->last.reg);
+            emit_byte(compiler, 0);
+
+            #undef L_TYPE
+
+            if (compiler->parser->current.type == TOKEN_RIGHT_BRACKET || compiler->parser->current.type == TOKEN_EOF)
+                break;
+
+            parser_advance(compiler->parser);
+        }
+    }
+
+    parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after object properties");
 
     compiler->last.reg = reg;
     compiler->last.isNew = true;
@@ -1266,7 +1319,8 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_dot(Compiler* compiler, bool allowAssignment) {
-    uint8_t instanceReg = compiler->last.reg;
+    uint8_t leftReg = compiler->last.reg;
+    bool leftNew = compiler->last.isNew;
 
     if(compiler->parser->current.type != TOKEN_IDENTIFIER) {
         parser_error_at_current(compiler->parser, "Expected identifier");
@@ -1276,32 +1330,118 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
     Token prop = compiler->parser->current;
     parser_advance(compiler->parser);
 
-    uint8_t destReg;
+    uint16_t propIndex = create_identifier_constant(compiler);
+    bool identifierConst;
 
-    if(compiler->last.isNew) {
-        destReg = compiler->last.reg;
-    } else if(compiler->regs[instanceReg].type != REG_TEMP) {
+    if(propIndex < UINT8_MAX) {
+        identifierConst = true;
+
+        compiler->last.reg = propIndex;
+        compiler->last.isNew = false;
+    } else {
+        identifierConst = false;
+
         if(!register_reserve(compiler))
             return;
-        destReg = compiler->regIndex - 1;
-    } else destReg = compiler->last.reg;
 
-    if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
-        emit_byte(compiler, OP_LEN);
-        emit_byte(compiler, destReg);
-        emit_byte(compiler, instanceReg);
-        emit_byte(compiler, 0);
+        emit_byte(compiler, OP_CNSTW);
+        emit_byte(compiler, compiler->regIndex - 1);
+        emit_word(compiler, propIndex);
+
+        compiler->last.reg = compiler->regIndex -1;
+        compiler->last.isNew = true;
+    }
+
+    if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
+        if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+            parser_error_at_previous(compiler->parser, "Cannot assign to length");
+            return;
+        }
+
+        uint8_t rightReg = compiler->last.reg;
+        bool rightNew = compiler->last.isNew;
+
+        parser_advance(compiler->parser);
+        compile_expression(compiler);
+
+        #define L_TYPE (identifierConst * 0x80)
+
+        emit_byte(compiler, OP_SET | L_TYPE);
+        emit_byte(compiler, leftReg);
+        emit_byte(compiler, rightReg);
+        emit_byte(compiler, compiler->last.reg);
+
+        #undef L_TYPE
+
+        if(leftNew)
+            register_free(compiler);
+        if(rightNew)
+            register_free(compiler);
+        if(!compiler->last.canOverwrite || compiler->last.lvalMeta.type == LVAL_GLOBAL)
+            register_free(compiler);
 
         compiler->last.isLvalue = false;
     } else {
-        parser_error_at_previous(compiler->parser, "Invalid property");
-    }
+        uint8_t destReg;
 
-    compiler->regs[instanceReg] = (RegInfo) { REG_TEMP };
-    compiler->last.reg = destReg;
-    compiler->last.isNew = true;
-    compiler->last.isConst = false;
-    compiler->last.isPostIncrement = false;
+        if(compiler->last.isNew) {
+            destReg = compiler->last.reg;
+
+            if(leftNew)
+                register_free(compiler);
+        } else if(compiler->last.canOverwrite && leftNew) {
+            destReg = leftReg;
+        } else {
+            register_reserve(compiler);
+            destReg = compiler->regIndex - 1;
+        }
+
+        if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+            emit_byte(compiler, OP_LEN);
+            emit_byte(compiler, destReg);
+            emit_byte(compiler, leftReg);
+            emit_byte(compiler, 0);
+
+            compiler->last.isLvalue = false;
+        } else {
+            #define R_TYPE (identifierConst * 0x40)
+
+            emit_byte(compiler, OP_GET | R_TYPE);
+            emit_byte(compiler, destReg);
+            emit_byte(compiler, leftReg);
+            emit_byte(compiler, compiler->last.reg);
+
+            #undef R_TYPE
+        }
+
+        switch(compiler->last.lvalMeta.type) {
+            case LVAL_LOCAL:
+                compiler->last.lvalMeta.type = LVAL_LOCAL_PROP;
+                break;
+            case LVAL_GLOBAL:
+                compiler->last.lvalMeta.type = LVAL_GLOBAL_PROP;
+                break;
+            case LVAL_UPVAL:
+                compiler->last.lvalMeta.type = LVAL_UPVAL_PROP;
+                break;
+            default:
+                break;
+        }
+
+        compiler->last.lvalMeta.propOrigin = leftReg;
+        compiler->last.lvalMeta.propIndex.isConst = compiler->last.isConst;
+
+        if(compiler->last.isConst)
+            compiler->last.lvalMeta.propIndex.as.cnst = compiler->last.reg;
+        else compiler->last.lvalMeta.propIndex.as.reg = compiler->last.reg;
+
+        compiler->last.reg = destReg;
+        compiler->last.isNew = true;
+        compiler->last.isConst = false;
+        compiler->last.isLvalue = true;
+        compiler->last.isPostIncrement = false;
+        compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+    }
 }
 
 static uint8_t compile_arguments(Compiler* compiler) {

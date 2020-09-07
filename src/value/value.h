@@ -15,6 +15,7 @@ typedef enum {
 typedef enum {
     DVAL_STRING,
     DVAL_ARRAY,
+    DVAL_OBJECT,
     DVAL_UPVALUE,
     DVAL_FUNCTION,
     DVAL_CLOSURE,

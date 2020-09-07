@@ -4,6 +4,7 @@
 #include "../chunk/chunk.h"
 #include "../common/def.h"
 #include "../data/map.h"
+#include "../value/dense.h"
 
 #define VM_STACK_SIZE CALLFRAME_STACK_SIZE * 251
 

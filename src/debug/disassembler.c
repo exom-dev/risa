@@ -66,6 +66,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_array_push_instruction("PARR", types, chunk, offset);
         case OP_LEN:
             return disassemble_array_length_instruction("LEN", chunk, offset);
+        case OP_OBJ:
+            return disassemble_byte_instruction("OBJ", chunk, offset);
         case OP_GET:
             return disassemble_get_instruction("GET", types, chunk, offset);
         case OP_SET:

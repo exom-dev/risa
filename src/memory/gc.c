@@ -31,7 +31,7 @@ void gc_run(VM* vm) {
     for(uint32_t i = 0; i < vm->strings.capacity; ++i) {
         Entry* entry = &vm->strings.entries[i];
 
-        if(entry->key != NULL && !entry->key->dense.marked)
+        if(entry->key != NULL && !((DenseString*) entry->key)->dense.marked)
             map_erase(&vm->strings, entry->key);
     }
 

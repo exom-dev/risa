@@ -9,12 +9,32 @@ void dense_print(DenseValue* dense) {
         case DVAL_ARRAY:
             PRINT("[");
             for(uint32_t i = 0; i < ((DenseArray*) dense)->data.size; ++i) {
-                value_print(((DenseArray *) dense)->data.values[i]);
+                value_print(((DenseArray*) dense)->data.values[i]);
                 if(i < ((DenseArray*) dense)->data.size - 1)
                     PRINT(", ");
             }
             PRINT("]");
             break;
+        case DVAL_OBJECT: {
+            bool first = true;
+
+            PRINT("{ ");
+            for (uint32_t i = 0; i < ((DenseObject *) dense)->data.capacity; ++i) {
+                if(((DenseObject *) dense)->data.entries[i].key != NULL) {
+                    if(first)
+                        first = false;
+                    else PRINT(", ");
+
+                    PRINT("\"");
+                    dense_print((DenseValue *) (((DenseObject *) dense)->data.entries[i].key));
+                    PRINT("\": ");
+
+                    value_print(((DenseObject *) dense)->data.entries[i].value);
+                }
+            }
+            PRINT(" }");
+            break;
+        }
         case DVAL_UPVALUE:
             PRINT("<upval>");
             break;
@@ -42,6 +62,8 @@ size_t dense_size(DenseValue* dense) {
             return sizeof(DenseString) + ((DenseString*) dense)->length + 1;
         case DVAL_ARRAY:
             return sizeof(DenseArray);
+        case DVAL_OBJECT:
+            return sizeof(DenseObject);
         case DVAL_UPVALUE:
             return sizeof(DenseUpvalue);
         case DVAL_FUNCTION:
@@ -60,6 +82,11 @@ void dense_delete(DenseValue* dense) {
             MEM_FREE(dense);
             break;
         case DVAL_ARRAY:
+            dense_array_delete((DenseArray*) dense);
+            MEM_FREE(dense);
+            break;
+        case DVAL_OBJECT:
+            dense_object_delete((DenseObject*) dense);
             MEM_FREE(dense);
             break;
         case DVAL_UPVALUE:

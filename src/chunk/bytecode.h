@@ -18,6 +18,7 @@ typedef enum {
     OP_ARR,
     OP_PARR,
     OP_LEN,
+    OP_OBJ,
     OP_GET,
     OP_SET,
     OP_NULL,
