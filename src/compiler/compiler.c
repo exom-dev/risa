@@ -20,6 +20,7 @@ static void compile_literal(Compiler* compiler, bool);
 static void compile_identifier(Compiler* compiler, bool);
 static void compile_array(Compiler* compiler, bool);
 static void compile_object(Compiler* compiler, bool);
+static void compile_object_entries(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_function_declaration(Compiler* compiler);
@@ -606,32 +607,93 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    if(compiler->parser->current.type != TOKEN_RIGHT_BRACE) {
-        while (1) {
-            compile_expression_precedence(compiler, PREC_COMMA + 1);
+    while(1) {
+        uint8_t dest;
+        bool isConst;
 
-            if (compiler->last.isNew)
-                register_free(compiler);
+        switch(compiler->parser->current.type) {
+            case TOKEN_IDENTIFIER: {
+                Token prop = compiler->parser->current;
+                parser_advance(compiler->parser);
 
-            if (compiler->last.isConst) {
-                compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-                compiler->function->chunk.size -= 4;
-            }
+                if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+                    parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
+                    return;
+                }
 
-            #define L_TYPE (compiler->last.isConst * 0x80)
+                uint16_t propIndex = create_identifier_constant(compiler);
 
-            emit_byte(compiler, OP_PARR | L_TYPE);
-            emit_byte(compiler, reg);
-            emit_byte(compiler, compiler->last.reg);
-            emit_byte(compiler, 0);
+                if(propIndex < UINT8_MAX) {
+                    isConst = true;
 
-            #undef L_TYPE
+                    dest = propIndex;
+                } else {
+                    isConst = false;
 
-            if (compiler->parser->current.type == TOKEN_RIGHT_BRACKET || compiler->parser->current.type == TOKEN_EOF)
+                    if(!register_reserve(compiler))
+                        return;
+
+                    emit_byte(compiler, OP_CNSTW);
+                    emit_byte(compiler, compiler->regIndex - 1);
+                    emit_word(compiler, propIndex);
+
+                    dest = compiler->regIndex -1;
+                }
+
                 break;
+            }
+            case TOKEN_STRING: {
+                Token prop = compiler->parser->current;
+                parser_advance(compiler->parser);
 
-            parser_advance(compiler->parser);
+                if(prop.size == 8 && memcmp(prop.start, "\"length\"", 8) == 0) {
+                    parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
+                    return;
+                }
+
+                size_t chunkSize = compiler->function->chunk.size;
+
+                compile_string(compiler, allowAssignment);
+
+                if (compiler->function->chunk.size != chunkSize) {
+                    dest = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
+                    compiler->function->chunk.size = chunkSize;
+                } else dest = compiler->last.reg;
+
+                isConst = compiler->last.isConst;
+
+                break;
+            }
+            default:
+                parser_error_at_current(compiler->parser, "Expected identifier or string");
+                return;
         }
+
+        parser_consume(compiler->parser, TOKEN_COLON, "Expected ':' after object key");
+
+        compile_expression_precedence(compiler, PREC_COMMA + 1);
+
+        if (compiler->last.isNew)
+            register_free(compiler);
+
+        if (compiler->last.isConst) {
+            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
+            compiler->function->chunk.size -= 4;
+        }
+
+        #define LR_TYPES ((isConst * 0x80) | (compiler->last.isConst * 0x40))
+
+        emit_byte(compiler, OP_SET | LR_TYPES);
+        emit_byte(compiler, reg);
+        emit_byte(compiler, dest);
+        emit_byte(compiler, compiler->last.reg);
+
+        #undef LR_TYPES
+
+        if (compiler->parser->current.type == TOKEN_RIGHT_BRACE || compiler->parser->current.type == TOKEN_EOF)
+            break;
+
+        parser_consume(compiler->parser, TOKEN_COMMA, "Expected ',' after object entry");
     }
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after object properties");
@@ -643,6 +705,10 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
     compiler->last.isPostIncrement = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+}
+
+static void compile_object_entries(Compiler* compiler, bool allowAssignment) {
+
 }
 
 static void compile_declaration(Compiler* compiler) {

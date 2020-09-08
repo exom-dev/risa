@@ -272,7 +272,7 @@ size_t disassemble_get_instruction(const char* name, uint8_t types, Chunk* chunk
 }
 
 size_t disassemble_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
-    PRINT("%-16s %4d %4d%c %4d\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], types & LEFT_TYPE_MASK ? 'c' : 'r', chunk->bytecode[offset + 3]);
+    PRINT("%-16s %4d %4d%c %4d%c\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], types & LEFT_TYPE_MASK ? 'c' : 'r', chunk->bytecode[offset + 3], types & RIGHT_TYPE_MASK ? 'c' : 'r');
 
     return offset + 4;
 }
