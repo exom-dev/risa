@@ -123,7 +123,7 @@ DIGIT ::= [0-9] ;
 - ~~lambda expressions~~
 - ~~string escape sequences~~
 - ~~comma operator~~
-- prefix/postfix inc/dec
+- ~~prefix/postfix inc/dec~~
 - extra equal operators
 - ~~compiler optimizations~~
 - assembler + inline assembly
