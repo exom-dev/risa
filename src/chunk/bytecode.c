@@ -2,6 +2,8 @@
 
 bool op_has_direct_dest(OpCode op) {
     switch(op) {
+        case OP_CNST:
+        case OP_CNSTW:
         case OP_MOV:
         case OP_GGLOB:
         case OP_GUPVAL:

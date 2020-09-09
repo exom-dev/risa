@@ -20,7 +20,6 @@ static void compile_literal(Compiler* compiler, bool);
 static void compile_identifier(Compiler* compiler, bool);
 static void compile_array(Compiler* compiler, bool);
 static void compile_object(Compiler* compiler, bool);
-static void compile_object_entries(Compiler* compiler, bool);
 static void compile_declaration(Compiler* compiler);
 static void compile_variable_declaration(Compiler* compiler);
 static void compile_function_declaration(Compiler* compiler);
@@ -188,13 +187,7 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     parser_advance(compiler->parser);
 
     while(compiler->parser->current.type != TOKEN_EOF) {
-        size_t regIndex = compiler->regIndex;
-        size_t localCount = compiler->localCount;
-
         compile_declaration(compiler);
-
-        if(compiler->regIndex - regIndex != compiler->localCount - localCount)
-            compiler->regIndex = regIndex;
     }
 
     finalize_compilation(compiler);
@@ -463,11 +456,76 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
 
         uint32_t chunkSize = compiler->function->chunk.size;
         compile_expression(compiler);
+        Chunk chunk = compiler->function->chunk;
 
         if(set == OP_MOV) {
-            if(chunkSize == compiler->function->chunk.size)
-                emit_mov(compiler, index, compiler->last.reg);
-            else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
+            if((chunkSize == chunk.size)                  // Register reference; no new OPs.
+            || (chunkSize + 4 == chunk.size               // Only one OP.
+              && (chunk.bytecode[chunkSize] == OP_INC     // OP is INC.
+              || (chunk.bytecode[chunkSize] == OP_DEC)))) // OP is DEC.
+                emit_mov(compiler, index, compiler->last.reg); // MOV the origin.
+
+            else if(compiler->last.isPostIncrement) {
+                int32_t incOffset = 4;
+
+                while(chunk.size - incOffset >= chunkSize && chunk.bytecode[chunk.size - incOffset] != OP_INC && chunk.bytecode[chunk.size - incOffset] != OP_DEC)
+                    incOffset += 4;
+
+                if(chunk.size - incOffset < chunkSize) {
+                    parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix when it isn't (report this to the developers)");
+                    return;
+                }
+
+                if(chunk.size - incOffset - 4 < chunkSize || chunk.bytecode[chunk.size - incOffset - 4] != OP_MOV) {
+                    parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not MOV (report this to the developers)");
+                    return;
+                }
+
+                if(chunk.bytecode[chunk.size - incOffset + 1] == compiler->localCount - 1) { // The INC target interferes with the local register.
+                    uint8_t dest = compiler->localCount - 1;
+                    uint8_t tmp = chunk.bytecode[chunk.size - incOffset - 4 + 1]; // Original MOV target.
+
+                    chunk.bytecode[chunk.size - incOffset - 4 + 2] = tmp;  // MOV source.
+                    chunk.bytecode[chunk.size - incOffset - 4 + 1] = dest; // MOV target.
+                    chunk.bytecode[chunk.size - incOffset + 1] = tmp;      // INC target.
+
+                    incOffset += 8; // Jump over MOV.
+
+                    if(chunk.size - incOffset >= chunkSize) {
+                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_GET) {
+                            parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not GET (report this to the developers)");
+                            return;
+                        }
+
+                        chunk.bytecode[chunk.size - incOffset + 1] = tmp;
+                    }
+
+                    incOffset -= 4 + 8;
+
+                    if(incOffset > 0) {
+                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SET) {
+                            parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC successor is not SET (report this to the developers)");
+                            return;
+                        }
+
+                        chunk.bytecode[chunk.size - incOffset + 3] = tmp;
+                    }
+
+                    incOffset -= 4;
+
+                    if(incOffset > 0) {
+                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SGLOB) {
+                            parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but SET successor is not SGLOB (report this to the developers)");
+                            return;
+                        }
+
+                        chunk.bytecode[chunk.size - incOffset + 2] = tmp;
+                    }
+                } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
+            } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)) { // Can directly assign to local.
+                chunk.bytecode[chunk.size - 4 + 1] = index;  // Do it.
+                compiler->last.reg = index;
+            } else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
         } else {
             if(set == OP_SGLOB) {
                 Chunk* chunk = &compiler->function->chunk;
@@ -487,6 +545,8 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             emit_byte(compiler, compiler->last.reg); // compiler->regIndex - 1;
             emit_byte(compiler, 0);
         }
+
+        compiler->last.isConst = false;
 
         //register_free(compiler);
     } else {
@@ -607,93 +667,95 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
-    while(1) {
-        uint8_t dest;
-        bool isConst;
+    if(compiler->parser->current.type != TOKEN_RIGHT_BRACE) {
+        while (1) {
+            uint8_t dest;
+            bool isConst;
 
-        switch(compiler->parser->current.type) {
-            case TOKEN_IDENTIFIER: {
-                Token prop = compiler->parser->current;
-                parser_advance(compiler->parser);
+            switch (compiler->parser->current.type) {
+                case TOKEN_IDENTIFIER: {
+                    Token prop = compiler->parser->current;
+                    parser_advance(compiler->parser);
 
-                if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
-                    parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
-                    return;
-                }
-
-                uint16_t propIndex = create_identifier_constant(compiler);
-
-                if(propIndex < UINT8_MAX) {
-                    isConst = true;
-
-                    dest = propIndex;
-                } else {
-                    isConst = false;
-
-                    if(!register_reserve(compiler))
+                    if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+                        parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
                         return;
+                    }
 
-                    emit_byte(compiler, OP_CNSTW);
-                    emit_byte(compiler, compiler->regIndex - 1);
-                    emit_word(compiler, propIndex);
+                    uint16_t propIndex = create_identifier_constant(compiler);
 
-                    dest = compiler->regIndex -1;
+                    if(propIndex < UINT8_MAX) {
+                        isConst = true;
+
+                        dest = propIndex;
+                    } else {
+                        isConst = false;
+
+                        if (!register_reserve(compiler))
+                            return;
+
+                        emit_byte(compiler, OP_CNSTW);
+                        emit_byte(compiler, compiler->regIndex - 1);
+                        emit_word(compiler, propIndex);
+
+                        dest = compiler->regIndex - 1;
+                    }
+
+                    break;
                 }
+                case TOKEN_STRING: {
+                    Token prop = compiler->parser->current;
+                    parser_advance(compiler->parser);
 
-                break;
-            }
-            case TOKEN_STRING: {
-                Token prop = compiler->parser->current;
-                parser_advance(compiler->parser);
+                    if(prop.size == 8 && memcmp(prop.start, "\"length\"", 8) == 0) {
+                        parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
+                        return;
+                    }
 
-                if(prop.size == 8 && memcmp(prop.start, "\"length\"", 8) == 0) {
-                    parser_error_at_previous(compiler->parser, "The property 'length' is reserved");
+                    size_t chunkSize = compiler->function->chunk.size;
+
+                    compile_string(compiler, allowAssignment);
+
+                    if(compiler->function->chunk.size != chunkSize) {
+                        dest = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
+                        compiler->function->chunk.size = chunkSize;
+                    } else dest = compiler->last.reg;
+
+                    isConst = compiler->last.isConst;
+
+                    break;
+                }
+                default:
+                    parser_error_at_current(compiler->parser, "Expected identifier or string");
                     return;
-                }
-
-                size_t chunkSize = compiler->function->chunk.size;
-
-                compile_string(compiler, allowAssignment);
-
-                if (compiler->function->chunk.size != chunkSize) {
-                    dest = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
-                    compiler->function->chunk.size = chunkSize;
-                } else dest = compiler->last.reg;
-
-                isConst = compiler->last.isConst;
-
-                break;
             }
-            default:
-                parser_error_at_current(compiler->parser, "Expected identifier or string");
-                return;
+
+            parser_consume(compiler->parser, TOKEN_COLON, "Expected ':' after object key");
+
+            compile_expression_precedence(compiler, PREC_COMMA + 1);
+
+            if(compiler->last.isNew)
+                register_free(compiler);
+
+            if(compiler->last.isConst) {
+                compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
+                compiler->function->chunk.size -= 4;
+            }
+
+            #define LR_TYPES ((isConst * 0x80) | (compiler->last.isConst * 0x40))
+
+            emit_byte(compiler, OP_SET | LR_TYPES);
+            emit_byte(compiler, reg);
+            emit_byte(compiler, dest);
+            emit_byte(compiler, compiler->last.reg);
+
+            #undef LR_TYPES
+
+            if(compiler->parser->current.type == TOKEN_RIGHT_BRACE || compiler->parser->current.type == TOKEN_EOF)
+                break;
+
+            parser_consume(compiler->parser, TOKEN_COMMA, "Expected ',' after object entry");
         }
-
-        parser_consume(compiler->parser, TOKEN_COLON, "Expected ':' after object key");
-
-        compile_expression_precedence(compiler, PREC_COMMA + 1);
-
-        if (compiler->last.isNew)
-            register_free(compiler);
-
-        if (compiler->last.isConst) {
-            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
-            compiler->function->chunk.size -= 4;
-        }
-
-        #define LR_TYPES ((isConst * 0x80) | (compiler->last.isConst * 0x40))
-
-        emit_byte(compiler, OP_SET | LR_TYPES);
-        emit_byte(compiler, reg);
-        emit_byte(compiler, dest);
-        emit_byte(compiler, compiler->last.reg);
-
-        #undef LR_TYPES
-
-        if (compiler->parser->current.type == TOKEN_RIGHT_BRACE || compiler->parser->current.type == TOKEN_EOF)
-            break;
-
-        parser_consume(compiler->parser, TOKEN_COMMA, "Expected ',' after object entry");
     }
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after object properties");
@@ -712,6 +774,9 @@ static void compile_object_entries(Compiler* compiler, bool allowAssignment) {
 }
 
 static void compile_declaration(Compiler* compiler) {
+    size_t regIndex = compiler->regIndex;
+    size_t localCount = compiler->localCount;
+
     if(compiler->parser->current.type == TOKEN_VAR) {
         parser_advance(compiler->parser);
         compile_variable_declaration(compiler);
@@ -722,6 +787,9 @@ static void compile_declaration(Compiler* compiler) {
 
     if(compiler->parser->panic)
         parser_sync(compiler->parser);
+
+    if(compiler->regIndex - regIndex != compiler->localCount - localCount)
+        compiler->regIndex = regIndex + (compiler->localCount - localCount);
 }
 
 static void compile_variable_declaration(Compiler* compiler) {
@@ -816,7 +884,8 @@ static void compile_variable_declaration(Compiler* compiler) {
             } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
         } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)) { // Can directly assign to local.
             chunk.bytecode[chunk.size - 4 + 1] = compiler->localCount - 1;  // Do it.
-        }
+            compiler->last.reg = index;
+        } else emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the result.
 
         if(compiler->last.isNew)
             register_free(compiler);
@@ -1447,6 +1516,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
             register_free(compiler);
 
         compiler->last.isLvalue = false;
+        compiler->last.isConst = false; // CNST was already handled here.
     } else {
         uint8_t destReg;
 
@@ -1660,6 +1730,9 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
     bool isLeftConst = compiler->last.isConst;
 
     compile_expression(compiler);
+
+    bool isLength = (compiler->parser->previous.type == TOKEN_STRING && compiler->parser->previous.size == 8 && memcmp(compiler->parser->previous.start, "\"length\"", 8) == 0);
+
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACKET, "Expected ']' after expression");
 
     if(compiler->last.isConst) {
@@ -1670,16 +1743,14 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
     }
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
+        if(isLength) {
+            parser_error_at_previous(compiler->parser, "Cannot assign to length");
+            return;
+        }
+
         uint8_t rightReg = compiler->last.reg;
         bool isRightConst = compiler->last.isConst;
         bool isRightNew = compiler->last.isNew;
-
-        if(!compiler->last.canOverwrite || compiler->last.lvalMeta.type == LVAL_GLOBAL) {
-            if(!register_reserve(compiler))
-                return;
-
-            leftReg = compiler->regIndex - 1;
-        }
 
         parser_advance(compiler->parser);
         compile_expression(compiler);
@@ -1721,10 +1792,10 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
 
         #define R_TYPE (compiler->last.isConst * 0x40)
 
-        emit_byte(compiler, OP_GET | R_TYPE);
+        emit_byte(compiler, isLength ? OP_LEN : OP_GET | R_TYPE);
         emit_byte(compiler, destReg);
         emit_byte(compiler, leftReg);
-        emit_byte(compiler, compiler->last.reg);
+        emit_byte(compiler, isLength ? 0 : compiler->last.reg);
 
         #undef R_TYPE
 
