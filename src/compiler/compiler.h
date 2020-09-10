@@ -58,6 +58,7 @@ typedef struct Compiler {
         bool isConst;
         bool isLvalue;
         bool isPostIncrement;
+        bool isEqualOp;
         bool canOverwrite;
 
         struct {

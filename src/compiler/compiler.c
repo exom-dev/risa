@@ -44,6 +44,7 @@ static void compile_accessor(Compiler* compiler, bool);
 static void compile_unary(Compiler* compiler, bool);
 static void compile_binary(Compiler* compiler, bool);
 static void compile_ternary(Compiler* compiler, bool);
+static void compile_equal_op(Compiler* compiler, bool);
 static void compile_prefix(Compiler* compiler, bool);
 static void compile_postfix(Compiler* compiler, bool);
 static void compile_and(Compiler* compiler, bool);
@@ -110,7 +111,15 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,                 PREC_EQUALITY },    // TOKEN_BANG_EQUAL
         { NULL,     NULL,                           PREC_NONE },        // TOKEN_EQUAL
         { NULL,     compile_binary,                 PREC_EQUALITY },    // TOKEN_EQUAL_EQUAL
-        { NULL,     NULL,                           PREC_NONE },        // TOKEN_EQUAL_GREATER
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_EQUAL_GREATER
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_PLUS_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_MINUS_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_STAR_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_SLASH_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_CARET_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_PERCENT_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_PIPE_EQUAL
+        { NULL,     compile_equal_op,               PREC_ASSIGNMENT },  // TOKEN_AMPERSAND_EQUAL
         { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_GREATER
         { NULL,     compile_binary,                 PREC_COMPARISON },  // TOKEN_GREATER_EQUAL
         { NULL,     compile_binary,                 PREC_SHIFT },       // TOKEN_GREATER_GREATER
@@ -155,6 +164,7 @@ void compiler_init(Compiler* compiler) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
     compiler->last.canOverwrite = false; // true
     compiler->last.lvalMeta.type = LVAL_LOCAL;
     compiler->last.lvalMeta.global = 0;
@@ -217,12 +227,14 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     } else  {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     }
 }
 
@@ -248,12 +260,14 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     }
 }
 
@@ -278,11 +292,13 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     }
 }
 
@@ -379,12 +395,14 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     }
 }
 
@@ -419,12 +437,14 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
     }
 }
 
@@ -522,7 +542,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                         chunk.bytecode[chunk.size - incOffset + 2] = tmp;
                     }
                 } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
-            } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)) { // Can directly assign to local.
+            } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp) { // Can directly assign to local.
                 chunk.bytecode[chunk.size - 4 + 1] = index;  // Do it.
                 compiler->last.reg = index;
             } else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
@@ -552,13 +572,13 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     } else {
         uint8_t reg = register_find(compiler, get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous);
 
-        // Eliminate SGLOB after DGLOB
+        // Eliminate GGLOB after DGLOB
         if(reg == 251) {
             Chunk *chunk = &compiler->function->chunk;
 
-            if (chunk->size > 0 && chunk->bytecode[chunk->size - 4] == OP_DGLOB)
-                if (chunk->bytecode[chunk->size - 3] == index)
-                    reg = chunk->bytecode[chunk->size - 2];
+            if(chunk->size > 0 && chunk->bytecode[chunk->size - 4] == OP_DGLOB)
+                if(chunk->bytecode[chunk->size - 4 + 1] == index)
+                    reg = chunk->bytecode[chunk->size - 4 + 2];
         }
 
         if(reg == 251) {
@@ -604,6 +624,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = true;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 }
 
 static void compile_array(Compiler* compiler, bool allowAssignment) {
@@ -652,6 +673,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
@@ -765,6 +787,7 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
@@ -882,7 +905,7 @@ static void compile_variable_declaration(Compiler* compiler) {
                     chunk.bytecode[chunk.size - incOffset + 2] = tmp;
                 }
             } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
-        } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)) { // Can directly assign to local.
+        } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp) { // Can directly assign to local.
             chunk.bytecode[chunk.size - 4 + 1] = compiler->localCount - 1;  // Do it.
             compiler->last.reg = index;
         } else emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the result.
@@ -897,6 +920,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         compiler->last.isNew = true;
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
 
         if(compiler->regIndex == 249) {
             parser_error_at_current(compiler->parser, "Register limit exceeded (250)");
@@ -928,6 +952,7 @@ static void compile_variable_declaration(Compiler* compiler) {
 
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 }
 
 static void compile_function_declaration(Compiler* compiler) {
@@ -964,6 +989,7 @@ static void compile_function_declaration(Compiler* compiler) {
 
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 }
 
 static void compile_function(Compiler* compiler) {
@@ -1046,6 +1072,7 @@ static void compile_function(Compiler* compiler) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     compiler_delete(&subcompiler);
 }
@@ -1451,6 +1478,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 }
 
 static void compile_dot(Compiler* compiler, bool allowAssignment) {
@@ -1576,6 +1604,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = false;
         compiler->last.isLvalue = true;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     }
 }
@@ -1596,7 +1625,9 @@ static uint8_t compile_arguments(Compiler* compiler) {
 
             if(chunkSize == compiler->function->chunk.size)
                 emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
-            else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
+            else if(op_has_direct_dest(compiler->function->chunk.bytecode[compiler->function->chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp)
+                compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
+            else emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
 
             if(argc == 255) {
                 parser_error_at_previous(compiler->parser, "Argument limit exceeded (255)");
@@ -1720,6 +1751,7 @@ static void compile_lambda(Compiler* compiler) {
     compiler->last.isConst = true;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     compiler_delete(&subcompiler);
 }
@@ -1825,6 +1857,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = false;
         compiler->last.isLvalue = true;
         compiler->last.isPostIncrement = false;
+        compiler->last.isEqualOp = false;
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     }
 }
@@ -1875,6 +1908,7 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     #undef L_TYPE
 }
@@ -1980,6 +2014,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
 
     #undef LR_TYPES
 }
@@ -2003,6 +2038,110 @@ static void compile_ternary(Compiler* compiler, bool allowAssignment) {
     emit_jump(compiler, first);
     compile_expression(compiler);
     emit_jump(compiler, second);
+}
+
+static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
+    TokenType operator = compiler->parser->previous.type;
+
+    if(!compiler->last.isLvalue) {
+        parser_error_at_current(compiler->parser, "Cannot assign to non-lvalue");
+        return;
+    }
+
+    uint8_t destReg = compiler->last.reg;
+
+    bool isNew = compiler->last.isNew;
+    bool isConst = compiler->last.isConst;
+    bool isLvalue = compiler->last.isLvalue;
+
+    compile_expression(compiler);
+
+    if(compiler->last.isConst) {
+        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
+        compiler->function->chunk.size -= 4;
+    }
+
+    #define R_TYPE (compiler->last.isConst * 0x40)
+
+    switch(operator) {
+        case TOKEN_PLUS_EQUAL:
+            emit_byte(compiler, OP_ADD | R_TYPE);
+            break;
+        case TOKEN_MINUS_EQUAL:
+            emit_byte(compiler, OP_SUB | R_TYPE);
+            break;
+        case TOKEN_STAR_EQUAL:
+            emit_byte(compiler, OP_MUL | R_TYPE);
+            break;
+        case TOKEN_SLASH_EQUAL:
+            emit_byte(compiler, OP_DIV | R_TYPE);
+            break;
+        case TOKEN_CARET_EQUAL:
+            emit_byte(compiler, OP_BXOR | R_TYPE);
+            break;
+        case TOKEN_PERCENT_EQUAL:
+            emit_byte(compiler, OP_MOD | R_TYPE);
+            break;
+        case TOKEN_PIPE_EQUAL:
+            emit_byte(compiler, OP_BOR | R_TYPE);
+            break;
+        case TOKEN_AMPERSAND_EQUAL:
+            emit_byte(compiler, OP_BAND | R_TYPE);
+            break;
+        default:
+            return;
+    }
+
+    emit_byte(compiler, destReg);
+    emit_byte(compiler, destReg);
+    emit_byte(compiler, compiler->last.reg);
+
+    #undef R_TYPE
+
+    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
+
+    switch(compiler->last.lvalMeta.type) {
+        case LVAL_LOCAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+            break;
+        case LVAL_GLOBAL:
+            emit_bytes(compiler, OP_SGLOB, compiler->last.lvalMeta.global, destReg);
+            emit_byte(compiler, 0);
+            break;
+        case LVAL_GLOBAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+
+            emit_bytes(compiler, OP_SGLOB, compiler->last.lvalMeta.global, compiler->last.lvalMeta.propOrigin);
+            emit_byte(compiler, 0);
+            break;
+        case LVAL_UPVAL:
+            emit_bytes(compiler, OP_SUPVAL, compiler->last.lvalMeta.upval, destReg);
+            emit_byte(compiler, 0);
+        case LVAL_UPVAL_PROP:
+            emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
+                                                                                                                                : compiler->last.lvalMeta.propIndex.as.reg);
+            emit_byte(compiler, destReg);
+
+            emit_bytes(compiler, OP_SUPVAL, compiler->last.lvalMeta.upval, compiler->last.lvalMeta.propOrigin);
+            emit_byte(compiler, 0);
+            break;
+        default:
+            break;
+    }
+
+    #undef L_TYPE
+
+    compiler->last.reg = destReg;
+    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
+    compiler->last.isNew = isNew;
+    compiler->last.isConst = isConst;
+    compiler->last.isLvalue = isLvalue;
+    compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = true;
 }
 
 static void compile_prefix(Compiler* compiler, bool allowAssignment) {
@@ -2155,6 +2294,7 @@ static void compile_postfix(Compiler* compiler, bool allowAssignment) {
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = true;
+    compiler->last.isEqualOp = false;
 }
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {

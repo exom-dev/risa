@@ -97,13 +97,15 @@ Token lexer_next(Lexer* lexer) {
         case ';': return lexer_emit(lexer, TOKEN_SEMICOLON);
         case ',': return lexer_emit(lexer, TOKEN_COMMA);
         case '.': return lexer_emit(lexer, TOKEN_DOT);
-        case '-': return lexer_emit(lexer, MATCH('-') ? TOKEN_MINUS_MINUS : TOKEN_MINUS);
-        case '+': return lexer_emit(lexer, MATCH('+') ? TOKEN_PLUS_PLUS : TOKEN_PLUS);
-        case '/': return lexer_emit(lexer, TOKEN_SLASH);
-        case '*': return lexer_emit(lexer, TOKEN_STAR);
+        case '-': return lexer_emit(lexer, MATCH('-') ? TOKEN_MINUS_MINUS :
+                                           MATCH('=') ? TOKEN_MINUS_EQUAL: TOKEN_MINUS);
+        case '+': return lexer_emit(lexer, MATCH('+') ? TOKEN_PLUS_PLUS :
+                                           MATCH('=') ? TOKEN_PLUS_EQUAL: TOKEN_PLUS);
+        case '/': return lexer_emit(lexer, MATCH('=') ? TOKEN_SLASH_EQUAL: TOKEN_SLASH);
+        case '*': return lexer_emit(lexer, MATCH('=') ? TOKEN_STAR_EQUAL: TOKEN_STAR);
         case '~': return lexer_emit(lexer, TOKEN_TILDE);
-        case '^': return lexer_emit(lexer, TOKEN_CARET);
-        case '%': return lexer_emit(lexer, TOKEN_PERCENT);
+        case '^': return lexer_emit(lexer, MATCH('=') ? TOKEN_CARET_EQUAL: TOKEN_CARET);
+        case '%': return lexer_emit(lexer, MATCH('=') ? TOKEN_PERCENT_EQUAL: TOKEN_PERCENT);
         case '?': return lexer_emit(lexer, TOKEN_QUESTION);
         case '!': return lexer_emit(lexer, MATCH('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '=': return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL :
@@ -112,8 +114,10 @@ Token lexer_next(Lexer* lexer) {
                                            MATCH('<') ? TOKEN_LESS_LESS : TOKEN_LESS);
         case '>': return lexer_emit(lexer, MATCH('=') ? TOKEN_GREATER_EQUAL :
                                            MATCH('>') ? TOKEN_GREATER_GREATER : TOKEN_GREATER);
-        case '&': return lexer_emit(lexer, MATCH('&') ? TOKEN_AMPERSAND_AMPERSAND : TOKEN_AMPERSAND);
-        case '|': return lexer_emit(lexer, MATCH('|') ? TOKEN_PIPE_PIPE : TOKEN_PIPE);
+        case '&': return lexer_emit(lexer, MATCH('&') ? TOKEN_AMPERSAND_AMPERSAND :
+                                           MATCH('=') ? TOKEN_AMPERSAND_EQUAL: TOKEN_AMPERSAND);
+        case '|': return lexer_emit(lexer, MATCH('|') ? TOKEN_PIPE_PIPE :
+                                           MATCH('=') ? TOKEN_PIPE_EQUAL: TOKEN_PIPE);
         case '"': return next_string(lexer);
 
         default: return lexer_error(lexer, "Unexpected character");
