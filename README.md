@@ -116,7 +116,7 @@ DIGIT ::= [0-9] ;
 - ~~garbage collector~~
 - ~~break statement~~
 - ~~continue statement~~
-- objects
+- ~~objects~~
 - ~~arrays~~
 - ~~ternary operator~~
 - ~~function arrow body~~
@@ -124,7 +124,7 @@ DIGIT ::= [0-9] ;
 - ~~string escape sequences~~
 - ~~comma operator~~
 - ~~prefix/postfix inc/dec~~
-- extra equal operators
+- ~~extra equal operators~~
 - ~~compiler optimizations~~
 - assembler + inline assembly
 - REPL compilation option
