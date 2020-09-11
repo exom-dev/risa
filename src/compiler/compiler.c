@@ -587,10 +587,14 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             if(!register_reserve(compiler))
                 return;
 
-            emit_byte(compiler, get);
-            emit_byte(compiler, compiler->regIndex - 1);
-            emit_byte(compiler, index);
-            emit_byte(compiler, 0);
+            if(get == OP_MOV)
+                emit_mov(compiler, compiler->regIndex - 1, index);
+            else {
+                emit_byte(compiler, get);
+                emit_byte(compiler, compiler->regIndex - 1);
+                emit_byte(compiler, index);
+                emit_byte(compiler, 0);
+            }
 
             compiler->last.reg = compiler->regIndex - 1;
             compiler->regs[compiler->last.reg] = (RegInfo) { get == OP_MOV ? REG_LOCAL : (get == OP_GUPVAL ? REG_UPVAL : REG_GLOBAL), compiler->parser->previous };
@@ -1031,9 +1035,10 @@ static void compile_function(Compiler* compiler) {
             }
 
             declare_variable(&subcompiler);
+
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
-            //++subcompiler.regIndex;
+            ++subcompiler.regIndex;
         } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
     }
 
@@ -1475,6 +1480,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
         --argc;
     }
 
+    compiler->last.reg = functionReg;
     compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = true;
     compiler->last.isConst = false;
