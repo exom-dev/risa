@@ -37,6 +37,7 @@ static void compile_expression(Compiler* compiler);
 static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
 static void compile_return_expression(Compiler* compiler);
 static void compile_call(Compiler* compiler, bool);
+static void compile_clone(Compiler* compiler, bool);
 static void compile_dot(Compiler* compiler, bool);
 static void compile_grouping_or_lambda(Compiler* compiler, bool);
 static void compile_lambda(Compiler* compiler);
@@ -137,18 +138,19 @@ Rule EXPRESSION_RULES[] = {
         { compile_float,     NULL,                  PREC_NONE },        // TOKEN_FLOAT
         { NULL,     NULL,                           PREC_NONE },        // TOKEN_IF
         { NULL,     NULL,                           PREC_NONE },        // TOKEN_ELSE
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_WHILE
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_FOR
-        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_TRUE
-        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_FALSE
-        { compile_literal,     NULL,                PREC_NONE },         // TOKEN_NULL
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_VAR
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_FUNCTION
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_RETURN
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_CONTINUE
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_BREAK
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_ERROR
-        { NULL,     NULL,                           PREC_NONE },         // TOKEN_EOF
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_WHILE
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_FOR
+        { compile_literal,     NULL,                PREC_NONE },        // TOKEN_TRUE
+        { compile_literal,     NULL,                PREC_NONE },        // TOKEN_FALSE
+        { compile_literal,     NULL,                PREC_NONE },        // TOKEN_NULL
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_VAR
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_FUNCTION
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_RETURN
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_CONTINUE
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_BREAK
+        { compile_clone,     NULL,                  PREC_NONE },        // TOKEN_CLONE
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_ERROR
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_EOF
 };
 
 void compiler_init(Compiler* compiler) {
@@ -1474,6 +1476,37 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     }
 
     compiler->regs[functionReg] = (RegInfo) { REG_TEMP };
+    compiler->last.isNew = true;
+    compiler->last.isConst = false;
+    compiler->last.isLvalue = false;
+    compiler->last.isPostIncrement = false;
+    compiler->last.isEqualOp = false;
+}
+
+static void compile_clone(Compiler* compiler, bool allowAssignment) {
+    parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after 'clone' keyword");
+    compile_expression(compiler);
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after clone argument");
+
+    uint8_t destReg;
+
+    if(compiler->last.isNew) {
+        destReg = compiler->last.reg;
+
+        register_free(compiler);
+    } else {
+        if(!register_reserve(compiler))
+            return;
+        destReg = compiler->regIndex - 1;
+    }
+
+    emit_byte(compiler, OP_CLONE);
+    emit_byte(compiler, destReg);
+    emit_byte(compiler, compiler->last.reg);
+    emit_byte(compiler, 0);
+
+    compiler->last.reg = destReg;
+    compiler->regs[destReg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;

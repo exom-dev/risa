@@ -71,6 +71,7 @@ typedef struct {
 #define AS_NATIVE(value)   ((DenseNative*) ((value).as.dense))
 
 void   dense_print(DenseValue* dense);
+Value  dense_clone(DenseValue* dense);
 size_t dense_size(DenseValue* dense);
 void   dense_delete(DenseValue* dense);
 

@@ -44,6 +44,8 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_constant_instruction("CNSTW", chunk, offset);
         case OP_MOV:
             return disassemble_mov_instruction("MOV", chunk, offset);
+        case OP_CLONE:
+            return disassemble_mov_instruction("CLONE", chunk, offset);
         case OP_DGLOB:
             return disassemble_global_define_instruction("DGLOB", types, chunk, offset);
         case OP_GGLOB:

@@ -118,6 +118,25 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
+            case OP_CLONE: {
+                DEST_REG = value_clone(LEFT_REG);
+
+                if(DEST_REG.type == VAL_DENSE) {
+                    switch(AS_DENSE(DEST_REG)->type) {
+                        case DVAL_ARRAY:
+                        case DVAL_OBJECT:
+                        case DVAL_UPVALUE:
+                            vm_register_dense(vm, AS_DENSE(DEST_REG));
+                        default:
+                            break;
+                    }
+                }
+
+                gc_check(vm);
+
+                SKIP(3);
+                break;
+            }
             case OP_DGLOB: {
                 map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE);
                 gc_check(vm);

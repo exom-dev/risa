@@ -25,6 +25,19 @@ void value_print(Value value) {
     }
 }
 
+Value value_clone(Value value) {
+    switch(value.type) {
+        case VAL_NULL:
+        case VAL_BOOL:
+        case VAL_BYTE:
+        case VAL_INT:
+        case VAL_FLOAT:
+            return value;
+        case VAL_DENSE:
+            return dense_clone(AS_DENSE(value));
+    }
+}
+
 bool value_is_falsy(Value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
