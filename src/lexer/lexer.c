@@ -232,13 +232,13 @@ Token next_string(Lexer* lexer) {
             if(PEEK(-1) != '\\')
                 break;
         } else if(PEEK(0) == '\n')
-            return lexer_error(lexer, "Expecter end of string");
+            return lexer_error(lexer, "Expected end of string");
 
         ADVANCE(1);
     }
 
     if(AT_END(0))
-        return lexer_error(lexer, "Expecter end of string");
+        return lexer_error(lexer, "Expected end of string");
 
     ADVANCE(1);
     return lexer_emit(lexer, TOKEN_STRING);

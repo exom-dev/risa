@@ -79,8 +79,6 @@ static uint16_t create_identifier_constant(Compiler* compiler);
 static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
 static uint16_t declare_variable(Compiler* compiler);
 
-static uint16_t identifier_to_constant(Compiler* compiler, Token identifier);
-
 static bool    register_reserve(Compiler* compiler);
 static uint8_t register_find(Compiler* compiler, RegType type, Token token);
 static void    register_free(Compiler* compiler);

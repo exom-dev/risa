@@ -2,7 +2,7 @@
 
 #include "chunk/chunk.h"
 #include "compiler/compiler.h"
-#include "debug/disassembler.h"
+#include "asm/disassembler.h"
 #include "common/logging.h"
 #include "common/def.h"
 
@@ -94,13 +94,13 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         compiler_delete(&compiler);
         vm_delete(&vm);
 
-        PRINT("Heap size: %zu\n", vm.heapSize);
+        PRINT("\n\nHeap size: %zu\n", vm.heapSize);
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
     compiler_delete(&compiler);
     vm_delete(&vm);
 
-    PRINT("Heap size: %zu\n", vm.heapSize);
+    PRINT("\n\nHeap size: %zu\n", vm.heapSize);
     return RISA_INTERPRET_OK;
 }
