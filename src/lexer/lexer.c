@@ -207,20 +207,28 @@ Token next_number(Lexer* lexer) {
     while(!AT_END(0) && is_digit(PEEK(0)))
         ADVANCE(1);
 
-    if(PEEK(0) == '.') {
-        type = TOKEN_FLOAT;
+    switch(PEEK(0)) {
+        case '.':
+            type = TOKEN_FLOAT;
 
-        if(!AT_END(1) && is_digit(PEEK(1))) {
-            ADVANCE(1);
-
-            while(!AT_END(0) && is_digit(PEEK(0)))
+            if(!AT_END(1) && is_digit(PEEK(1))) {
                 ADVANCE(1);
-        } else return lexer_error(lexer, "Expected digit after dot");
-    }
 
-    if(PEEK(0) == 'b') {
-        type = TOKEN_BYTE;
-        ADVANCE(1);
+                while(!AT_END(0) && is_digit(PEEK(0)))
+                    ADVANCE(1);
+
+                if(!AT_END(0) && PEEK(0) == 'f')
+                    ADVANCE(1);
+            } else return lexer_error(lexer, "Expected digit after dot");
+            break;
+        case 'b':
+            type = TOKEN_BYTE;
+            ADVANCE(1);
+            break;
+        case 'f':
+            type = TOKEN_FLOAT;
+            ADVANCE(1);
+            break;
     }
 
     return lexer_emit(lexer, type);

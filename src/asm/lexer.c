@@ -147,6 +147,7 @@ Token next_identifier(Lexer* lexer) {
                     case 'n': return lexer_emit(lexer, CLASSIFY(2, 2, "ot", TOKEN_BNOT));
                     case 'o': return lexer_emit(lexer, CLASSIFY(2, 1, "r", TOKEN_BOR));
                     case 'x': return lexer_emit(lexer, CLASSIFY(2, 2, "or", TOKEN_BXOR));
+                    case 'y': return lexer_emit(lexer, CLASSIFY(2, 2, "te", TOKEN_BYTE_TYPE));
                 }
             }
         case 'c':
@@ -162,19 +163,29 @@ Token next_identifier(Lexer* lexer) {
                         }
                     case 'n': return lexer_emit(lexer, CLASSIFY(2, 3, "stw", TOKEN_CNSTW) == TOKEN_CNSTW ? TOKEN_CNSTW :
                                                        CLASSIFY(2, 2, "st", TOKEN_CNST));
+                    case 'o': return lexer_emit(lexer, CLASSIFY(2, 2, "de", TOKEN_CODE));
                     case 'u': return lexer_emit(lexer, CLASSIFY(2, 4, "pval", TOKEN_CUPVAL));
                 }
             }
         case 'd':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
+                    case 'a': return lexer_emit(lexer, CLASSIFY(2, 2, "ta", TOKEN_DATA));
                     case 'e': return lexer_emit(lexer, CLASSIFY(2, 1, "c", TOKEN_DEC));
                     case 'i': return lexer_emit(lexer, CLASSIFY(2, 1, "v", TOKEN_DIV));
                     case 'g': return lexer_emit(lexer, CLASSIFY(2, 3, "lob", TOKEN_DGLOB));
                 }
             }
         case 'e': return lexer_emit(lexer, CLASSIFY(1, 1, "e", TOKEN_EQ));
-        case 'f': return lexer_emit(lexer, CLASSIFY(1, 4, "alse", TOKEN_FALSE));
+        case 'f':
+            if(lexer->current - lexer->start > 1) {
+                switch(lexer->start[1]) {
+                    case 'a': return lexer_emit(lexer, CLASSIFY(2, 3, "lse", TOKEN_FALSE));
+                    case 'l': return lexer_emit(lexer, CLASSIFY(2, 3, "oat", TOKEN_FLOAT_TYPE));
+                    case 'u': return lexer_emit(lexer, CLASSIFY(2, 6, "nction", TOKEN_FUNCTION_TYPE));
+                }
+            }
+            return lexer_emit(lexer, CLASSIFY(1, 4, "alse", TOKEN_FALSE));
         case 'g':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
@@ -184,7 +195,9 @@ Token next_identifier(Lexer* lexer) {
                     case 'u': return lexer_emit(lexer, CLASSIFY(2, 4, "pval", TOKEN_GUPVAL));
                 }
             }
-        case 'i': return lexer_emit(lexer, CLASSIFY(1, 2, "nc", TOKEN_INC));
+        case 'i':
+            return lexer_emit(lexer, CLASSIFY(1, 1, "nc", TOKEN_INC) == TOKEN_INC ? TOKEN_INC :
+                                     CLASSIFY(1, 1, "nt", TOKEN_INT_TYPE));
         case 'j': return lexer_emit(lexer, CLASSIFY(2, 3, "mpw", TOKEN_JMPW) == TOKEN_JMPW ? TOKEN_JMPW :
                                            CLASSIFY(2, 2, "mp", TOKEN_JMP));
         case 'l':
@@ -222,6 +235,7 @@ Token next_identifier(Lexer* lexer) {
                     case 'g': return lexer_emit(lexer, CLASSIFY(2, 3, "lob", TOKEN_SGLOB));
                     case 'h': return lexer_emit(lexer, CLASSIFY(2, 1, "l", TOKEN_SHL) == TOKEN_SHL ? TOKEN_SHL :
                                                        CLASSIFY(2, 1, "r", TOKEN_SHR));
+                    case 't': return lexer_emit(lexer, CLASSIFY(2, 4, "ring", TOKEN_STRING_TYPE));
                     case 'u':
                         if(lexer->current - lexer->start > 2) {
                             switch(lexer->start[2]) {
@@ -247,20 +261,36 @@ Token next_number(Lexer* lexer) {
     while(!AT_END(0) && is_digit(PEEK(0)))
         ADVANCE(1);
 
-    if(PEEK(0) == '.') {
-        type = TOKEN_FLOAT;
+    switch(PEEK(0)) {
+        case '.':
+            type = TOKEN_FLOAT;
 
-        if(!AT_END(1) && is_digit(PEEK(1))) {
-            ADVANCE(1);
-
-            while(!AT_END(0) && is_digit(PEEK(0)))
+            if(!AT_END(1) && is_digit(PEEK(1))) {
                 ADVANCE(1);
-        } else return lexer_error(lexer, "Expected digit after dot");
-    }
 
-    if(PEEK(0) == 'b') {
-        type = TOKEN_BYTE;
-        ADVANCE(1);
+                while(!AT_END(0) && is_digit(PEEK(0)))
+                    ADVANCE(1);
+
+                if(!AT_END(0) && PEEK(0) == 'f')
+                    ADVANCE(1);
+            } else return lexer_error(lexer, "Expected digit after dot");
+            break;
+        case 'b':
+            type = TOKEN_BYTE;
+            ADVANCE(1);
+            break;
+        case 'c':
+            type = TOKEN_CONSTANT;
+            ADVANCE(1);
+            break;
+        case 'f':
+            type = TOKEN_FLOAT;
+            ADVANCE(1);
+            break;
+        case 'r':
+            type = TOKEN_REGISTER;
+            ADVANCE(1);
+            break;
     }
 
     return lexer_emit(lexer, type);
