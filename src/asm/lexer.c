@@ -145,7 +145,8 @@ Token next_identifier(Lexer* lexer) {
                     case 'j': return lexer_emit(lexer, CLASSIFY(2, 3, "mpw", TOKEN_BJMPW) == TOKEN_BJMPW ? TOKEN_BJMPW :
                                                        CLASSIFY(2, 2, "mp", TOKEN_BJMP));
                     case 'n': return lexer_emit(lexer, CLASSIFY(2, 2, "ot", TOKEN_BNOT));
-                    case 'o': return lexer_emit(lexer, CLASSIFY(2, 1, "r", TOKEN_BOR));
+                    case 'o': return lexer_emit(lexer, CLASSIFY(2, 1, "r", TOKEN_BOR) == TOKEN_BOR ? TOKEN_BOR :
+                                                       CLASSIFY(2, 2, "ol", TOKEN_BOOL_TYPE));
                     case 'x': return lexer_emit(lexer, CLASSIFY(2, 2, "or", TOKEN_BXOR));
                     case 'y': return lexer_emit(lexer, CLASSIFY(2, 2, "te", TOKEN_BYTE_TYPE));
                 }
