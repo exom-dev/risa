@@ -18,6 +18,7 @@ void parser_init(Parser* parser);
 void parser_advance(Parser* parser);
 void parser_consume(Parser* parser, TokenType type, const char* err);
 
+void parser_sync(Parser* parser);
 void parser_error_at(Parser* parser, Token token, const char* msg);
 void parser_error_at_previous(Parser* parser, const char* msg);
 void parser_error_at_current(Parser* parser, const char* msg);

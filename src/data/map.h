@@ -27,5 +27,6 @@ bool map_erase(Map* map, DenseStringPtr key);
 void map_copy(Map* map, Map* from);
 
 DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash);
+Entry* map_find_entry(Map* map, const char* chars, int length, uint32_t hash);
 
 #endif

@@ -105,6 +105,28 @@ DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash) 
     }
 }
 
+Entry* map_find_entry(Map* map, const char* chars, int length, uint32_t hash) {
+    if(map->count == 0)
+        return NULL;
+
+    uint32_t index = hash & (map->capacity - 1);
+
+    while(1) {
+        Entry* entry = &map->entries[index];
+
+        if(entry->key == NULL) {
+            if(IS_NULL(entry->value))
+                return NULL;
+        } else if(((DenseString*) (entry->key))->length == length
+                  && ((DenseString*) (entry->key))->hash == hash
+                  && memcmp(((DenseString*) (entry->key))->chars, chars, length) == 0) {
+            return entry;
+        }
+
+        index = (index + 1) & (map->capacity - 1);
+    }
+}
+
 static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key) {
     uint32_t index = ((DenseString*) key)->hash & (capacity - 1);
     Entry* tombstone = NULL;
