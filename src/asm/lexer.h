@@ -58,12 +58,12 @@ typedef struct {
     size_t index;
 } Lexer;
 
-void lexer_init(Lexer* lexer);
-void lexer_source(Lexer* lexer, const char* src);
-void lexer_delete(Lexer* lexer);
+void asm_lexer_init(Lexer* lexer);
+void asm_lexer_source(Lexer* lexer, const char* src);
+void asm_lexer_delete(Lexer* lexer);
 
-Token lexer_next(Lexer* lexer);
-Token lexer_emit(Lexer* lexer, TokenType type);
-Token lexer_error(Lexer* lexer, const char* msg);
+Token asm_lexer_next(Lexer* lexer);
+Token asm_lexer_emit(Lexer* lexer, TokenType type);
+Token asm_lexer_error(Lexer* lexer, const char* msg);
 
 #endif

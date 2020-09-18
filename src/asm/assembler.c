@@ -91,14 +91,14 @@ void assembler_delete(Assembler* assembler) {
 
 AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
     Parser parser;
-    parser_init(&parser);
+    asm_parser_init(&parser);
 
     assembler->parser = &parser;
 
-    lexer_init(&assembler->parser->lexer);
-    lexer_source(&assembler->parser->lexer, str);
+    asm_lexer_init(&assembler->parser->lexer);
+    asm_lexer_source(&assembler->parser->lexer, str);
 
-    parser_advance(assembler->parser);
+    asm_parser_advance(assembler->parser);
 
     while(assembler->parser->current.type != TOKEN_EOF) {
         assemble_mode_line(assembler);
@@ -107,7 +107,7 @@ AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
             assembler->canSwitchToData = false;
 
         if(assembler->parser->panic)
-            parser_sync(assembler->parser);
+            asm_parser_sync(assembler->parser);
     }
 
     return assembler->parser->error ? ASSEMBLER_ERROR : ASSEMBLER_OK;
@@ -115,13 +115,13 @@ AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
 
 static void assemble_mode_line(Assembler* assembler) {
     if(assembler->parser->current.type == TOKEN_DOT) {
-        parser_advance(assembler->parser);
+        asm_parser_advance(assembler->parser);
 
         if(assembler->parser->current.type == TOKEN_DATA)
             assemble_data_mode_switch(assembler);
         else if(assembler->parser->current.type == TOKEN_CODE)
             assemble_code_mode_switch(assembler);
-        else parser_error_at_current(assembler->parser, "Expected 'data' or 'code' after dot");
+        else asm_parser_error_at_current(assembler->parser, "Expected 'data' or 'code' after dot");
     } else {
         switch(assembler->mode) {
             case ASM_DATA:
@@ -136,23 +136,23 @@ static void assemble_mode_line(Assembler* assembler) {
 
 static void assemble_data_mode_switch(Assembler* assembler) {
     if(!assembler->canSwitchToData) {
-        parser_error_at_current(assembler->parser, "Cannot switch to data mode");
+        asm_parser_error_at_current(assembler->parser, "Cannot switch to data mode");
         return;
     } else if(assembler->mode == ASM_DATA) {
-        parser_error_at_current(assembler->parser, "Assembler already is in data mode");
+        asm_parser_error_at_current(assembler->parser, "Assembler already is in data mode");
         return;
     } else assembler->mode = ASM_DATA;
 
-    parser_advance(assembler->parser);
+    asm_parser_advance(assembler->parser);
 }
 
 static void assemble_code_mode_switch(Assembler* assembler) {
     if(!assembler->canSwitchToData && assembler->mode == ASM_CODE) {
-        parser_error_at_current(assembler->parser, "Assembler already is in code mode");
+        asm_parser_error_at_current(assembler->parser, "Assembler already is in code mode");
         return;
     } else assembler->mode = ASM_CODE;
 
-    parser_advance(assembler->parser);
+    asm_parser_advance(assembler->parser);
 }
 
 static void assemble_data_line(Assembler* assembler) {
@@ -312,7 +312,7 @@ static void assemble_code_line(Assembler* assembler) {
             assemble_ret(assembler);
             break;
         default:
-            parser_error_at_current(assembler->parser, "Expected instruction");
+            asm_parser_error_at_current(assembler->parser, "Expected instruction");
             return;
     }
 }
@@ -530,7 +530,7 @@ static uint16_t create_constant(Assembler* assembler, Value value) {
     size_t index = chunk_write_constant(&assembler->chunk, value);
 
     if(index > UINT16_MAX) {
-        parser_error_at_previous(assembler->parser, "Constant limit exceeded (65535)");
+        asm_parser_error_at_previous(assembler->parser, "Constant limit exceeded (65535)");
         return 0;
     }
 

@@ -14,13 +14,13 @@ typedef struct {
     bool panic;
 } Parser;
 
-void parser_init(Parser* parser);
-void parser_advance(Parser* parser);
-void parser_consume(Parser* parser, TokenType type, const char* err);
+void asm_parser_init(Parser* parser);
+void asm_parser_advance(Parser* parser);
+void asm_parser_consume(Parser* parser, TokenType type, const char* err);
 
-void parser_sync(Parser* parser);
-void parser_error_at(Parser* parser, Token token, const char* msg);
-void parser_error_at_previous(Parser* parser, const char* msg);
-void parser_error_at_current(Parser* parser, const char* msg);
+void asm_parser_sync(Parser* parser);
+void asm_parser_error_at(Parser* parser, Token token, const char* msg);
+void asm_parser_error_at_previous(Parser* parser, const char* msg);
+void asm_parser_error_at_current(Parser* parser, const char* msg);
 
 #endif
