@@ -71,6 +71,14 @@ static void assemble_ret(Assembler*);
 static void emit_byte(Assembler*, uint8_t);
 static void emit_word(Assembler*, uint16_t);
 
+static uint8_t read_reg(Assembler*);
+static uint16_t read_const(Assembler*);
+static uint16_t read_byte(Assembler*);
+static uint16_t read_int(Assembler*);
+static uint16_t read_float(Assembler*);
+static uint16_t read_string(Assembler*);
+static uint16_t read_any_const(Assembler*);
+
 static uint16_t create_constant(Assembler*, Value);
 static uint16_t create_string_constant(Assembler*, const char*, uint32_t);
 
@@ -318,27 +326,207 @@ static void assemble_code_line(Assembler* assembler) {
 }
 
 static void assemble_cnst(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left = read_any_const(assembler);
+
+    if(left > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Constant index is too large; consider using 'CNSTW'");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_CNST);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_cnstw(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t lr = read_any_const(assembler);
+
+    if(lr > UINT16_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_CNSTW);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_word(assembler, lr);
 }
 
 static void assemble_mov(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    emit_byte(assembler, OP_MOV);
+    emit_byte(assembler, dest);
+    emit_byte(assembler, left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_clone(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    emit_byte(assembler, OP_CLONE);
+    emit_byte(assembler, dest);
+    emit_byte(assembler, left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_dglob(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_STRING) {
+        asm_parser_error_at_current(assembler->parser, "Expected string");
+        return;
+    }
+
+    uint8_t dest = read_string(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+        return;
+    }
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_DGLOB);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_DGLOB | 0x40);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_gglob(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_STRING) {
+        asm_parser_error_at_current(assembler->parser, "Expected string");
+        return;
+    }
+
+    uint16_t left = read_string(assembler);
+
+    if(left > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_GGLOB);
+    emit_byte(assembler, dest);
+    emit_byte(assembler, left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_sglob(Assembler* assembler) {
@@ -524,6 +712,161 @@ static void emit_byte(Assembler* assembler, uint8_t byte) {
 static void emit_word(Assembler* assembler, uint16_t word) {
     emit_byte(assembler, ((uint8_t*) &word)[0]);
     emit_byte(assembler, ((uint8_t*) &word)[1]);
+}
+
+static uint8_t read_reg(Assembler* assembler) {
+    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+    if(errno == ERANGE || num > 249) {
+        asm_parser_error_at_current(assembler->parser, "Number is not a valid register (0-249)");
+        return 251;
+    }
+
+    return (uint8_t) num;
+}
+
+static uint16_t read_const(Assembler* assembler) {
+    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+    if(errno == ERANGE || num > UINT16_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is not a valid constant (0-65535)");
+        return -1;
+    }
+
+    return (uint16_t) num;
+}
+
+static uint16_t read_byte(Assembler* assembler) {
+    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+    if(errno == ERANGE || num > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is too large for type 'byte'");
+        return -1;
+    }
+
+    return create_constant(assembler, INT_VALUE(num));
+}
+
+static uint16_t read_int(Assembler* assembler) {
+    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+    if(errno == ERANGE) {
+        asm_parser_error_at_current(assembler->parser, "Number is too large for type 'int'");
+        return -1;
+    }
+
+    return create_constant(assembler, INT_VALUE(num));
+}
+
+static uint16_t read_float(Assembler* assembler) {
+    double num = strtod(assembler->parser->current.start, NULL);
+
+    if(errno == ERANGE) {
+        asm_parser_error_at_current(assembler->parser, "Number is too small or too large for type 'float'");
+        return -1;
+    }
+
+    return create_constant(assembler, FLOAT_VALUE(num));
+}
+
+static uint16_t read_string(Assembler* assembler) {
+    const char* start = assembler->parser->current.start + 1;
+    uint32_t length = assembler->parser->current.size - 2;
+
+    const char* ptr = start;
+    const char* end = start + length;
+
+    uint32_t escapeCount = 0;
+
+    while(ptr < end)
+        if(*(ptr++) == '\\')
+            ++escapeCount;
+
+    char* str = (char*) MEM_ALLOC(length + 1 - escapeCount);
+    uint32_t index = 0;
+
+    for(uint32_t i = 0; i < length; ++i) {
+        if(start[i] == '\\') {
+            if(i < length) {
+                switch(start[i + 1]) {
+                    case 'a':
+                        str[index++] = '\a';
+                        break;
+                    case 'b':
+                        str[index++] = '\b';
+                        break;
+                    case 'f':
+                        str[index++] = '\f';
+                        break;
+                    case 'n':
+                        str[index++] = '\n';
+                        break;
+                    case 'r':
+                        str[index++] = '\r';
+                        break;
+                    case 't':
+                        str[index++] = '\t';
+                        break;
+                    case 'v':
+                        str[index++] = '\v';
+                        break;
+                    case '\\':
+                        str[index++] = '\\';
+                        break;
+                    case '\'':
+                        str[index++] = '\'';
+                        break;
+                    case '\"':
+                        str[index++] = '\"';
+                        break;
+                    default:
+                        WARNING("Invalid escape sequence at index %d", assembler->parser->current.index + 1 + i);
+                        break;
+                }
+                ++i;
+            }
+        } else str[index++] = start[i];
+    }
+
+    str[index] = '\0';
+
+    start = str;
+    length = index;
+    uint32_t hash = map_hash(start, length);
+
+    Assembler* super = assembler->super == NULL ? assembler : assembler->super;
+
+    while(super->super != NULL)
+        super = super->super;
+
+    DenseString* interned = map_find(super->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = dense_string_from(start, length);
+        map_set(super->strings, interned, NULL_VALUE);
+    }
+
+    MEM_FREE(str);
+
+    return create_constant(assembler, DENSE_VALUE(interned));
+}
+
+static uint16_t read_any_const(Assembler* assembler) {
+    switch(assembler->parser->current.type) {
+        case TOKEN_CONSTANT:
+            return read_const(assembler);
+        case TOKEN_BYTE:
+            return read_byte(assembler);
+        case TOKEN_INT:
+            return read_int(assembler);
+        case TOKEN_FLOAT:
+            return read_float(assembler);
+        case TOKEN_STRING:
+            return read_string(assembler);
+        default:
+            asm_parser_error_at_current(assembler->parser, "Expected constant");
+            return -1;
+    }
 }
 
 static uint16_t create_constant(Assembler* assembler, Value value) {
