@@ -78,6 +78,8 @@ static uint16_t read_int(Assembler*);
 static uint16_t read_float(Assembler*);
 static uint16_t read_string(Assembler*);
 static uint16_t read_any_const(Assembler*);
+static int64_t read_number(Assembler*);
+static bool read_bool(Assembler*);
 
 static uint16_t create_constant(Assembler*, Value);
 static uint16_t create_string_constant(Assembler*, const char*, uint32_t);
@@ -530,179 +532,2130 @@ static void assemble_gglob(Assembler* assembler) {
 }
 
 static void assemble_sglob(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_STRING) {
+        asm_parser_error_at_current(assembler->parser, "Expected string");
+        return;
+    }
+
+    uint8_t dest = read_string(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+        return;
+    }
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_SGLOB);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_SGLOB | 0x40);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_upval(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
+
+    int64_t dest = read_number(assembler);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type != TOKEN_TRUE && assembler->parser->current.type != TOKEN_FALSE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'bool'");
+        return;
+    }
+
+    bool left = read_bool(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_UPVAL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_gupval(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
+
+    int64_t left = read_number(assembler);
+
+    if(left > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_GUPVAL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_supval(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
+
+    int64_t dest = read_number(assembler);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    emit_byte(assembler, OP_SUPVAL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_cupval(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_CUPVAL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_clsr(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
+
+    int64_t right = read_number(assembler);
+
+    if(right > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_CLSR);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_arr(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_ARR);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_parr(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_PARR);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_PARR | 0x40);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_len(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    emit_byte(assembler, OP_LEN);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_obj(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_OBJ);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_get(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t left = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(left > 249)
+        return;
+
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        right = read_reg(assembler);
+
+        if(right > 249)
+            return;
+
+        emit_byte(assembler, OP_GET);
+    } else {
+        right = read_any_const(assembler);
+
+        if(right > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_GET | 0x80);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_set(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_SET);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_SET | 0x40);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t right = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(right > 249)
+        return;
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_null(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_NULL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_true(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_TRUE);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_false(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_FALSE);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_not(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_NOT);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_NOT | 0x80);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_bnot(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_BNOT);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_BNOT | 0x80);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_neg(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        emit_byte(assembler, OP_NEG);
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        emit_byte(assembler, OP_NEG | 0x80);
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_inc(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_INC);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_dec(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_DEC);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_add(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_ADD);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_ADD | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_ADD | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_ADD | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_sub(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SUB);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SUB | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SUB | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SUB | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_mul(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_MUL);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_MUL | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_MUL | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_MUL | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_div(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_DIV);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_DIV | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_DIV | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_DIV | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_mod(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_MOD);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_MOD | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_MOD | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_MOD | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_shl(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SHL);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SHL | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SHL | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SHL | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_shr(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SHR);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SHR | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_SHR | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_SHR | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_gt(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_GT);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_GT | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_GT | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_GT | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_gte(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_GTE);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_GTE | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_GTE | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_GTE | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_lt(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_LT);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_LT | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_LT | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_LT | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_lte(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_LTE);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_LTE | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_LTE | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_LTE | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_eq(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_EQ);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_EQ | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_EQ | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_EQ | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_neq(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_NEQ);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_NEQ | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_NEQ | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_NEQ | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_band(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BAND);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BAND | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BAND | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BAND | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_bxor(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BXOR);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BXOR | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BXOR | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BXOR | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_bor(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    uint16_t left;
+    uint16_t right;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        left = read_reg(assembler);
+
+        if(left > 249)
+            return;
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BOR);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BOR | 0x40);
+        }
+    } else {
+        left = read_any_const(assembler);
+
+        if(left > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+
+        if(assembler->parser->current.type == TOKEN_REGISTER) {
+            right = read_reg(assembler);
+
+            if(right > 249)
+                return;
+
+            emit_byte(assembler, OP_BOR | 0x80);
+        } else {
+            right = read_any_const(assembler);
+
+            if(right > UINT8_MAX) {
+                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
+                return;
+            }
+
+            emit_byte(assembler, OP_BOR | 0xC0);
+        }
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, (uint8_t) right);
 }
 
 static void assemble_test(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_TEST);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_ntest(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    emit_byte(assembler, OP_NTEST);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_jmp(Assembler* assembler) {
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
 
+    int64_t dest = read_number(assembler);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_JMP);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_jmpw(Assembler* assembler) {
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
 
+    int64_t dl = read_number(assembler);
+
+    if(dl > UINT16_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_JMPW);
+    emit_word(assembler, dl);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_bjmp(Assembler* assembler) {
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
 
+    int64_t dest = read_number(assembler);
+
+    if(dest > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_BJMP);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_bjmpw(Assembler* assembler) {
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
 
+    int64_t dl = read_number(assembler);
+
+    if(dl > UINT16_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_BJMPW);
+    emit_word(assembler, dl);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_call(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    if(assembler->parser->current.type != TOKEN_REGISTER) {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    uint8_t dest = read_reg(assembler);
+
+    asm_parser_advance(assembler->parser);
+
+    if(dest > 249)
+        return;
+
+    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return;
+    }
+
+    int64_t left = read_number(assembler);
+
+    if(left > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+        return;
+    }
+
+    asm_parser_advance(assembler->parser);
+
+    emit_byte(assembler, OP_CALL);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, (uint8_t) left);
+    emit_byte(assembler, 0);
 }
 
 static void assemble_ret(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
 
+    int64_t dest;
+
+    if(assembler->parser->current.type == TOKEN_REGISTER) {
+        dest = read_reg(assembler);
+
+        asm_parser_advance(assembler->parser);
+
+        if(dest > 249)
+            return;
+    } else {
+        if (assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+            asm_parser_error_at_current(assembler->parser, "Expected register, 'int', or 'byte'");
+            return;
+        }
+
+        dest = read_number(assembler);
+
+        if (dest > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Number is out of range (0-255)");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+    }
+
+    emit_byte(assembler, OP_RET);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
 }
 
 static void emit_byte(Assembler* assembler, uint8_t byte) {
@@ -867,6 +2820,32 @@ static uint16_t read_any_const(Assembler* assembler) {
             asm_parser_error_at_current(assembler->parser, "Expected constant");
             return -1;
     }
+}
+
+static int64_t read_number(Assembler* assembler) {
+    if(assembler->parser->current.type == TOKEN_INT) {
+        int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+        if (errno == ERANGE) {
+            asm_parser_error_at_current(assembler->parser, "Number is too large for type 'int'");
+            return -1;
+        }
+
+        return num;
+    } else {
+        int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+
+        if (errno == ERANGE || num > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Number is too large for type 'byte'");
+            return -1;
+        }
+
+        return num;
+    }
+}
+
+static bool read_bool(Assembler* assembler) {
+    return assembler->parser->current.type == TOKEN_TRUE;
 }
 
 static uint16_t create_constant(Assembler* assembler, Value value) {
