@@ -1073,7 +1073,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_JMPW: {
-                uint16_t amount = *((uint16_t*) &frame->ip);
+                uint16_t amount = *((uint16_t*) &frame->ip); // This takes DEST and LEFT as 16 bits.
 
                 SKIP(amount * 4);
                 SKIP(3);
@@ -1085,7 +1085,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_BJMPW: {
-                uint16_t amount = *((uint16_t*) &frame->ip);
+                uint16_t amount = *((uint16_t*) &frame->ip); // This takes DEST and LEFT as 16 bits.
 
                 BSKIP(amount * 4);
                 BSKIP(1);
