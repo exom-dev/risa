@@ -6,84 +6,87 @@
 #include "../common/logging.h"
 #include "../lexer/lexer.h"
 
+#include "../asm/assembler.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
 
 #define INSTRUCTION_MASK 0x3F
 
-static void compile_byte(Compiler* compiler, bool);
-static void compile_int(Compiler* compiler, bool);
-static void compile_float(Compiler* compiler, bool);
-static void compile_string(Compiler* compiler, bool);
-static void compile_literal(Compiler* compiler, bool);
-static void compile_identifier(Compiler* compiler, bool);
-static void compile_array(Compiler* compiler, bool);
-static void compile_object(Compiler* compiler, bool);
-static void compile_declaration(Compiler* compiler);
-static void compile_variable_declaration(Compiler* compiler);
-static void compile_function_declaration(Compiler* compiler);
-static void compile_function(Compiler* compiler);
-static void compile_statement(Compiler* compiler);
-static void compile_if_statement(Compiler* compiler);
-static void compile_while_statement(Compiler* compiler);
-static void compile_for_statement(Compiler* compiler);
-static void compile_return_statement(Compiler* compiler);
-static void compile_continue_statement(Compiler* compiler);
-static void compile_break_statement(Compiler* compiler);
-static void compile_block(Compiler* compiler);
-static void compile_expression_statement(Compiler* compiler);
-static void compile_expression(Compiler* compiler);
-static void compile_expression_precedence(Compiler* compiler, Precedence precedence);
-static void compile_return_expression(Compiler* compiler);
-static void compile_call(Compiler* compiler, bool);
-static void compile_clone(Compiler* compiler, bool);
-static void compile_dot(Compiler* compiler, bool);
-static void compile_grouping_or_lambda(Compiler* compiler, bool);
-static void compile_lambda(Compiler* compiler);
-static void compile_accessor(Compiler* compiler, bool);
-static void compile_unary(Compiler* compiler, bool);
-static void compile_binary(Compiler* compiler, bool);
-static void compile_ternary(Compiler* compiler, bool);
-static void compile_equal_op(Compiler* compiler, bool);
-static void compile_prefix(Compiler* compiler, bool);
-static void compile_postfix(Compiler* compiler, bool);
-static void compile_and(Compiler* compiler, bool);
-static void compile_or(Compiler* compiler, bool);
-static void compile_comma(Compiler* compiler, bool);
+static void compile_byte(Compiler*, bool);
+static void compile_int(Compiler*, bool);
+static void compile_float(Compiler*, bool);
+static void compile_string(Compiler*, bool);
+static void compile_literal(Compiler*, bool);
+static void compile_identifier(Compiler*, bool);
+static void compile_array(Compiler*, bool);
+static void compile_object(Compiler*, bool);
+static void compile_declaration(Compiler*);
+static void compile_variable_declaration(Compiler*);
+static void compile_function_declaration(Compiler*);
+static void compile_function(Compiler*);
+static void compile_statement(Compiler*);
+static void compile_if_statement(Compiler*);
+static void compile_while_statement(Compiler*);
+static void compile_for_statement(Compiler*);
+static void compile_return_statement(Compiler*);
+static void compile_continue_statement(Compiler*);
+static void compile_break_statement(Compiler*);
+static void compile_block(Compiler*);
+static void compile_inline_asm_statement(Compiler*);
+static void compile_expression_statement(Compiler*);
+static void compile_expression(Compiler*);
+static void compile_expression_precedence(Compiler*, Precedence);
+static void compile_return_expression(Compiler*);
+static void compile_call(Compiler*, bool);
+static void compile_clone(Compiler*, bool);
+static void compile_dot(Compiler*, bool);
+static void compile_grouping_or_lambda(Compiler*, bool);
+static void compile_lambda(Compiler*);
+static void compile_accessor(Compiler*, bool);
+static void compile_unary(Compiler*, bool);
+static void compile_binary(Compiler*, bool);
+static void compile_ternary(Compiler*, bool);
+static void compile_equal_op(Compiler*, bool);
+static void compile_prefix(Compiler*, bool);
+static void compile_postfix(Compiler*, bool);
+static void compile_and(Compiler*, bool);
+static void compile_or(Compiler*, bool);
+static void compile_comma(Compiler*, bool);
 
-static uint8_t compile_arguments(Compiler* compiler);
+static uint8_t compile_arguments(Compiler*);
 
-static void scope_begin(Compiler* compiler);
-static void scope_end(Compiler* compiler);
+static void scope_begin(Compiler*);
+static void scope_end(Compiler*);
 
-static void    local_add(Compiler* compiler, Token identifier);
-static uint8_t local_resolve(Compiler* compiler, Token* identifier);
+static void    local_add(Compiler*, Token);
+static uint8_t local_resolve(Compiler*, Token*);
 
-static uint8_t upvalue_add(Compiler* compiler, uint8_t index, bool local);
-static uint8_t upvalue_resolve(Compiler* compiler, Token* identifier);
+static uint8_t upvalue_add(Compiler*, uint8_t, bool);
+static uint8_t upvalue_resolve(Compiler*, Token*);
 
-static void     emit_byte(Compiler* compiler, uint8_t byte);
-static void     emit_bytes(Compiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-static void     emit_word(Compiler* compiler, uint16_t word);
-static void     emit_constant(Compiler* compiler, Value value);
-static void     emit_return(Compiler* compiler);
-static void     emit_mov(Compiler* compiler, uint8_t dest, uint8_t src);
-static void     emit_jump(Compiler* compiler, uint32_t index);
-static void     emit_backwards_jump(Compiler* compiler, uint32_t to);
-static void     emit_backwards_jump_from(Compiler* compiler, uint32_t from, uint32_t to);
-static uint32_t emit_blank(Compiler* compiler);
+static void     emit_byte(Compiler*, uint8_t);
+static void     emit_bytes(Compiler*, uint8_t, uint8_t, uint8_t);
+static void     emit_word(Compiler*, uint16_t);
+static void     emit_constant(Compiler*, Value);
+static void     emit_return(Compiler*);
+static void     emit_mov(Compiler*, uint8_t, uint8_t);
+static void     emit_jump(Compiler*, uint32_t);
+static void     emit_backwards_jump(Compiler*, uint32_t);
+static void     emit_backwards_jump_from(Compiler*, uint32_t, uint32_t);
+static uint32_t emit_blank(Compiler*);
 
-static uint16_t create_constant(Compiler* compiler, Value value);
-static uint16_t create_identifier_constant(Compiler* compiler);
-static uint16_t create_string_constant(Compiler* compiler, const char* start, uint32_t length);
-static uint16_t declare_variable(Compiler* compiler);
+static uint16_t create_constant(Compiler*, Value);
+static uint16_t create_identifier_constant(Compiler*);
+static uint16_t create_string_constant(Compiler*, const char*, uint32_t);
+static uint16_t declare_variable(Compiler*);
 
-static bool    register_reserve(Compiler* compiler);
-static uint8_t register_find(Compiler* compiler, RegType type, Token token);
-static void    register_free(Compiler* compiler);
+static bool    register_reserve(Compiler*);
+static uint8_t register_find(Compiler*, RegType, Token);
+static void    register_free(Compiler*);
 
-static void finalize_compilation(Compiler* compiler);
+static void finalize_compilation(Compiler*);
 
 Rule EXPRESSION_RULES[] = {
         {compile_grouping_or_lambda, compile_call,  PREC_CALL },        // TOKEN_LEFT_PAREN
@@ -106,6 +109,7 @@ Rule EXPRESSION_RULES[] = {
         { NULL,     compile_binary,                 PREC_BITWISE_XOR }, // TOKEN_AMPERSAND
         { NULL,     compile_binary,                 PREC_FACTOR },      // TOKEN_PERCENT
         { NULL,     compile_ternary,                PREC_TERNARY },     // TOKEN_QUESTION
+        { NULL,     NULL,                           PREC_NONE },        // TOKEN_DOLLAR
         { compile_unary,     NULL,                  PREC_NONE },        // TOKEN_BANG
         { NULL,     compile_binary,                 PREC_EQUALITY },    // TOKEN_BANG_EQUAL
         { NULL,     NULL,                           PREC_NONE },        // TOKEN_EQUAL
@@ -1083,32 +1087,45 @@ static void compile_function(Compiler* compiler) {
 }
 
 static void compile_statement(Compiler* compiler) {
-    if (compiler->parser->current.type == TOKEN_IF) {
-        parser_advance(compiler->parser);
-        compile_if_statement(compiler);
-    } else if (compiler->parser->current.type == TOKEN_WHILE) {
-        parser_advance(compiler->parser);
-        compile_while_statement(compiler);
-    } else if (compiler->parser->current.type == TOKEN_FOR) {
-        parser_advance(compiler->parser);
-        compile_for_statement(compiler);
-    } else if (compiler->parser->current.type == TOKEN_RETURN) {
-        parser_advance(compiler->parser);
-        compile_return_statement(compiler);
-    } else if (compiler->parser->current.type == TOKEN_CONTINUE) {
-        parser_advance(compiler->parser);
-        compile_continue_statement(compiler);
-    } else if (compiler->parser->current.type == TOKEN_BREAK) {
-        parser_advance(compiler->parser);
-        compile_break_statement(compiler);
-    } else if(compiler->parser->current.type == TOKEN_LEFT_BRACE) {
-        parser_advance(compiler->parser);
+    switch(compiler->parser->current.type) {
+        case TOKEN_IF:
+            parser_advance(compiler->parser);
+            compile_if_statement(compiler);
+            break;
+        case TOKEN_WHILE:
+            parser_advance(compiler->parser);
+            compile_while_statement(compiler);
+            break;
+        case TOKEN_FOR:
+            parser_advance(compiler->parser);
+            compile_for_statement(compiler);
+            break;
+        case TOKEN_RETURN:
+            parser_advance(compiler->parser);
+            compile_return_statement(compiler);
+            break;
+        case TOKEN_CONTINUE:
+            parser_advance(compiler->parser);
+            compile_continue_statement(compiler);
+            break;
+        case TOKEN_BREAK:
+            parser_advance(compiler->parser);
+            compile_break_statement(compiler);
+            break;
+        case TOKEN_LEFT_BRACE:
+            parser_advance(compiler->parser);
 
-        scope_begin(compiler);
-        compile_block(compiler);
-        scope_end(compiler);
-    } else {
-        compile_expression_statement(compiler);
+            scope_begin(compiler);
+            compile_block(compiler);
+            scope_end(compiler);
+            break;
+        case TOKEN_DOLLAR:
+            parser_advance(compiler->parser);
+            compile_inline_asm_statement(compiler);
+            break;
+        default:
+            compile_expression_statement(compiler);
+            break;
     }
 }
 
@@ -1411,6 +1428,43 @@ static void compile_block(Compiler* compiler) {
     }
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
+}
+
+static void compile_inline_asm_statement(Compiler* compiler) {
+    bool isBlock = false;
+
+    if(compiler->parser->current.type == TOKEN_LEFT_BRACE) {
+        isBlock = true;
+        parser_advance(compiler->parser);
+    }
+
+    Assembler iasm;
+
+    assembler_init(&iasm);
+
+    Compiler* super = compiler->super != NULL ? compiler->super : compiler;
+
+    while(super->super != NULL)
+        super = super->super;
+
+    iasm.chunk = compiler->function->chunk;
+    iasm.strings = &super->strings;
+
+    assembler_assemble(&iasm, compiler->parser->lexer.start, isBlock ? "}" : "\r\n");
+
+    compiler->function->chunk = iasm.chunk;
+    compiler->function->chunk.constants = iasm.chunk.constants;
+
+    compiler->parser->lexer.start = iasm.parser->lexer.start;
+    compiler->parser->lexer.current = iasm.parser->lexer.current;
+    compiler->parser->lexer.index += iasm.parser->lexer.index - 1;
+
+    parser_advance(compiler->parser);
+
+    assembler_delete(&iasm);
+
+    if(isBlock)
+        parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after inline asm statement");
 }
 
 static void compile_expression_statement(Compiler* compiler) {

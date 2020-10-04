@@ -4,66 +4,68 @@
 #include "../common/headers.h"
 
 typedef enum {
-    TOKEN_DOT, TOKEN_COMMA,
+    ASM_TOKEN_DOT, ASM_TOKEN_COMMA,
 
-    TOKEN_IDENTIFIER, TOKEN_STRING,
-    TOKEN_BYTE, TOKEN_INT, TOKEN_FLOAT, TOKEN_REGISTER, TOKEN_CONSTANT,
+    ASM_TOKEN_IDENTIFIER, ASM_TOKEN_STRING,
+    ASM_TOKEN_BYTE, ASM_TOKEN_INT, ASM_TOKEN_FLOAT, ASM_TOKEN_REGISTER, ASM_TOKEN_CONSTANT,
 
-    TOKEN_STRING_TYPE, TOKEN_BOOL_TYPE, TOKEN_BYTE_TYPE, TOKEN_INT_TYPE, TOKEN_FLOAT_TYPE, TOKEN_FUNCTION_TYPE,
+    ASM_TOKEN_STRING_TYPE, ASM_TOKEN_BOOL_TYPE, ASM_TOKEN_BYTE_TYPE, ASM_TOKEN_INT_TYPE, ASM_TOKEN_FLOAT_TYPE, ASM_TOKEN_FUNCTION_TYPE,
 
-    TOKEN_CODE, TOKEN_DATA,
+    ASM_TOKEN_CODE, ASM_TOKEN_DATA,
 
-    TOKEN_CNST, TOKEN_CNSTW,
-    TOKEN_MOV,
-    TOKEN_CLONE,
+    ASM_TOKEN_CNST, ASM_TOKEN_CNSTW,
+    ASM_TOKEN_MOV,
+    ASM_TOKEN_CLONE,
 
-    TOKEN_DGLOB, TOKEN_GGLOB, TOKEN_SGLOB,
+    ASM_TOKEN_DGLOB, ASM_TOKEN_GGLOB, ASM_TOKEN_SGLOB,
 
-    TOKEN_UPVAL, TOKEN_GUPVAL, TOKEN_SUPVAL, TOKEN_CUPVAL, TOKEN_CLSR,
+    ASM_TOKEN_UPVAL, ASM_TOKEN_GUPVAL, ASM_TOKEN_SUPVAL, ASM_TOKEN_CUPVAL, ASM_TOKEN_CLSR,
 
-    TOKEN_ARR, TOKEN_PARR, TOKEN_LEN,
-    TOKEN_OBJ, TOKEN_GET, TOKEN_SET,
+    ASM_TOKEN_ARR, ASM_TOKEN_PARR, ASM_TOKEN_LEN,
+    ASM_TOKEN_OBJ, ASM_TOKEN_GET, ASM_TOKEN_SET,
 
-    TOKEN_NULL, TOKEN_TRUE, TOKEN_FALSE,
+    ASM_TOKEN_NULL, ASM_TOKEN_TRUE, ASM_TOKEN_FALSE,
 
-    TOKEN_NOT, TOKEN_BNOT, TOKEN_NEG, TOKEN_INC, TOKEN_DEC,
+    ASM_TOKEN_NOT, ASM_TOKEN_BNOT, ASM_TOKEN_NEG, ASM_TOKEN_INC, ASM_TOKEN_DEC,
 
-    TOKEN_ADD, TOKEN_SUB, TOKEN_MUL, TOKEN_DIV, TOKEN_MOD, TOKEN_SHL, TOKEN_SHR,
-    TOKEN_GT, TOKEN_GTE, TOKEN_LT, TOKEN_LTE, TOKEN_EQ, TOKEN_NEQ,
+    ASM_TOKEN_ADD, ASM_TOKEN_SUB, ASM_TOKEN_MUL, ASM_TOKEN_DIV, ASM_TOKEN_MOD, ASM_TOKEN_SHL, ASM_TOKEN_SHR,
+    ASM_TOKEN_GT, ASM_TOKEN_GTE, ASM_TOKEN_LT, ASM_TOKEN_LTE, ASM_TOKEN_EQ, ASM_TOKEN_NEQ,
 
-    TOKEN_BAND, TOKEN_BXOR, TOKEN_BOR,
+    ASM_TOKEN_BAND, ASM_TOKEN_BXOR, ASM_TOKEN_BOR,
 
-    TOKEN_TEST, TOKEN_NTEST,
+    ASM_TOKEN_TEST, ASM_TOKEN_NTEST,
 
-    TOKEN_JMP, TOKEN_JMPW, TOKEN_BJMP, TOKEN_BJMPW,
-    TOKEN_CALL, TOKEN_RET,
+    ASM_TOKEN_JMP, ASM_TOKEN_JMPW, ASM_TOKEN_BJMP, ASM_TOKEN_BJMPW,
+    ASM_TOKEN_CALL, ASM_TOKEN_RET,
 
-    TOKEN_ERROR,
-    TOKEN_EOF
-} TokenType;
+    ASM_TOKEN_ERROR,
+    ASM_TOKEN_EOF
+} AsmTokenType;
 
 typedef struct {
-    TokenType type;
+    AsmTokenType type;
     const char* start;
 
     size_t size;
     uint32_t index;
-} Token;
+} AsmToken;
 
 typedef struct {
     const char* source;
     const char* start;
     const char* current;
 
+    const char* stoppers;
+
     size_t index;
-} Lexer;
+} AsmLexer;
 
-void asm_lexer_init(Lexer* lexer);
-void asm_lexer_source(Lexer* lexer, const char* src);
-void asm_lexer_delete(Lexer* lexer);
+void asm_lexer_init(AsmLexer* lexer);
+void asm_lexer_source(AsmLexer* lexer, const char* src);
+void asm_lexer_delete(AsmLexer* lexer);
 
-Token asm_lexer_next(Lexer* lexer);
-Token asm_lexer_emit(Lexer* lexer, TokenType type);
-Token asm_lexer_error(Lexer* lexer, const char* msg);
+AsmToken asm_lexer_next(AsmLexer* lexer);
+AsmToken asm_lexer_emit(AsmLexer* lexer, AsmTokenType type);
+AsmToken asm_lexer_error(AsmLexer* lexer, const char* msg);
 
 #endif

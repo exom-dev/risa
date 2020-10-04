@@ -3,25 +3,25 @@
 #include "../lib/mem_index.h"
 #include "../common/logging.h"
 
-void asm_parser_init(Parser* parser) {
+void asm_parser_init(AsmParser* parser) {
     parser->error = false;
     parser->panic = false;
 }
 
-void asm_parser_advance(Parser* parser) {
+void asm_parser_advance(AsmParser* parser) {
     parser->previous = parser->current;
 
     while(1) {
         parser->current = asm_lexer_next(&parser->lexer);
 
-        if(parser->current.type != TOKEN_ERROR)
+        if(parser->current.type != ASM_TOKEN_ERROR)
             break;
 
         asm_parser_error_at_current(parser, parser->current.start);
     }
 }
 
-void asm_parser_consume(Parser* parser, TokenType type, const char* err) {
+void asm_parser_consume(AsmParser* parser, AsmTokenType type, const char* err) {
     if(parser->current.type == type) {
         asm_parser_advance(parser);
         return;
@@ -30,37 +30,36 @@ void asm_parser_consume(Parser* parser, TokenType type, const char* err) {
     asm_parser_error_at_current(parser, err);
 }
 
-void asm_parser_sync(Parser* parser) {
+void asm_parser_sync(AsmParser* parser) {
     parser->panic = false;
 
-    while(parser->current.type != TOKEN_EOF) {
+    while(parser->current.type != ASM_TOKEN_EOF) {
         switch(parser->current.type) {
-            case TOKEN_DOT:
-            case TOKEN_COMMA:
-            case TOKEN_STRING:
-            case TOKEN_TRUE:
-            case TOKEN_FALSE:
-            case TOKEN_BYTE:
-            case TOKEN_INT:
-            case TOKEN_FLOAT:
-            case TOKEN_REGISTER:
-            case TOKEN_CONSTANT:
+            case ASM_TOKEN_DOT:
+            case ASM_TOKEN_COMMA:
+            case ASM_TOKEN_STRING:
+            case ASM_TOKEN_TRUE:
+            case ASM_TOKEN_FALSE:
+            case ASM_TOKEN_BYTE:
+            case ASM_TOKEN_INT:
+            case ASM_TOKEN_FLOAT:
+            case ASM_TOKEN_REGISTER:
+            case ASM_TOKEN_CONSTANT:
+                asm_parser_advance(parser);
                 continue;
-            default: break;
+            default: return;
         }
-
-        asm_parser_advance(parser);
     }
 }
 
-void asm_parser_error_at(Parser* parser, Token token, const char* msg) {
+void asm_parser_error_at(AsmParser* parser, AsmToken token, const char* msg) {
     if(parser->panic)
         return;
     parser->panic = true;
 
-    if(token.type == TOKEN_EOF)
+    if(token.type == ASM_TOKEN_EOF)
         ERROR("at EOF: %s\n", msg);
-    else if(token.type != TOKEN_ERROR) {
+    else if(token.type != ASM_TOKEN_ERROR) {
         size_t ln;
         size_t col;
 
@@ -71,10 +70,10 @@ void asm_parser_error_at(Parser* parser, Token token, const char* msg) {
     parser->error = true;
 }
 
-void asm_parser_error_at_current(Parser* parser, const char* msg) {
+void asm_parser_error_at_current(AsmParser* parser, const char* msg) {
     asm_parser_error_at(parser, parser->current, msg);
 }
 
-void asm_parser_error_at_previous(Parser* parser, const char* msg) {
+void asm_parser_error_at_previous(AsmParser* parser, const char* msg) {
     asm_parser_error_at(parser, parser->previous, msg);
 }

@@ -5,22 +5,22 @@
 #include "../common/headers.h"
 
 typedef struct {
-    Lexer lexer;
+    AsmLexer lexer;
 
-    Token current;
-    Token previous;
+    AsmToken current;
+    AsmToken previous;
 
     bool error;
     bool panic;
-} Parser;
+} AsmParser;
 
-void asm_parser_init(Parser* parser);
-void asm_parser_advance(Parser* parser);
-void asm_parser_consume(Parser* parser, TokenType type, const char* err);
+void asm_parser_init(AsmParser* parser);
+void asm_parser_advance(AsmParser* parser);
+void asm_parser_consume(AsmParser* parser, AsmTokenType type, const char* err);
 
-void asm_parser_sync(Parser* parser);
-void asm_parser_error_at(Parser* parser, Token token, const char* msg);
-void asm_parser_error_at_previous(Parser* parser, const char* msg);
-void asm_parser_error_at_current(Parser* parser, const char* msg);
+void asm_parser_sync(AsmParser* parser);
+void asm_parser_error_at(AsmParser* parser, AsmToken token, const char* msg);
+void asm_parser_error_at_previous(AsmParser* parser, const char* msg);
+void asm_parser_error_at_current(AsmParser* parser, const char* msg);
 
 #endif

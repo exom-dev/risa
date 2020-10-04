@@ -17,6 +17,12 @@ static void assemble_code_mode_switch(Assembler*);
 static void assemble_data_line(Assembler*);
 static void assemble_code_line(Assembler*);
 
+static void assemble_byte_data(Assembler*);
+static void assemble_int_data(Assembler*);
+static void assemble_float_data(Assembler*);
+static void assemble_string_data(Assembler*);
+static void assemble_bool_data(Assembler*);
+
 static void assemble_cnst(Assembler*);
 static void assemble_cnstw(Assembler*);
 static void assemble_mov(Assembler*);
@@ -99,8 +105,8 @@ void assembler_delete(Assembler* assembler) {
     map_delete(&assembler->identifiers);
 }
 
-AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
-    Parser parser;
+AssemblerStatus assembler_assemble(Assembler* assembler, const char* str, const char* stoppers) {
+    AsmParser parser;
     asm_parser_init(&parser);
 
     assembler->parser = &parser;
@@ -108,9 +114,11 @@ AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
     asm_lexer_init(&assembler->parser->lexer);
     asm_lexer_source(&assembler->parser->lexer, str);
 
+    assembler->parser->lexer.stoppers = stoppers;
+
     asm_parser_advance(assembler->parser);
 
-    while(assembler->parser->current.type != TOKEN_EOF) {
+    while(assembler->parser->current.type != ASM_TOKEN_EOF) {
         assemble_mode_line(assembler);
 
         if(assembler->canSwitchToData)
@@ -124,12 +132,12 @@ AssemblerStatus assembler_assemble(Assembler* assembler, const char* str) {
 }
 
 static void assemble_mode_line(Assembler* assembler) {
-    if(assembler->parser->current.type == TOKEN_DOT) {
+    if(assembler->parser->current.type == ASM_TOKEN_DOT) {
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_DATA)
+        if(assembler->parser->current.type == ASM_TOKEN_DATA)
             assemble_data_mode_switch(assembler);
-        else if(assembler->parser->current.type == TOKEN_CODE)
+        else if(assembler->parser->current.type == ASM_TOKEN_CODE)
             assemble_code_mode_switch(assembler);
         else asm_parser_error_at_current(assembler->parser, "Expected 'data' or 'code' after dot");
     } else {
@@ -145,20 +153,20 @@ static void assemble_mode_line(Assembler* assembler) {
 }
 
 static void assemble_data_mode_switch(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
     if(!assembler->canSwitchToData) {
         asm_parser_error_at_current(assembler->parser, "Cannot switch to data mode");
         return;
     } else if(assembler->mode == ASM_DATA) {
-        asm_parser_error_at_current(assembler->parser, "Assembler already is in data mode");
+        asm_parser_error_at_current(assembler->parser, "Assembler is already in data mode");
         return;
     } else assembler->mode = ASM_DATA;
-
-    asm_parser_advance(assembler->parser);
 }
 
 static void assemble_code_mode_switch(Assembler* assembler) {
     if(!assembler->canSwitchToData && assembler->mode == ASM_CODE) {
-        asm_parser_error_at_current(assembler->parser, "Assembler already is in code mode");
+        asm_parser_error_at_current(assembler->parser, "Assembler is already in code mode");
         return;
     } else assembler->mode = ASM_CODE;
 
@@ -166,171 +174,262 @@ static void assemble_code_mode_switch(Assembler* assembler) {
 }
 
 static void assemble_data_line(Assembler* assembler) {
-
+    switch(assembler->parser->current.type) {
+        case ASM_TOKEN_BYTE_TYPE:
+            assemble_byte_data(assembler);
+            break;
+        case ASM_TOKEN_INT_TYPE:
+            assemble_int_data(assembler);
+            break;
+        case ASM_TOKEN_FLOAT_TYPE:
+            assemble_float_data(assembler);
+            break;
+        case ASM_TOKEN_BOOL_TYPE:
+            assemble_bool_data(assembler);
+            break;
+        case ASM_TOKEN_STRING_TYPE:
+            assemble_string_data(assembler);
+            break;
+        default:
+            asm_parser_error_at_current(assembler->parser, "Expected data type");
+            asm_parser_advance(assembler->parser);
+            return;
+    }
 }
 
 static void assemble_code_line(Assembler* assembler) {
     switch(assembler->parser->current.type) {
-        case TOKEN_CNST:
+        case ASM_TOKEN_CNST:
             assemble_cnst(assembler);
             break;
-        case TOKEN_CNSTW:
+        case ASM_TOKEN_CNSTW:
             assemble_cnstw(assembler);
             break;
-        case TOKEN_MOV:
+        case ASM_TOKEN_MOV:
             assemble_mov(assembler);
             break;
-        case TOKEN_CLONE:
+        case ASM_TOKEN_CLONE:
             assemble_clone(assembler);
             break;
-        case TOKEN_DGLOB:
+        case ASM_TOKEN_DGLOB:
             assemble_dglob(assembler);
             break;
-        case TOKEN_GGLOB:
+        case ASM_TOKEN_GGLOB:
             assemble_gglob(assembler);
             break;
-        case TOKEN_SGLOB:
+        case ASM_TOKEN_SGLOB:
             assemble_sglob(assembler);
             break;
-        case TOKEN_UPVAL:
+        case ASM_TOKEN_UPVAL:
             assemble_upval(assembler);
             break;
-        case TOKEN_GUPVAL:
+        case ASM_TOKEN_GUPVAL:
             assemble_gupval(assembler);
             break;
-        case TOKEN_SUPVAL:
+        case ASM_TOKEN_SUPVAL:
             assemble_supval(assembler);
             break;
-        case TOKEN_CUPVAL:
+        case ASM_TOKEN_CUPVAL:
             assemble_cupval(assembler);
             break;
-        case TOKEN_CLSR:
+        case ASM_TOKEN_CLSR:
             assemble_clsr(assembler);
             break;
-        case TOKEN_ARR:
+        case ASM_TOKEN_ARR:
             assemble_arr(assembler);
             break;
-        case TOKEN_PARR:
+        case ASM_TOKEN_PARR:
             assemble_parr(assembler);
             break;
-        case TOKEN_LEN:
+        case ASM_TOKEN_LEN:
             assemble_len(assembler);
             break;
-        case TOKEN_OBJ:
+        case ASM_TOKEN_OBJ:
             assemble_obj(assembler);
             break;
-        case TOKEN_GET:
+        case ASM_TOKEN_GET:
             assemble_get(assembler);
             break;
-        case TOKEN_SET:
+        case ASM_TOKEN_SET:
             assemble_set(assembler);
             break;
-        case TOKEN_NULL:
+        case ASM_TOKEN_NULL:
             assemble_null(assembler);
             break;
-        case TOKEN_TRUE:
+        case ASM_TOKEN_TRUE:
             assemble_true(assembler);
             break;
-        case TOKEN_FALSE:
+        case ASM_TOKEN_FALSE:
             assemble_false(assembler);
             break;
-        case TOKEN_NOT:
+        case ASM_TOKEN_NOT:
             assemble_not(assembler);
             break;
-        case TOKEN_BNOT:
+        case ASM_TOKEN_BNOT:
             assemble_bnot(assembler);
             break;
-        case TOKEN_NEG:
+        case ASM_TOKEN_NEG:
             assemble_neg(assembler);
             break;
-        case TOKEN_INC:
+        case ASM_TOKEN_INC:
             assemble_inc(assembler);
             break;
-        case TOKEN_DEC:
+        case ASM_TOKEN_DEC:
             assemble_dec(assembler);
             break;
-        case TOKEN_ADD:
+        case ASM_TOKEN_ADD:
             assemble_add(assembler);
             break;
-        case TOKEN_SUB:
+        case ASM_TOKEN_SUB:
             assemble_sub(assembler);
             break;
-        case TOKEN_MUL:
+        case ASM_TOKEN_MUL:
             assemble_mul(assembler);
             break;
-        case TOKEN_DIV:
+        case ASM_TOKEN_DIV:
             assemble_div(assembler);
             break;
-        case TOKEN_MOD:
+        case ASM_TOKEN_MOD:
             assemble_mod(assembler);
             break;
-        case TOKEN_SHL:
+        case ASM_TOKEN_SHL:
             assemble_shl(assembler);
             break;
-        case TOKEN_SHR:
+        case ASM_TOKEN_SHR:
             assemble_shr(assembler);
             break;
-        case TOKEN_GT:
+        case ASM_TOKEN_GT:
             assemble_gt(assembler);
             break;
-        case TOKEN_GTE:
+        case ASM_TOKEN_GTE:
             assemble_gte(assembler);
             break;
-        case TOKEN_LT:
+        case ASM_TOKEN_LT:
             assemble_lt(assembler);
             break;
-        case TOKEN_LTE:
+        case ASM_TOKEN_LTE:
             assemble_lte(assembler);
             break;
-        case TOKEN_EQ:
+        case ASM_TOKEN_EQ:
             assemble_eq(assembler);
             break;
-        case TOKEN_NEQ:
+        case ASM_TOKEN_NEQ:
             assemble_neq(assembler);
             break;
-        case TOKEN_BAND:
+        case ASM_TOKEN_BAND:
             assemble_band(assembler);
             break;
-        case TOKEN_BXOR:
+        case ASM_TOKEN_BXOR:
             assemble_bxor(assembler);
             break;
-        case TOKEN_BOR:
+        case ASM_TOKEN_BOR:
             assemble_bor(assembler);
             break;
-        case TOKEN_TEST:
+        case ASM_TOKEN_TEST:
             assemble_test(assembler);
             break;
-        case TOKEN_NTEST:
+        case ASM_TOKEN_NTEST:
             assemble_ntest(assembler);
             break;
-        case TOKEN_JMP:
+        case ASM_TOKEN_JMP:
             assemble_jmp(assembler);
             break;
-        case TOKEN_JMPW:
+        case ASM_TOKEN_JMPW:
             assemble_jmpw(assembler);
             break;
-        case TOKEN_BJMP:
+        case ASM_TOKEN_BJMP:
             assemble_bjmp(assembler);
             break;
-        case TOKEN_BJMPW:
+        case ASM_TOKEN_BJMPW:
             assemble_bjmpw(assembler);
             break;
-        case TOKEN_CALL:
+        case ASM_TOKEN_CALL:
             assemble_call(assembler);
             break;
-        case TOKEN_RET:
+        case ASM_TOKEN_RET:
             assemble_ret(assembler);
             break;
         default:
             asm_parser_error_at_current(assembler->parser, "Expected instruction");
+            asm_parser_advance(assembler->parser);
             return;
     }
+}
+
+static void assemble_byte_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type == ASM_TOKEN_BYTE) {
+        read_byte(assembler);
+        asm_parser_advance(assembler->parser);
+    } else if(assembler->parser->current.type == ASM_TOKEN_INT) {
+        uint16_t index = read_int(assembler);
+        asm_parser_advance(assembler->parser);
+
+        if(index == (uint16_t) -1u)
+            return;
+        if(AS_INT(assembler->chunk.constants.values[index]) > 255) {
+            asm_parser_error_at_current(assembler->parser, "Byte value out of range (0-255)");
+            return;
+        }
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected byte");
+        return;
+    }
+}
+
+static void assemble_int_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type == ASM_TOKEN_INT) {
+        read_int(assembler);
+        asm_parser_advance(assembler->parser);
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected int");
+        return;
+    }
+}
+
+static void assemble_float_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type == ASM_TOKEN_FLOAT) {
+        read_float(assembler);
+        asm_parser_advance(assembler->parser);
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected float");
+        return;
+    }
+}
+
+static void assemble_string_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type == ASM_TOKEN_STRING) {
+        read_string(assembler);
+        asm_parser_advance(assembler->parser);
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected string");
+        return;
+    }
+}
+
+static void assemble_bool_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    if(assembler->parser->current.type != ASM_TOKEN_TRUE && assembler->parser->current.type != ASM_TOKEN_FALSE) {
+        asm_parser_error_at_current(assembler->parser, "Expected bool");
+        return;
+    }
+
+    read_bool(assembler);
+    asm_parser_advance(assembler->parser);
 }
 
 static void assemble_cnst(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -360,7 +459,7 @@ static void assemble_cnst(Assembler* assembler) {
 static void assemble_cnstw(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -389,7 +488,7 @@ static void assemble_cnstw(Assembler* assembler) {
 static void assemble_mov(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -401,7 +500,7 @@ static void assemble_mov(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -422,7 +521,7 @@ static void assemble_mov(Assembler* assembler) {
 static void assemble_clone(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -434,7 +533,7 @@ static void assemble_clone(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -455,7 +554,7 @@ static void assemble_clone(Assembler* assembler) {
 static void assemble_dglob(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_STRING) {
+    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
         asm_parser_error_at_current(assembler->parser, "Expected string");
         return;
     }
@@ -471,7 +570,7 @@ static void assemble_dglob(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -499,7 +598,7 @@ static void assemble_dglob(Assembler* assembler) {
 static void assemble_gglob(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -511,7 +610,7 @@ static void assemble_gglob(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_STRING) {
+    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
         asm_parser_error_at_current(assembler->parser, "Expected string");
         return;
     }
@@ -534,7 +633,7 @@ static void assemble_gglob(Assembler* assembler) {
 static void assemble_sglob(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_STRING) {
+    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
         asm_parser_error_at_current(assembler->parser, "Expected string");
         return;
     }
@@ -550,7 +649,7 @@ static void assemble_sglob(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -578,7 +677,7 @@ static void assemble_sglob(Assembler* assembler) {
 static void assemble_upval(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -592,7 +691,7 @@ static void assemble_upval(Assembler* assembler) {
 
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_TRUE && assembler->parser->current.type != TOKEN_FALSE) {
+    if(assembler->parser->current.type != ASM_TOKEN_TRUE && assembler->parser->current.type != ASM_TOKEN_FALSE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'bool'");
         return;
     }
@@ -610,7 +709,7 @@ static void assemble_upval(Assembler* assembler) {
 static void assemble_gupval(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -622,7 +721,7 @@ static void assemble_gupval(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -645,7 +744,7 @@ static void assemble_gupval(Assembler* assembler) {
 static void assemble_supval(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -659,7 +758,7 @@ static void assemble_supval(Assembler* assembler) {
 
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -680,7 +779,7 @@ static void assemble_supval(Assembler* assembler) {
 static void assemble_cupval(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -701,7 +800,7 @@ static void assemble_cupval(Assembler* assembler) {
 static void assemble_clsr(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -713,7 +812,7 @@ static void assemble_clsr(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -725,7 +824,7 @@ static void assemble_clsr(Assembler* assembler) {
     if(left > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -748,7 +847,7 @@ static void assemble_clsr(Assembler* assembler) {
 static void assemble_arr(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -769,7 +868,7 @@ static void assemble_arr(Assembler* assembler) {
 static void assemble_parr(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -783,7 +882,7 @@ static void assemble_parr(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -811,7 +910,7 @@ static void assemble_parr(Assembler* assembler) {
 static void assemble_len(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -823,7 +922,7 @@ static void assemble_len(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -844,7 +943,7 @@ static void assemble_len(Assembler* assembler) {
 static void assemble_obj(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -865,7 +964,7 @@ static void assemble_obj(Assembler* assembler) {
 static void assemble_get(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -877,7 +976,7 @@ static void assemble_get(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -891,7 +990,7 @@ static void assemble_get(Assembler* assembler) {
 
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         right = read_reg(assembler);
 
         if(right > 249)
@@ -919,7 +1018,7 @@ static void assemble_get(Assembler* assembler) {
 static void assemble_set(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -933,7 +1032,7 @@ static void assemble_set(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -953,7 +1052,7 @@ static void assemble_set(Assembler* assembler) {
 
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -973,7 +1072,7 @@ static void assemble_set(Assembler* assembler) {
 static void assemble_null(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -994,7 +1093,7 @@ static void assemble_null(Assembler* assembler) {
 static void assemble_true(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1015,7 +1114,7 @@ static void assemble_true(Assembler* assembler) {
 static void assemble_false(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1036,7 +1135,7 @@ static void assemble_false(Assembler* assembler) {
 static void assemble_not(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1050,7 +1149,7 @@ static void assemble_not(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1078,7 +1177,7 @@ static void assemble_not(Assembler* assembler) {
 static void assemble_bnot(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1092,7 +1191,7 @@ static void assemble_bnot(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1120,7 +1219,7 @@ static void assemble_bnot(Assembler* assembler) {
 static void assemble_neg(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1134,7 +1233,7 @@ static void assemble_neg(Assembler* assembler) {
 
     uint16_t left;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1162,7 +1261,7 @@ static void assemble_neg(Assembler* assembler) {
 static void assemble_inc(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1183,7 +1282,7 @@ static void assemble_inc(Assembler* assembler) {
 static void assemble_dec(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1204,7 +1303,7 @@ static void assemble_dec(Assembler* assembler) {
 static void assemble_add(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1219,7 +1318,7 @@ static void assemble_add(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1227,7 +1326,7 @@ static void assemble_add(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1254,7 +1353,7 @@ static void assemble_add(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1283,7 +1382,7 @@ static void assemble_add(Assembler* assembler) {
 static void assemble_sub(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1298,7 +1397,7 @@ static void assemble_sub(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1306,7 +1405,7 @@ static void assemble_sub(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1333,7 +1432,7 @@ static void assemble_sub(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1362,7 +1461,7 @@ static void assemble_sub(Assembler* assembler) {
 static void assemble_mul(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1377,7 +1476,7 @@ static void assemble_mul(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1385,7 +1484,7 @@ static void assemble_mul(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1412,7 +1511,7 @@ static void assemble_mul(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1441,7 +1540,7 @@ static void assemble_mul(Assembler* assembler) {
 static void assemble_div(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1456,7 +1555,7 @@ static void assemble_div(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1464,7 +1563,7 @@ static void assemble_div(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1491,7 +1590,7 @@ static void assemble_div(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1520,7 +1619,7 @@ static void assemble_div(Assembler* assembler) {
 static void assemble_mod(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1535,7 +1634,7 @@ static void assemble_mod(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1543,7 +1642,7 @@ static void assemble_mod(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1570,7 +1669,7 @@ static void assemble_mod(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1599,7 +1698,7 @@ static void assemble_mod(Assembler* assembler) {
 static void assemble_shl(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1614,7 +1713,7 @@ static void assemble_shl(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1622,7 +1721,7 @@ static void assemble_shl(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1649,7 +1748,7 @@ static void assemble_shl(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1678,7 +1777,7 @@ static void assemble_shl(Assembler* assembler) {
 static void assemble_shr(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1693,7 +1792,7 @@ static void assemble_shr(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1701,7 +1800,7 @@ static void assemble_shr(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1728,7 +1827,7 @@ static void assemble_shr(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1757,7 +1856,7 @@ static void assemble_shr(Assembler* assembler) {
 static void assemble_gt(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1772,7 +1871,7 @@ static void assemble_gt(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1780,7 +1879,7 @@ static void assemble_gt(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1807,7 +1906,7 @@ static void assemble_gt(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1836,7 +1935,7 @@ static void assemble_gt(Assembler* assembler) {
 static void assemble_gte(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1851,7 +1950,7 @@ static void assemble_gte(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1859,7 +1958,7 @@ static void assemble_gte(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1886,7 +1985,7 @@ static void assemble_gte(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1915,7 +2014,7 @@ static void assemble_gte(Assembler* assembler) {
 static void assemble_lt(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -1930,7 +2029,7 @@ static void assemble_lt(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -1938,7 +2037,7 @@ static void assemble_lt(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1965,7 +2064,7 @@ static void assemble_lt(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -1994,7 +2093,7 @@ static void assemble_lt(Assembler* assembler) {
 static void assemble_lte(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2009,7 +2108,7 @@ static void assemble_lte(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2017,7 +2116,7 @@ static void assemble_lte(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2044,7 +2143,7 @@ static void assemble_lte(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2073,7 +2172,7 @@ static void assemble_lte(Assembler* assembler) {
 static void assemble_eq(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2088,7 +2187,7 @@ static void assemble_eq(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2096,7 +2195,7 @@ static void assemble_eq(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2123,7 +2222,7 @@ static void assemble_eq(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2152,7 +2251,7 @@ static void assemble_eq(Assembler* assembler) {
 static void assemble_neq(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2167,7 +2266,7 @@ static void assemble_neq(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2175,7 +2274,7 @@ static void assemble_neq(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2202,7 +2301,7 @@ static void assemble_neq(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2231,7 +2330,7 @@ static void assemble_neq(Assembler* assembler) {
 static void assemble_band(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2246,7 +2345,7 @@ static void assemble_band(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2254,7 +2353,7 @@ static void assemble_band(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2281,7 +2380,7 @@ static void assemble_band(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2310,7 +2409,7 @@ static void assemble_band(Assembler* assembler) {
 static void assemble_bxor(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2325,7 +2424,7 @@ static void assemble_bxor(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2333,7 +2432,7 @@ static void assemble_bxor(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2360,7 +2459,7 @@ static void assemble_bxor(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2389,7 +2488,7 @@ static void assemble_bxor(Assembler* assembler) {
 static void assemble_bor(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2404,7 +2503,7 @@ static void assemble_bor(Assembler* assembler) {
     uint16_t left;
     uint16_t right;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         left = read_reg(assembler);
 
         if(left > 249)
@@ -2412,7 +2511,7 @@ static void assemble_bor(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2439,7 +2538,7 @@ static void assemble_bor(Assembler* assembler) {
 
         asm_parser_advance(assembler->parser);
 
-        if(assembler->parser->current.type == TOKEN_REGISTER) {
+        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
             right = read_reg(assembler);
 
             if(right > 249)
@@ -2468,7 +2567,7 @@ static void assemble_bor(Assembler* assembler) {
 static void assemble_test(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2489,7 +2588,7 @@ static void assemble_test(Assembler* assembler) {
 static void assemble_ntest(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2508,7 +2607,7 @@ static void assemble_ntest(Assembler* assembler) {
 }
 
 static void assemble_jmp(Assembler* assembler) {
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -2529,7 +2628,7 @@ static void assemble_jmp(Assembler* assembler) {
 }
 
 static void assemble_jmpw(Assembler* assembler) {
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -2549,7 +2648,7 @@ static void assemble_jmpw(Assembler* assembler) {
 }
 
 static void assemble_bjmp(Assembler* assembler) {
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -2570,7 +2669,7 @@ static void assemble_bjmp(Assembler* assembler) {
 }
 
 static void assemble_bjmpw(Assembler* assembler) {
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -2592,7 +2691,7 @@ static void assemble_bjmpw(Assembler* assembler) {
 static void assemble_call(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != TOKEN_REGISTER) {
+    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
         asm_parser_error_at_current(assembler->parser, "Expected register");
         return;
     }
@@ -2604,7 +2703,7 @@ static void assemble_call(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
     }
@@ -2629,7 +2728,7 @@ static void assemble_ret(Assembler* assembler) {
 
     int64_t dest;
 
-    if(assembler->parser->current.type == TOKEN_REGISTER) {
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
         dest = read_reg(assembler);
 
         asm_parser_advance(assembler->parser);
@@ -2637,7 +2736,7 @@ static void assemble_ret(Assembler* assembler) {
         if(dest > 249)
             return;
     } else {
-        if (assembler->parser->current.type != TOKEN_INT && assembler->parser->current.type != TOKEN_BYTE) {
+        if (assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
             asm_parser_error_at_current(assembler->parser, "Expected register, 'int', or 'byte'");
             return;
         }
@@ -2806,15 +2905,15 @@ static uint16_t read_string(Assembler* assembler) {
 
 static uint16_t read_any_const(Assembler* assembler) {
     switch(assembler->parser->current.type) {
-        case TOKEN_CONSTANT:
+        case ASM_TOKEN_CONSTANT:
             return read_const(assembler);
-        case TOKEN_BYTE:
+        case ASM_TOKEN_BYTE:
             return read_byte(assembler);
-        case TOKEN_INT:
+        case ASM_TOKEN_INT:
             return read_int(assembler);
-        case TOKEN_FLOAT:
+        case ASM_TOKEN_FLOAT:
             return read_float(assembler);
-        case TOKEN_STRING:
+        case ASM_TOKEN_STRING:
             return read_string(assembler);
         default:
             asm_parser_error_at_current(assembler->parser, "Expected constant");
@@ -2823,7 +2922,7 @@ static uint16_t read_any_const(Assembler* assembler) {
 }
 
 static int64_t read_number(Assembler* assembler) {
-    if(assembler->parser->current.type == TOKEN_INT) {
+    if(assembler->parser->current.type == ASM_TOKEN_INT) {
         int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
         if (errno == ERANGE) {
@@ -2845,7 +2944,7 @@ static int64_t read_number(Assembler* assembler) {
 }
 
 static bool read_bool(Assembler* assembler) {
-    return assembler->parser->current.type == TOKEN_TRUE;
+    return assembler->parser->current.type == ASM_TOKEN_TRUE;
 }
 
 static uint16_t create_constant(Assembler* assembler, Value value) {

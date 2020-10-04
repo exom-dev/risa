@@ -107,6 +107,7 @@ Token lexer_next(Lexer* lexer) {
         case '^': return lexer_emit(lexer, MATCH('=') ? TOKEN_CARET_EQUAL: TOKEN_CARET);
         case '%': return lexer_emit(lexer, MATCH('=') ? TOKEN_PERCENT_EQUAL: TOKEN_PERCENT);
         case '?': return lexer_emit(lexer, TOKEN_QUESTION);
+        case '$': return lexer_emit(lexer, TOKEN_DOLLAR);
         case '!': return lexer_emit(lexer, MATCH('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '=': return lexer_emit(lexer, MATCH('=') ? TOKEN_EQUAL_EQUAL :
                                            MATCH('>') ? TOKEN_EQUAL_GREATER : TOKEN_EQUAL);

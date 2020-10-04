@@ -19,7 +19,7 @@ typedef struct Assembler {
 
     Chunk chunk;
 
-    Parser* parser;
+    AsmParser* parser;
     Map* strings;
 
     Map identifiers;
@@ -36,6 +36,6 @@ typedef enum {
 void assembler_init(Assembler* assembler);
 void assembler_delete(Assembler* assembler);
 
-AssemblerStatus assembler_assemble(Assembler* assembler, const char* str);
+AssemblerStatus assembler_assemble(Assembler* assembler, const char* str, const char* stoppers);
 
 #endif
