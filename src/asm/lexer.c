@@ -220,8 +220,8 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
             } else return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);
         case 'i': case 'I': return asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 2, "nc", ASM_TOKEN_INC) == ASM_TOKEN_INC ? ASM_TOKEN_INC :
                                                          CLASSIFY_INSENS(1, 2, "nt", ASM_TOKEN_INT_TYPE));
-        case 'j': case 'J': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 3, "mpw", ASM_TOKEN_JMPW) == ASM_TOKEN_JMPW ? ASM_TOKEN_JMPW :
-                                                         CLASSIFY_INSENS(2, 2, "mp", ASM_TOKEN_JMP));
+        case 'j': case 'J': return asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 3, "mpw", ASM_TOKEN_JMPW) == ASM_TOKEN_JMPW ? ASM_TOKEN_JMPW :
+                                                         CLASSIFY_INSENS(1, 2, "mp", ASM_TOKEN_JMP));
         case 'l': case 'L':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
@@ -233,7 +233,7 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
         case 'm': case 'M':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
-                    case 'o': case 'O': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "d", ASM_TOKEN_MOD) == ASM_TOKEN_MOV ? ASM_TOKEN_MOV :
+                    case 'o': case 'O': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "v", ASM_TOKEN_MOV) == ASM_TOKEN_MOV ? ASM_TOKEN_MOV :
                                                                      CLASSIFY_INSENS(2, 1, "d", ASM_TOKEN_MOD));
                     case 'u': case 'U': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "l", ASM_TOKEN_MUL));
                     default: return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);

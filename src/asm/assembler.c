@@ -2607,6 +2607,8 @@ static void assemble_ntest(Assembler* assembler) {
 }
 
 static void assemble_jmp(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
     if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
@@ -2628,6 +2630,8 @@ static void assemble_jmp(Assembler* assembler) {
 }
 
 static void assemble_jmpw(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
     if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
@@ -2648,6 +2652,8 @@ static void assemble_jmpw(Assembler* assembler) {
 }
 
 static void assemble_bjmp(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
     if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
@@ -2669,6 +2675,8 @@ static void assemble_bjmp(Assembler* assembler) {
 }
 
 static void assemble_bjmpw(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
     if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
         asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
         return;
