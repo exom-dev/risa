@@ -1459,6 +1459,9 @@ static void compile_inline_asm_statement(Compiler* compiler) {
     compiler->parser->lexer.current = iasm.parser->lexer.current;
     compiler->parser->lexer.index += iasm.parser->lexer.index - 1;
 
+    if(iasm.parser->error)
+        compiler->parser->error = true;
+
     parser_advance(compiler->parser);
 
     assembler_delete(&iasm);
