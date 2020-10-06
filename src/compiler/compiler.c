@@ -1145,14 +1145,15 @@ static void compile_if_statement(Compiler* compiler) {
     uint32_t ifEnd = emit_blank(compiler);
 
     compile_statement(compiler);
-    emit_jump(compiler, ifEnd);
 
     if(compiler->parser->current.type == TOKEN_ELSE) {
         uint32_t elseEnd = emit_blank(compiler);
+
+        emit_jump(compiler, ifEnd);
         parser_advance(compiler->parser);
         compile_statement(compiler);
         emit_jump(compiler, elseEnd);
-    }
+    } else emit_jump(compiler, ifEnd);
 }
 
 static void compile_while_statement(Compiler* compiler) {
