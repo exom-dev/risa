@@ -2149,6 +2149,10 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
     bool isConst = compiler->last.isConst;
     bool isLvalue = compiler->last.isLvalue;
 
+    // Save the lval meta.
+    uint8_t meta[sizeof(compiler->last.lvalMeta)];
+    memcpy(meta, &compiler->last.lvalMeta, sizeof(compiler->last.lvalMeta));
+
     compile_expression(compiler);
 
     if(compiler->last.isConst) {
@@ -2192,6 +2196,9 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, compiler->last.reg);
 
     #undef R_TYPE
+
+    // Load the lval meta.
+    memcpy(&compiler->last.lvalMeta, meta, sizeof(compiler->last.lvalMeta));
 
     #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
 

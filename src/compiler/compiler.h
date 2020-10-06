@@ -63,26 +63,26 @@ typedef struct Compiler {
 
         struct {
             enum LValType {
-                LVAL_LOCAL,
-                LVAL_GLOBAL,
-                LVAL_UPVAL,
-                LVAL_LOCAL_PROP,
-                LVAL_GLOBAL_PROP,
-                LVAL_UPVAL_PROP
+                LVAL_LOCAL,       // Local.
+                LVAL_GLOBAL,      // Global.
+                LVAL_UPVAL,       // Upvalue.
+                LVAL_LOCAL_PROP,  // Property of local.
+                LVAL_GLOBAL_PROP, // Property of global.
+                LVAL_UPVAL_PROP   // Property of upvalue.
             } type;
 
-            uint16_t global;
-            uint8_t globalReg;
-            uint8_t propOrigin;
+            uint16_t global;    // The constant string that identifies the global.
+            uint8_t globalReg;  // In which register the global temporarily resides.
+            uint8_t propOrigin; // The register in which the property holder resides.
             uint8_t upval;
 
             struct {
                 union {
-                    uint8_t reg;
-                    uint16_t cnst;
+                    uint8_t reg;   // The property index as a register.
+                    uint16_t cnst; // The property index as a constant.
                 } as;
 
-                bool isConst;
+                bool isConst;      // Whether or not the property index is constant.
             } propIndex;
         } lvalMeta;
     } last;

@@ -198,7 +198,7 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
                     default: return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);
                 }
             } else return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);
-        case 'e': case 'E': return asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 1, "e", ASM_TOKEN_EQ));
+        case 'e': case 'E': return asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 1, "q", ASM_TOKEN_EQ));
         case 'f': case 'F':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
