@@ -218,7 +218,7 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
 
         int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
 
-        if (errno == ERANGE || num > 256) {
+        if (errno == ERANGE || num > 255) {
             parser_error_at_previous(compiler->parser, "Number is too large for type 'byte'");
             return;
         }
@@ -232,7 +232,7 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
-    } else  {
+    } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;

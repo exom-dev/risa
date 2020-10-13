@@ -45,3 +45,7 @@ DenseString* dense_string_concat(DenseString* left, DenseString* right) {
 
     return string;
 }
+
+void dense_string_delete(DenseString* string) {
+    MEM_FREE(string);
+}

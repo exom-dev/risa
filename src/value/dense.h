@@ -78,6 +78,7 @@ void   dense_delete(DenseValue* dense);
 uint32_t     dense_string_hash(DenseString* string);
 DenseString* dense_string_from(const char* chars, uint32_t length);
 DenseString* dense_string_concat(DenseString* left, DenseString* right);
+void         dense_string_delete(DenseString* string);
 
 DenseArray* dense_array_create();
 void        dense_array_init(DenseArray* array);

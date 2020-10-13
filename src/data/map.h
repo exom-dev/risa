@@ -11,8 +11,8 @@ typedef struct {
 } Entry;
 
 typedef struct {
-    int count;
-    int capacity;
+    uint32_t count;
+    uint32_t capacity;
     Entry* entries;
 } Map;
 

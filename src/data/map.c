@@ -76,7 +76,7 @@ bool map_erase(Map* map, DenseStringPtr key) {
 }
 
 void map_copy(Map* map, Map* from) {
-    for(int i = 0; i < from->capacity; ++i) {
+    for(uint32_t i = 0; i < from->capacity; ++i) {
         Entry* entry = &from->entries[i];
         if(entry->key != NULL)
             map_set(map, entry->key, entry->value);

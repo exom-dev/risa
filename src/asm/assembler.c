@@ -77,15 +77,19 @@ static void assemble_ret(Assembler*);
 static void emit_byte(Assembler*, uint8_t);
 static void emit_word(Assembler*, uint16_t);
 
-static uint8_t read_reg(Assembler*);
+static uint8_t  read_reg(Assembler*);
 static uint16_t read_const(Assembler*);
 static uint16_t read_byte(Assembler*);
 static uint16_t read_int(Assembler*);
 static uint16_t read_float(Assembler*);
 static uint16_t read_string(Assembler*);
 static uint16_t read_any_const(Assembler*);
-static int64_t read_number(Assembler*);
-static bool read_bool(Assembler*);
+static uint16_t read_identifier(Assembler*);
+static int64_t  read_number(Assembler*);
+static bool     read_bool(Assembler*);
+
+static bool     identifier_add(Assembler*, const char*, uint32_t, uint16_t);
+static uint32_t identifier_resolve(Assembler*, AsmToken*);
 
 static uint16_t create_constant(Assembler*, Value);
 static uint16_t create_string_constant(Assembler*, const char*, uint32_t);
@@ -102,6 +106,13 @@ void assembler_init(Assembler* assembler) {
 }
 
 void assembler_delete(Assembler* assembler) {
+    for(uint32_t i = 0; i < assembler->identifiers.capacity; ++i) {
+        Entry* entry = &assembler->identifiers.entries[i];
+
+        if(entry->key != NULL)
+            dense_string_delete(entry->key);
+    }
+
     map_delete(&assembler->identifiers);
 }
 
@@ -359,9 +370,21 @@ static void assemble_code_line(Assembler* assembler) {
 static void assemble_byte_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type == ASM_TOKEN_BYTE) {
-        read_byte(assembler);
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
         asm_parser_advance(assembler->parser);
+    }
+
+    if(assembler->parser->current.type == ASM_TOKEN_BYTE) {
+        uint16_t index = read_byte(assembler);
+        asm_parser_advance(assembler->parser);
+
+        if(id.type != ASM_TOKEN_ERROR) {
+            if(!identifier_add(assembler, id.start, id.size, index))
+                asm_parser_error_at_current(assembler->parser, "Identifier already exists");
+        }
     } else if(assembler->parser->current.type == ASM_TOKEN_INT) {
         uint16_t index = read_int(assembler);
         asm_parser_advance(assembler->parser);
@@ -372,6 +395,9 @@ static void assemble_byte_data(Assembler* assembler) {
             asm_parser_error_at_current(assembler->parser, "Byte value out of range (0-255)");
             return;
         }
+
+        if(id.type != ASM_TOKEN_ERROR)
+            identifier_add(assembler, id.start, id.size, index);
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected byte");
         return;
@@ -381,9 +407,19 @@ static void assemble_byte_data(Assembler* assembler) {
 static void assemble_int_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type == ASM_TOKEN_INT) {
-        read_int(assembler);
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
         asm_parser_advance(assembler->parser);
+    }
+
+    if(assembler->parser->current.type == ASM_TOKEN_INT) {
+        uint16_t index = read_int(assembler);
+        asm_parser_advance(assembler->parser);
+
+        if(id.type != ASM_TOKEN_ERROR)
+            identifier_add(assembler, id.start, id.size, index);
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected int");
         return;
@@ -393,9 +429,19 @@ static void assemble_int_data(Assembler* assembler) {
 static void assemble_float_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type == ASM_TOKEN_FLOAT) {
-        read_float(assembler);
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
         asm_parser_advance(assembler->parser);
+    }
+
+    if(assembler->parser->current.type == ASM_TOKEN_FLOAT) {
+        uint16_t index = read_float(assembler);
+        asm_parser_advance(assembler->parser);
+
+        if(id.type != ASM_TOKEN_ERROR)
+            identifier_add(assembler, id.start, id.size, index);
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected float");
         return;
@@ -405,9 +451,19 @@ static void assemble_float_data(Assembler* assembler) {
 static void assemble_string_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type == ASM_TOKEN_STRING) {
-        read_string(assembler);
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
         asm_parser_advance(assembler->parser);
+    }
+
+    if(assembler->parser->current.type == ASM_TOKEN_STRING) {
+        uint16_t index = read_string(assembler);
+        asm_parser_advance(assembler->parser);
+
+        if(id.type != ASM_TOKEN_ERROR)
+            identifier_add(assembler, id.start, id.size, index);
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected string");
         return;
@@ -417,13 +473,23 @@ static void assemble_string_data(Assembler* assembler) {
 static void assemble_bool_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
+        asm_parser_advance(assembler->parser);
+    }
+
     if(assembler->parser->current.type != ASM_TOKEN_TRUE && assembler->parser->current.type != ASM_TOKEN_FALSE) {
         asm_parser_error_at_current(assembler->parser, "Expected bool");
         return;
     }
 
-    read_bool(assembler);
+    uint16_t index = read_bool(assembler);
     asm_parser_advance(assembler->parser);
+
+    if(id.type != ASM_TOKEN_ERROR)
+        identifier_add(assembler, id.start, id.size, index);
 }
 
 static void assemble_cnst(Assembler* assembler) {
@@ -554,12 +620,7 @@ static void assemble_clone(Assembler* assembler) {
 static void assemble_dglob(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
-        asm_parser_error_at_current(assembler->parser, "Expected string");
-        return;
-    }
-
-    uint8_t dest = read_string(assembler);
+    uint16_t dest = read_string(assembler);
 
     asm_parser_advance(assembler->parser);
 
@@ -610,11 +671,6 @@ static void assemble_gglob(Assembler* assembler) {
     if(dest > 249)
         return;
 
-    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
-        asm_parser_error_at_current(assembler->parser, "Expected string");
-        return;
-    }
-
     uint16_t left = read_string(assembler);
 
     if(left > UINT8_MAX) {
@@ -633,12 +689,7 @@ static void assemble_gglob(Assembler* assembler) {
 static void assemble_sglob(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
-        asm_parser_error_at_current(assembler->parser, "Expected string");
-        return;
-    }
-
-    uint8_t dest = read_string(assembler);
+    uint16_t dest = read_string(assembler);
 
     asm_parser_advance(assembler->parser);
 
@@ -2609,11 +2660,6 @@ static void assemble_ntest(Assembler* assembler) {
 static void assemble_jmp(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
-        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
-        return;
-    }
-
     int64_t dest = read_number(assembler);
 
     if(dest > UINT8_MAX) {
@@ -2632,11 +2678,6 @@ static void assemble_jmp(Assembler* assembler) {
 static void assemble_jmpw(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
-    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
-        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
-        return;
-    }
-
     int64_t dl = read_number(assembler);
 
     if(dl > UINT16_MAX) {
@@ -2653,11 +2694,6 @@ static void assemble_jmpw(Assembler* assembler) {
 
 static void assemble_bjmp(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
-
-    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
-        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
-        return;
-    }
 
     int64_t dest = read_number(assembler);
 
@@ -2676,11 +2712,6 @@ static void assemble_bjmp(Assembler* assembler) {
 
 static void assemble_bjmpw(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
-
-    if(assembler->parser->current.type != ASM_TOKEN_INT && assembler->parser->current.type != ASM_TOKEN_BYTE) {
-        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
-        return;
-    }
 
     int64_t dl = read_number(assembler);
 
@@ -2797,6 +2828,24 @@ static uint16_t read_const(Assembler* assembler) {
 }
 
 static uint16_t read_byte(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = read_identifier(assembler);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return -1;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+
+            if(value->type != VAL_BYTE) {
+                asm_parser_error_at_current(assembler->parser, "Expected byte");
+                return -1;
+            }
+
+            return index;
+        }
+    }
+
     int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
     if(errno == ERANGE || num > UINT8_MAX) {
@@ -2808,6 +2857,24 @@ static uint16_t read_byte(Assembler* assembler) {
 }
 
 static uint16_t read_int(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = read_identifier(assembler);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return -1;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+
+            if(value->type != VAL_INT) {
+                asm_parser_error_at_current(assembler->parser, "Expected int");
+                return -1;
+            }
+
+            return index;
+        }
+    }
+
     int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
     if(errno == ERANGE) {
@@ -2819,6 +2886,24 @@ static uint16_t read_int(Assembler* assembler) {
 }
 
 static uint16_t read_float(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = read_identifier(assembler);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return -1;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+
+            if(value->type != VAL_FLOAT) {
+                asm_parser_error_at_current(assembler->parser, "Expected float");
+                return -1;
+            }
+
+            return index;
+        }
+    }
+
     double num = strtod(assembler->parser->current.start, NULL);
 
     if(errno == ERANGE) {
@@ -2830,6 +2915,29 @@ static uint16_t read_float(Assembler* assembler) {
 }
 
 static uint16_t read_string(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = read_identifier(assembler);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return (uint16_t) -1u;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+
+            if(!value_is_dense_of_type(*value, DVAL_STRING)) {
+                asm_parser_error_at_current(assembler->parser, "Expected string");
+                return (uint16_t) -1u;
+            }
+
+            return index;
+        }
+    }
+
+    if(assembler->parser->current.type != ASM_TOKEN_STRING) {
+        asm_parser_error_at_current(assembler->parser, "Expected string");
+        return (uint16_t) -1u;
+    }
+
     const char* start = assembler->parser->current.start + 1;
     uint32_t length = assembler->parser->current.size - 2;
 
@@ -2911,6 +3019,17 @@ static uint16_t read_string(Assembler* assembler) {
     return create_constant(assembler, DENSE_VALUE(interned));
 }
 
+static uint16_t read_identifier(Assembler* assembler) {
+    uint32_t index = identifier_resolve(assembler, &assembler->parser->current);
+
+    if(index > UINT16_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+        return (uint16_t) - 1;
+    }
+
+    return (uint16_t) index;
+}
+
 static uint16_t read_any_const(Assembler* assembler) {
     switch(assembler->parser->current.type) {
         case ASM_TOKEN_CONSTANT:
@@ -2923,6 +3042,8 @@ static uint16_t read_any_const(Assembler* assembler) {
             return read_float(assembler);
         case ASM_TOKEN_STRING:
             return read_string(assembler);
+        case ASM_TOKEN_IDENTIFIER:
+            return read_identifier(assembler);
         default:
             asm_parser_error_at_current(assembler->parser, "Expected constant");
             return -1;
@@ -2930,6 +3051,21 @@ static uint16_t read_any_const(Assembler* assembler) {
 }
 
 static int64_t read_number(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = identifier_resolve(assembler, &assembler->parser->current);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return -1;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+
+            if(value->type == VAL_INT)
+                return AS_INT(*value);
+            return AS_BYTE(*value);
+        }
+    }
+
     if(assembler->parser->current.type == ASM_TOKEN_INT) {
         int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
@@ -2939,20 +3075,49 @@ static int64_t read_number(Assembler* assembler) {
         }
 
         return num;
-    } else {
+    } else if(assembler->parser->current.type == ASM_TOKEN_BYTE){
         int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
-        if (errno == ERANGE || num > UINT8_MAX) {
+        if(errno == ERANGE || num > UINT8_MAX) {
             asm_parser_error_at_current(assembler->parser, "Number is too large for type 'byte'");
             return -1;
         }
 
         return num;
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected 'int' or 'byte'");
+        return -1;
     }
 }
 
 static bool read_bool(Assembler* assembler) {
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        uint16_t index = identifier_resolve(assembler, &assembler->parser->current);
+
+        if(index == (uint16_t) -1u) {
+            asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
+            return -1;
+        } else {
+            Value* value = &assembler->chunk.constants.values[index];
+            return AS_BOOL(*value);
+        }
+    }
+
     return assembler->parser->current.type == ASM_TOKEN_TRUE;
+}
+
+static bool identifier_add(Assembler* assembler, const char* start, uint32_t length, uint16_t index) {
+    if(map_find(&assembler->identifiers, start, length, map_hash(start, length)) == NULL) {
+        map_set(&assembler->identifiers, dense_string_from(start, length), INT_VALUE(index));
+        return true;
+    } else return false;
+}
+
+// uint32_t max if the identifier does not exist.
+static uint32_t identifier_resolve(Assembler* assembler, AsmToken* token) {
+    Entry* entry = map_find_entry(&assembler->identifiers, token->start, token->size, map_hash(token->start, token->size));
+
+    return entry == NULL ? UINT32_MAX : AS_INT(entry->value);
 }
 
 static uint16_t create_constant(Assembler* assembler, Value value) {
