@@ -397,7 +397,8 @@ static void assemble_byte_data(Assembler* assembler) {
         }
 
         if(id.type != ASM_TOKEN_ERROR)
-            identifier_add(assembler, id.start, id.size, index);
+            if(!identifier_add(assembler, id.start, id.size, index))
+                asm_parser_error_at_current(assembler->parser, "Identifier already exists");
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected byte");
         return;
@@ -419,7 +420,8 @@ static void assemble_int_data(Assembler* assembler) {
         asm_parser_advance(assembler->parser);
 
         if(id.type != ASM_TOKEN_ERROR)
-            identifier_add(assembler, id.start, id.size, index);
+            if(!identifier_add(assembler, id.start, id.size, index))
+                asm_parser_error_at_current(assembler->parser, "Identifier already exists");
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected int");
         return;
@@ -441,7 +443,8 @@ static void assemble_float_data(Assembler* assembler) {
         asm_parser_advance(assembler->parser);
 
         if(id.type != ASM_TOKEN_ERROR)
-            identifier_add(assembler, id.start, id.size, index);
+            if(!identifier_add(assembler, id.start, id.size, index))
+                asm_parser_error_at_current(assembler->parser, "Identifier already exists");
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected float");
         return;
@@ -463,7 +466,8 @@ static void assemble_string_data(Assembler* assembler) {
         asm_parser_advance(assembler->parser);
 
         if(id.type != ASM_TOKEN_ERROR)
-            identifier_add(assembler, id.start, id.size, index);
+            if(!identifier_add(assembler, id.start, id.size, index))
+                asm_parser_error_at_current(assembler->parser, "Identifier already exists");
     } else {
         asm_parser_error_at_current(assembler->parser, "Expected string");
         return;
@@ -489,7 +493,8 @@ static void assemble_bool_data(Assembler* assembler) {
     asm_parser_advance(assembler->parser);
 
     if(id.type != ASM_TOKEN_ERROR)
-        identifier_add(assembler, id.start, id.size, index);
+        if(!identifier_add(assembler, id.start, id.size, index))
+            asm_parser_error_at_current(assembler->parser, "Identifier already exists");
 }
 
 static void assemble_cnst(Assembler* assembler) {
@@ -2808,7 +2813,7 @@ static void emit_word(Assembler* assembler, uint16_t word) {
 static uint8_t read_reg(Assembler* assembler) {
     int64_t num = strtol(assembler->parser->current.start, NULL, 10);
 
-    if(errno == ERANGE || num > 249) {
+    if (errno == ERANGE || num > 249) {
         asm_parser_error_at_current(assembler->parser, "Number is not a valid register (0-249)");
         return 251;
     }
@@ -2853,7 +2858,7 @@ static uint16_t read_byte(Assembler* assembler) {
         return -1;
     }
 
-    return create_constant(assembler, INT_VALUE(num));
+    return create_constant(assembler, BYTE_VALUE((uint8_t) num));
 }
 
 static uint16_t read_int(Assembler* assembler) {
