@@ -6,7 +6,7 @@
 #define ADVANCE(i) (++lexer->index, lexer->current += i)
 #define NEXT() (++lexer->index, *(lexer->current++))
 
-#define AT_END(i) (lexer->current[i] == '\0' || (lexer->stoppers != NULL && strchr(lexer->stoppers, lexer->current[i]) != NULL))
+#define AT_END(i) (lexer->current[i] == '\0' || (lexer->stoppers != NULL && (!lexer->ignoreStoppers && strchr(lexer->stoppers, lexer->current[i]) != NULL)))
 #define MATCH(c) \
     ((AT_END(0) || *lexer->current != c) ? false : (ADVANCE(1), true))
 
@@ -23,6 +23,7 @@ void asm_lexer_init(AsmLexer* lexer) {
     lexer->start = NULL;
     lexer->current = NULL;
     lexer->stoppers = NULL;
+    lexer->ignoreStoppers = false;
     lexer->index = 0;
 }
 
@@ -88,7 +89,10 @@ AsmToken asm_lexer_next(AsmLexer* lexer) {
 
     switch(c) {
         case '.': return asm_lexer_emit(lexer, ASM_TOKEN_DOT);
-        case ',': return asm_lexer_emit(lexer, ASM_TOKEN_COMMA);
+        case '(': return asm_lexer_emit(lexer, ASM_TOKEN_LEFT_PAREN);
+        case ')': return asm_lexer_emit(lexer, ASM_TOKEN_RIGHT_PAREN);
+        case '{': return asm_lexer_emit(lexer, ASM_TOKEN_LEFT_BRACE);
+        case '}': return asm_lexer_emit(lexer, ASM_TOKEN_RIGHT_BRACE);
         case '"': return asm_next_string(lexer);
         default: return asm_lexer_error(lexer, "Unexpected character");
     }

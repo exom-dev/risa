@@ -36,7 +36,6 @@ void asm_parser_sync(AsmParser* parser) {
     while(parser->current.type != ASM_TOKEN_EOF) {
         switch(parser->current.type) {
             case ASM_TOKEN_DOT:
-            case ASM_TOKEN_COMMA:
             case ASM_TOKEN_STRING:
             case ASM_TOKEN_TRUE:
             case ASM_TOKEN_FALSE:

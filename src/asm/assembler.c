@@ -22,6 +22,7 @@ static void assemble_int_data(Assembler*);
 static void assemble_float_data(Assembler*);
 static void assemble_string_data(Assembler*);
 static void assemble_bool_data(Assembler*);
+static void assemble_function_data(Assembler*);
 
 static void assemble_cnst(Assembler*);
 static void assemble_cnstw(Assembler*);
@@ -91,8 +92,9 @@ static bool     read_bool(Assembler*);
 static bool     identifier_add(Assembler*, const char*, uint32_t, uint16_t);
 static uint32_t identifier_resolve(Assembler*, AsmToken*);
 
-static uint16_t create_constant(Assembler*, Value);
-static uint16_t create_string_constant(Assembler*, const char*, uint32_t);
+static uint16_t     create_constant(Assembler*, Value);
+static uint16_t     create_string_constant(Assembler*, const char*, uint32_t);
+static DenseString* create_string_entry(Assembler* assembler, const char* start, uint32_t length);
 
 void assembler_init(Assembler* assembler) {
     assembler->super = NULL;
@@ -200,6 +202,9 @@ static void assemble_data_line(Assembler* assembler) {
             break;
         case ASM_TOKEN_STRING_TYPE:
             assemble_string_data(assembler);
+            break;
+        case ASM_TOKEN_FUNCTION_TYPE:
+            assemble_function_data(assembler);
             break;
         default:
             asm_parser_error_at_current(assembler->parser, "Expected data type");
@@ -491,6 +496,86 @@ static void assemble_bool_data(Assembler* assembler) {
 
     uint16_t index = read_bool(assembler);
     asm_parser_advance(assembler->parser);
+
+    if(id.type != ASM_TOKEN_ERROR)
+        if(!identifier_add(assembler, id.start, id.size, index))
+            asm_parser_error_at_current(assembler->parser, "Identifier already exists");
+}
+
+static void assemble_function_data(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    AsmToken id = { .type = ASM_TOKEN_ERROR };
+
+    if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
+        id = assembler->parser->current;
+        asm_parser_advance(assembler->parser);
+    }
+
+    asm_parser_consume(assembler->parser, ASM_TOKEN_LEFT_PAREN, "Expected '('");
+
+    int64_t argc = 0;
+
+    if(assembler->parser->current.type == ASM_TOKEN_INT) {
+        argc = strtol(assembler->parser->current.start, NULL, 10);
+
+        if(errno == ERANGE || (argc < 0 || argc > 250)) {
+            asm_parser_error_at_current(assembler->parser, "Argument count out of range (0-250)");
+            return;
+        }
+
+        asm_parser_advance(assembler->parser);
+    }
+
+    asm_parser_consume(assembler->parser, ASM_TOKEN_RIGHT_PAREN, "Expected ')'");
+    asm_parser_consume(assembler->parser, ASM_TOKEN_LEFT_BRACE, "Expected '{'");
+
+    Assembler iasm;
+
+    assembler_init(&iasm);
+
+    DenseFunction* func = dense_function_create(&func);
+
+    DenseString* funcName;
+
+    if(id.type != ASM_TOKEN_ERROR)
+        funcName = create_string_entry(assembler, id.start, id.size);
+    else funcName = create_string_entry(assembler, "lambda", 6);
+
+    if(funcName == NULL)
+        return;
+
+    func->arity = (uint8_t) argc;
+    func->name = funcName;
+
+    iasm.chunk = func->chunk;
+    iasm.strings = assembler->strings;
+
+    assembler_assemble(&iasm, assembler->parser->lexer.start, "}");
+
+    func->chunk = iasm.chunk;
+    func->chunk.constants = iasm.chunk.constants;
+
+    assembler->parser->lexer.start = iasm.parser->lexer.start;
+    assembler->parser->lexer.current = iasm.parser->lexer.current;
+    assembler->parser->lexer.index += iasm.parser->lexer.index - 1;
+
+    if(iasm.parser->error)
+        assembler->parser->error = true;
+
+
+    // Edge case when the stopper is '}'
+    assembler->parser->lexer.ignoreStoppers = true;
+
+    asm_parser_advance(assembler->parser);
+
+    assembler->parser->lexer.ignoreStoppers = false;
+
+    assembler_delete(&iasm);
+
+    asm_parser_consume(assembler->parser, ASM_TOKEN_RIGHT_BRACE, "Expected '}'");
+
+    uint16_t index = create_constant(assembler, DENSE_VALUE(func));
 
     if(id.type != ASM_TOKEN_ERROR)
         if(!identifier_add(assembler, id.start, id.size, index))
@@ -3130,7 +3215,7 @@ static uint16_t create_constant(Assembler* assembler, Value value) {
 
     if(index > UINT16_MAX) {
         asm_parser_error_at_previous(assembler->parser, "Constant limit exceeded (65535)");
-        return 0;
+        return -1;
     }
 
     return (uint16_t) index;
@@ -3152,4 +3237,22 @@ static uint16_t create_string_constant(Assembler* assembler, const char* start, 
     }
 
     return create_constant(assembler, DENSE_VALUE(interned));
+}
+
+static DenseString* create_string_entry(Assembler* assembler, const char* start, uint32_t length) {
+    uint32_t hash = map_hash(start, length);
+
+    Assembler* super = assembler->super == NULL ? assembler : assembler->super;
+
+    while(super->super != NULL)
+        super = super->super;
+
+    DenseString* interned = map_find(super->strings, start, length, hash);
+
+    if(interned == NULL) {
+        interned = dense_string_from(start, length);
+        map_set(super->strings, interned, NULL_VALUE);
+    }
+
+    return interned;
 }

@@ -4,7 +4,7 @@
 #include "../common/headers.h"
 
 typedef enum {
-    ASM_TOKEN_DOT, ASM_TOKEN_COMMA,
+    ASM_TOKEN_DOT, ASM_TOKEN_LEFT_PAREN, ASM_TOKEN_RIGHT_PAREN, ASM_TOKEN_LEFT_BRACE, ASM_TOKEN_RIGHT_BRACE,
 
     ASM_TOKEN_IDENTIFIER, ASM_TOKEN_STRING,
     ASM_TOKEN_BYTE, ASM_TOKEN_INT, ASM_TOKEN_FLOAT, ASM_TOKEN_REGISTER, ASM_TOKEN_CONSTANT,
@@ -56,6 +56,8 @@ typedef struct {
     const char* current;
 
     const char* stoppers;
+
+    bool ignoreStoppers;
 
     size_t index;
 } AsmLexer;
