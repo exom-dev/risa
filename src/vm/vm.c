@@ -1043,12 +1043,9 @@ VMStatus vm_run(VM* vm) {
                     }
                 }
 
-                if(func->name != NULL)
-                    PRINT("\n<%.*s>", func->name->length, func->name->chars);
-                else PRINT("\n<lambda>");
-
+                PRINT("\n");
+                dense_print((DenseValue*) func);
                 disassembler_process_chunk(&func->chunk);
-
                 PRINT("\n\n");
 
                 SKIP(3);
