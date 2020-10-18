@@ -3,7 +3,7 @@
 
 #include "../chunk/chunk.h"
 
-void debug_disassemble_chunk(Chunk* chunk);
-size_t debug_disassemble_instruction(Chunk* chunk, size_t offset);
+void   disassembler_process_chunk(Chunk* chunk);
+size_t disassembler_process_instruction(Chunk* chunk, size_t offset);
 
 #endif

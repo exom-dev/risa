@@ -12,7 +12,7 @@ RisaCompileStatus risa_compile_string(Compiler* compiler, const char* str) {
 
     #ifdef DEBUG_SHOW_DISASSEMBLY
         PRINT("\n<script>");
-        debug_disassemble_chunk(&compiler->function->chunk);
+        disassembler_process_chunk(&compiler->function->chunk);
         PRINT("\n");
     #endif
 
@@ -94,13 +94,19 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         compiler_delete(&compiler);
         vm_delete(&vm);
 
-        PRINT("\n\nHeap size: %zu\n", vm.heapSize);
+        #ifdef DEBUG_SHOW_HEAP_SIZE
+            PRINT("\n\nHeap size: %zu\n", vm.heapSize);
+        #endif
+
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
     compiler_delete(&compiler);
     vm_delete(&vm);
 
-    PRINT("\n\nHeap size: %zu\n", vm.heapSize);
+    #ifdef DEBUG_SHOW_HEAP_SIZE
+        PRINT("\n\nHeap size: %zu\n", vm.heapSize);
+    #endif
+
     return RISA_INTERPRET_OK;
 }

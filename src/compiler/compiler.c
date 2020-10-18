@@ -35,6 +35,7 @@ static void compile_continue_statement(Compiler*);
 static void compile_break_statement(Compiler*);
 static void compile_block(Compiler*);
 static void compile_inline_asm_statement(Compiler*);
+static void compile_disasm_statement(Compiler*);
 static void compile_expression_statement(Compiler*);
 static void compile_expression(Compiler*);
 static void compile_expression_precedence(Compiler*, Precedence);
@@ -1123,6 +1124,10 @@ static void compile_statement(Compiler* compiler) {
             parser_advance(compiler->parser);
             compile_inline_asm_statement(compiler);
             break;
+        case TOKEN_PERCENT:
+            parser_advance(compiler->parser);
+            compile_disasm_statement(compiler);
+            break;
         default:
             compile_expression_statement(compiler);
             break;
@@ -1469,6 +1474,27 @@ static void compile_inline_asm_statement(Compiler* compiler) {
 
     if(isBlock)
         parser_consume(compiler->parser, TOKEN_RIGHT_BRACE, "Expected '}' after inline asm statement");
+}
+
+static void compile_disasm_statement(Compiler* compiler) {
+    bool isSelf = false;
+
+    parser_consume(compiler->parser, TOKEN_LEFT_PAREN, "Expected '(' after '%'");
+
+    if(compiler->parser->current.type == TOKEN_RIGHT_PAREN)
+        isSelf = true;
+    else compile_expression(compiler);
+
+    parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after argument");
+    parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after ')'");
+
+    if(compiler->last.isNew)
+        register_free(compiler);
+
+    emit_byte(compiler, OP_DIS);
+    emit_byte(compiler, isSelf ? 251 : compiler->last.reg);
+    emit_byte(compiler, 0);
+    emit_byte(compiler, 0);
 }
 
 static void compile_expression_statement(Compiler* compiler) {

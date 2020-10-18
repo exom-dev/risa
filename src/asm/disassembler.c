@@ -28,9 +28,8 @@ size_t disassemble_array_push_instruction(const char* name, uint8_t types, Chunk
 size_t disassemble_array_length_instruction(const char* name, Chunk* chunk, size_t offset);
 size_t disassemble_get_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
 size_t disassemble_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset);
-size_t disassemble_return_instruction(const char* name, Chunk* chunk, size_t offset);
 
-size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
+size_t disassembler_process_instruction(Chunk* chunk, size_t offset) {
     PRINT("%04zu %4u ", offset, chunk->indices[offset]);
 
     uint8_t instruction = chunk->bytecode[offset];
@@ -133,24 +132,26 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
         case OP_CALL:
             return disassemble_call_instruction("CALL", chunk, offset);
         case OP_RET:
-            return disassemble_return_instruction("RET", chunk, offset);
+            return disassemble_byte_instruction("RET", chunk, offset);
+        case OP_DIS:
+            return disassemble_byte_instruction("DIS", chunk, offset);
         default:
             return offset;
     }
 }
 
-void debug_disassemble_chunk(Chunk* chunk) {
+void disassembler_process_chunk(Chunk* chunk) {
     PRINT("\nOFFS INDX OP\n");
 
     for(size_t offset = 0; offset < chunk->size;)
-        offset = debug_disassemble_instruction(chunk, offset);
+        offset = disassembler_process_instruction(chunk, offset);
     for(size_t i = 0; i < chunk->constants.size; ++i) {
         if(value_is_dense_of_type(chunk->constants.values[i], DVAL_FUNCTION)) {
             PRINT("\n<%s>", AS_FUNCTION(chunk->constants.values[i])->name->chars);
-            debug_disassemble_chunk(&(AS_FUNCTION(chunk->constants.values[i]))->chunk);
+            disassembler_process_chunk(&(AS_FUNCTION(chunk->constants.values[i]))->chunk);
         } else if(value_is_dense_of_type(chunk->constants.values[i], DVAL_CLOSURE)) {
             PRINT("\n<%s>", AS_CLOSURE(chunk->constants.values[i])->function->name->chars);
-            debug_disassemble_chunk(&(AS_CLOSURE(chunk->constants.values[i]))->function->chunk);
+            disassembler_process_chunk(&(AS_CLOSURE(chunk->constants.values[i]))->function->chunk);
         }
     }
 }
@@ -272,11 +273,6 @@ size_t disassemble_get_instruction(const char* name, uint8_t types, Chunk* chunk
 size_t disassemble_set_instruction(const char* name, uint8_t types, Chunk* chunk, size_t offset) {
     PRINT("%-16s %4d %4d%c %4d%c\n", name, chunk->bytecode[offset + 1], chunk->bytecode[offset + 2], types & LEFT_TYPE_MASK ? 'c' : 'r', chunk->bytecode[offset + 3], types & RIGHT_TYPE_MASK ? 'c' : 'r');
 
-    return offset + 4;
-}
-
-size_t disassemble_return_instruction(const char* name, Chunk* chunk, size_t offset) {
-    PRINT("%-16s %4d\n", name, chunk->bytecode[offset + 1]);
     return offset + 4;
 }
 

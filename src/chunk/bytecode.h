@@ -51,7 +51,8 @@ typedef enum {
     OP_BJMP,
     OP_BJMPW,
     OP_CALL,
-    OP_RET
+    OP_RET,
+    OP_DIS
 } OpCode;
 
 bool op_has_direct_dest(OpCode op);

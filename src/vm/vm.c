@@ -5,10 +5,7 @@
 #include "../chunk/bytecode.h"
 #include "../common/logging.h"
 #include "../value/dense.h"
-
-#ifdef DEBUG_TRACE_EXECUTION
-    #include "../debug/disassembler.h"
-#endif
+#include "../asm/disassembler.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
     fprintf(stderr, "[error] at index %u: " fmt "\n", FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.indices[vm->frames[vm->frameCount - 1].ip - FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.bytecode], ##__VA_ARGS__ )
@@ -1020,7 +1017,7 @@ VMStatus vm_run(VM* vm) {
                 if(vm->frameCount == 0)
                     return VM_OK;
 
-                if(DEST == 251)
+                if(DEST > 249)
                     *frame->base = NULL_VALUE;
                 else *frame->base = DEST_REG;
 
@@ -1028,6 +1025,33 @@ VMStatus vm_run(VM* vm) {
                 frame = &vm->frames[vm->frameCount - 1];
 
                 SKIP(3); // Skip the CALL args.
+                break;
+            }
+            case OP_DIS: {
+                DenseFunction* func;
+
+                if(DEST > 249)
+                    func = FRAME_FUNCTION(*frame);
+                else {
+                    if(value_is_dense_of_type(DEST_REG, DVAL_FUNCTION))
+                        func = AS_FUNCTION(DEST_REG);
+                    else if(value_is_dense_of_type(DEST_REG, DVAL_CLOSURE))
+                        func = AS_CLOSURE(DEST_REG)->function;
+                    else {
+                        VM_RUNTIME_ERROR(vm, "Argument must be a non-native function");
+                        return VM_ERROR;
+                    }
+                }
+
+                if(func->name != NULL)
+                    PRINT("\n<%.*s>", func->name->length, func->name->chars);
+                else PRINT("\n<lambda>");
+
+                disassembler_process_chunk(&func->chunk);
+
+                PRINT("\n\n");
+
+                SKIP(3);
                 break;
             }
             default: {
