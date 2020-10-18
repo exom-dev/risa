@@ -57,8 +57,6 @@ static void assemble_div(Assembler*);
 static void assemble_mod(Assembler*);
 static void assemble_shl(Assembler*);
 static void assemble_shr(Assembler*);
-static void assemble_gt(Assembler*);
-static void assemble_gte(Assembler*);
 static void assemble_lt(Assembler*);
 static void assemble_lte(Assembler*);
 static void assemble_eq(Assembler*);
@@ -313,12 +311,6 @@ static void assemble_code_line(Assembler* assembler) {
             break;
         case ASM_TOKEN_SHR:
             assemble_shr(assembler);
-            break;
-        case ASM_TOKEN_GT:
-            assemble_gt(assembler);
-            break;
-        case ASM_TOKEN_GTE:
-            assemble_gte(assembler);
             break;
         case ASM_TOKEN_LT:
             assemble_lt(assembler);
@@ -1984,164 +1976,6 @@ static void assemble_shr(Assembler* assembler) {
             }
 
             emit_byte(assembler, OP_SHR | 0xC0);
-        }
-    }
-
-    asm_parser_advance(assembler->parser);
-
-    emit_byte(assembler, (uint8_t) dest);
-    emit_byte(assembler, (uint8_t) left);
-    emit_byte(assembler, (uint8_t) right);
-}
-
-static void assemble_gt(Assembler* assembler) {
-    asm_parser_advance(assembler->parser);
-
-    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
-        asm_parser_error_at_current(assembler->parser, "Expected register");
-        return;
-    }
-
-    uint8_t dest = read_reg(assembler);
-
-    asm_parser_advance(assembler->parser);
-
-    if(dest > 249)
-        return;
-
-    uint16_t left;
-    uint16_t right;
-
-    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-        left = read_reg(assembler);
-
-        if(left > 249)
-            return;
-
-        asm_parser_advance(assembler->parser);
-
-        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-            right = read_reg(assembler);
-
-            if(right > 249)
-                return;
-
-            emit_byte(assembler, OP_GT);
-        } else {
-            right = read_any_const(assembler);
-
-            if(right > UINT8_MAX) {
-                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-                return;
-            }
-
-            emit_byte(assembler, OP_GT | 0x40);
-        }
-    } else {
-        left = read_any_const(assembler);
-
-        if(left > UINT8_MAX) {
-            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-            return;
-        }
-
-        asm_parser_advance(assembler->parser);
-
-        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-            right = read_reg(assembler);
-
-            if(right > 249)
-                return;
-
-            emit_byte(assembler, OP_GT | 0x80);
-        } else {
-            right = read_any_const(assembler);
-
-            if(right > UINT8_MAX) {
-                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-                return;
-            }
-
-            emit_byte(assembler, OP_GT | 0xC0);
-        }
-    }
-
-    asm_parser_advance(assembler->parser);
-
-    emit_byte(assembler, (uint8_t) dest);
-    emit_byte(assembler, (uint8_t) left);
-    emit_byte(assembler, (uint8_t) right);
-}
-
-static void assemble_gte(Assembler* assembler) {
-    asm_parser_advance(assembler->parser);
-
-    if(assembler->parser->current.type != ASM_TOKEN_REGISTER) {
-        asm_parser_error_at_current(assembler->parser, "Expected register");
-        return;
-    }
-
-    uint8_t dest = read_reg(assembler);
-
-    asm_parser_advance(assembler->parser);
-
-    if(dest > 249)
-        return;
-
-    uint16_t left;
-    uint16_t right;
-
-    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-        left = read_reg(assembler);
-
-        if(left > 249)
-            return;
-
-        asm_parser_advance(assembler->parser);
-
-        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-            right = read_reg(assembler);
-
-            if(right > 249)
-                return;
-
-            emit_byte(assembler, OP_GTE);
-        } else {
-            right = read_any_const(assembler);
-
-            if(right > UINT8_MAX) {
-                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-                return;
-            }
-
-            emit_byte(assembler, OP_GTE | 0x40);
-        }
-    } else {
-        left = read_any_const(assembler);
-
-        if(left > UINT8_MAX) {
-            asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-            return;
-        }
-
-        asm_parser_advance(assembler->parser);
-
-        if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
-            right = read_reg(assembler);
-
-            if(right > 249)
-                return;
-
-            emit_byte(assembler, OP_GTE | 0x80);
-        } else {
-            right = read_any_const(assembler);
-
-            if(right > UINT8_MAX) {
-                asm_parser_error_at_current(assembler->parser, "Constant index is too large");
-                return;
-            }
-
-            emit_byte(assembler, OP_GTE | 0xC0);
         }
     }
 

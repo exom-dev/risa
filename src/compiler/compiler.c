@@ -2032,7 +2032,9 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = false;
     }
 
+    // The GT and GTE instructions are simulated with reversed LT and LTE. Therefore, switch the operands and use the REV def.
     #define LR_TYPES ((isLeftConst * 0x80) | (compiler->last.isConst * 0x40))
+    #define LR_TYPES_REV ((compiler->last.isConst * 0x80) | (isLeftConst * 0x40))
 
     switch(operatorType) {
         case TOKEN_PLUS:
@@ -2057,10 +2059,10 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
             emit_byte(compiler, OP_SHR | LR_TYPES);
             break;
         case TOKEN_GREATER:
-            emit_byte(compiler, OP_GT | LR_TYPES);
+            emit_byte(compiler, OP_LT | LR_TYPES_REV);
             break;
         case TOKEN_GREATER_EQUAL:
-            emit_byte(compiler, OP_GTE | LR_TYPES);
+            emit_byte(compiler, OP_LTE | LR_TYPES_REV);
             break;
         case TOKEN_LESS:
             emit_byte(compiler, OP_LT | LR_TYPES);
@@ -2101,7 +2103,10 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
         destReg = compiler->regIndex - 1;
     }
 
-    emit_bytes(compiler, destReg, leftReg, compiler->last.reg);
+    // Reverse in the case of < and <= because only LT and LTE exist.
+    if(operatorType == TOKEN_GREATER || operatorType == TOKEN_GREATER_EQUAL)
+        emit_bytes(compiler, destReg, compiler->last.reg, leftReg);
+    else emit_bytes(compiler, destReg, leftReg, compiler->last.reg);
 
     compiler->regs[destReg] = (RegInfo) { REG_TEMP };
     compiler->last.reg = destReg;

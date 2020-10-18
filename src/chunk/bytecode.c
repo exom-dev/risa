@@ -24,8 +24,6 @@ bool op_has_direct_dest(OpCode op) {
         case OP_MOD:
         case OP_SHL:
         case OP_SHR:
-        case OP_GT:
-        case OP_GTE:
         case OP_LT:
         case OP_LTE:
         case OP_EQ:

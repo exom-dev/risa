@@ -37,8 +37,6 @@ typedef enum {
     OP_MOD,
     OP_SHL,
     OP_SHR,
-    OP_GT,
-    OP_GTE,
     OP_LT,
     OP_LTE,
     OP_EQ,

@@ -217,7 +217,6 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
                 switch(lexer->start[1]) {
                     case 'e': case 'E': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "t", ASM_TOKEN_GET));
                     case 'g': case 'G': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 3, "lob", ASM_TOKEN_GGLOB));
-                    case 't': case 'T': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "e", ASM_TOKEN_GTE) == ASM_TOKEN_GTE ? ASM_TOKEN_GTE : ASM_TOKEN_GT);
                     case 'u': case 'U': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 4, "pval", ASM_TOKEN_GUPVAL));
                     default: return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);
                 }

@@ -104,10 +104,6 @@ size_t debug_disassemble_instruction(Chunk* chunk, size_t offset) {
             return disassemble_binary_instruction("SHL", types, chunk, offset);
         case OP_SHR:
             return disassemble_binary_instruction("SHR", types, chunk, offset);
-        case OP_GT:
-            return disassemble_binary_instruction("GT", types, chunk, offset);
-        case OP_GTE:
-            return disassemble_binary_instruction("GTE", types, chunk, offset);
         case OP_LT:
             return disassemble_binary_instruction("LT", types, chunk, offset);
         case OP_LTE:
