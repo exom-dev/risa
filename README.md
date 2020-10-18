@@ -2,7 +2,7 @@
 
 **Risa** is an embeddable and modular scripting language.
 
-**This implementation is extremely early, work-in-progress and, therefore, not yet ready for an alpha release.**
+**This implementation is extremely early, work-in-progress and, therefore, not yet ready for an alpha release. Many parts of the code are temporary, and WILL be changed.**
 
 # Extended BNF (EBNF) notation
 
