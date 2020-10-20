@@ -25,7 +25,7 @@ void chunk_write(Chunk* chunk, uint8_t byte, uint32_t index) {
 
 size_t chunk_write_constant(Chunk* chunk, Value constant) {
     for(uint32_t i = 0; i < chunk->constants.size; ++i)
-        if(value_equals(constant, chunk->constants.values[i]))
+        if(value_strict_equals(constant, chunk->constants.values[i]))
             return i;
 
     value_array_write(&chunk->constants, constant);

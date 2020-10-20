@@ -1740,13 +1740,15 @@ static uint8_t compile_arguments(Compiler* compiler) {
 
             compile_expression_precedence(compiler, PREC_COMMA + 1);
 
-            if(regIndex == compiler->regIndex)
-                if(!register_reserve(compiler))
-                    return 255;
+            if(regIndex != compiler->regIndex)
+                compiler->regIndex = regIndex;
+
+            if(!register_reserve(compiler))
+                return 255;
 
             if(chunkSize == compiler->function->chunk.size)
                 emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
-            else if(op_has_direct_dest(compiler->function->chunk.bytecode[compiler->function->chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp)
+            else if(op_has_direct_dest(compiler->function->chunk.bytecode[compiler->function->chunk.size - 4] & INSTRUCTION_MASK) && !compiler->last.isEqualOp)
                 compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
             else emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
 

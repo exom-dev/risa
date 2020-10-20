@@ -71,6 +71,7 @@ void  value_print(Value value);
 Value value_clone(Value value);
 bool  value_is_falsy(Value value);
 bool  value_equals(Value left, Value right);
+bool  value_strict_equals(Value left, Value right);
 
 bool value_is_dense_of_type(Value value, DenseValueType type);
 

@@ -44,13 +44,13 @@ bool value_is_falsy(Value value) {
 
 bool value_equals(Value left, Value right) {
     if(left.type != right.type) {
-        if(IS_BYTE(left)){
+        if(IS_BYTE(left)) {
             if(IS_INT(right))
                 return AS_BYTE(left) == AS_INT(right);
             if(IS_FLOAT(right))
                 return AS_BYTE(left) == AS_FLOAT(right);
             return false;
-        } else if(IS_INT(left)){
+        } else if(IS_INT(left)) {
             if(IS_BYTE(right))
                 return AS_INT(left) == AS_BYTE(right);
             if(IS_FLOAT(right))
@@ -76,6 +76,14 @@ bool value_equals(Value left, Value right) {
         }
         default: return false;
     }
+}
+
+bool value_strict_equals(Value left, Value right) {
+    if(left.type != right.type)
+        return false;
+    if(left.type == VAL_DENSE && AS_DENSE(left)->type != AS_DENSE(right)->type)
+        return false;
+    return value_equals(left, right);
 }
 
 bool value_is_dense_of_type(Value value, DenseValueType type) {
