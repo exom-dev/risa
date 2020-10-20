@@ -71,9 +71,7 @@ bool value_equals(Value left, Value right) {
         case VAL_BYTE:  return AS_BYTE(left) == AS_BYTE(right);
         case VAL_INT:   return AS_INT(left) == AS_INT(right);
         case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
-        case VAL_DENSE: {
-            return AS_DENSE(left) == AS_DENSE(right);
-        }
+        case VAL_DENSE: return AS_DENSE(left) == AS_DENSE(right);
         default: return false;
     }
 }
@@ -83,7 +81,16 @@ bool value_strict_equals(Value left, Value right) {
         return false;
     if(left.type == VAL_DENSE && AS_DENSE(left)->type != AS_DENSE(right)->type)
         return false;
-    return value_equals(left, right);
+
+    switch(left.type) {
+        case VAL_NULL:  return true;
+        case VAL_BOOL:  return AS_BOOL(left) == AS_BOOL(right);
+        case VAL_BYTE:  return AS_BYTE(left) == AS_BYTE(right);
+        case VAL_INT:   return AS_INT(left) == AS_INT(right);
+        case VAL_FLOAT: return AS_FLOAT(left) == AS_FLOAT(right);
+        case VAL_DENSE: return AS_DENSE(left) == AS_DENSE(right);
+        default: return false;
+    }
 }
 
 bool value_is_dense_of_type(Value value, DenseValueType type) {
