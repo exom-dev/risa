@@ -1128,6 +1128,9 @@ static void compile_statement(Compiler* compiler) {
             parser_advance(compiler->parser);
             compile_disasm_statement(compiler);
             break;
+        case TOKEN_SEMICOLON:
+            parser_advance(compiler->parser);
+            break;
         default:
             compile_expression_statement(compiler);
             break;
