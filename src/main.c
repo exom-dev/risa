@@ -10,6 +10,8 @@
 void run_repl();
 void run_file(const char* path);
 
+VM create_vm();
+
 void print_info();
 
 int main(int argc, char** argv) {
@@ -20,8 +22,36 @@ int main(int argc, char** argv) {
     else TERMINATE(64, "Invalid arguments");
 }
 
+Value print(void* vm, uint8_t argc, Value* args) {
+    value_print(args[0]);
+    return args[0];
+}
+
+VM create_vm() {
+    VM vm;
+    vm_init(&vm);
+
+    DenseNative* native = dense_native_create(print);
+    DenseString* string = map_find(&vm.strings, "print", 5, map_hash("print", 5));
+
+    if(string == NULL) {
+        string = dense_string_from("print", 5);
+        vm_register_string(&vm, string);
+        vm_register_dense(&vm, (DenseValue*) string);
+    }
+
+    map_set(&vm.globals, string, DENSE_VALUE(native));
+    vm_register_dense(&vm, (DenseValue*) native);
+
+    return vm;
+}
+
 void run_repl() {
     print_info();
+
+    VM vm = create_vm();
+
+    vm.options.replMode = true;
 
     char line[256];
 
@@ -33,11 +63,17 @@ void run_repl() {
             break;
         }
 
-        risa_interpret_string(line);
+        RisaInterpretStatus status = risa_interpret_string(&vm, line);
+
+        if(status == RISA_INTERPRET_OK && vm.acc.type != VAL_NULL)
+            value_print(vm.acc);
+        PRINT("\n");
     }
 }
 
 void run_file(const char* path) {
+    VM vm = create_vm();
+
     FILE* file = fopen(path, "rb");
 
     if(file == NULL)
@@ -59,7 +95,7 @@ void run_file(const char* path) {
 
     fclose(file);
 
-    RisaInterpretStatus status = risa_interpret_string(data);
+    RisaInterpretStatus status = risa_interpret_string(&vm, data);
 
     MEM_FREE(data);
 

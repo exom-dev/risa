@@ -47,6 +47,17 @@ static void gc_mark_dense(DenseValue* dense) {
         case DVAL_STRING:
         case DVAL_NATIVE:
             break;
+        case DVAL_ARRAY: {
+            DenseArray* array = (DenseArray*) dense;
+
+            for(uint32_t i = 0; i < array->data.size; ++i)
+                if(IS_DENSE(array->data.values[i]))
+                    gc_mark_dense(AS_DENSE(array->data.values[i]));
+            break;
+        }
+        case DVAL_OBJECT:
+            gc_mark_map(&((DenseObject*) dense)->data);
+            break;
         case DVAL_UPVALUE:
             if(IS_DENSE(((DenseUpvalue*) dense)->closed))
                 gc_mark_dense(AS_DENSE(((DenseUpvalue*) dense)->closed));

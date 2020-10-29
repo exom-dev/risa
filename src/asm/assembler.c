@@ -72,6 +72,7 @@ static void assemble_bjmp(Assembler*);
 static void assemble_bjmpw(Assembler*);
 static void assemble_call(Assembler*);
 static void assemble_ret(Assembler*);
+static void assemble_acc(Assembler*);
 static void assemble_dis(Assembler*);
 
 static void emit_byte(Assembler*, uint8_t);
@@ -357,6 +358,12 @@ static void assemble_code_line(Assembler* assembler) {
             break;
         case ASM_TOKEN_RET:
             assemble_ret(assembler);
+            break;
+        case ASM_TOKEN_ACC:
+            assemble_acc(assembler);
+            break;
+        case ASM_TOKEN_DIS:
+            assemble_dis(assembler);
             break;
         default:
             asm_parser_error_at_current(assembler->parser, "Expected instruction");
@@ -2716,6 +2723,29 @@ static void assemble_ret(Assembler* assembler) {
     }
 
     emit_byte(assembler, OP_RET);
+    emit_byte(assembler, (uint8_t) dest);
+    emit_byte(assembler, 0);
+    emit_byte(assembler, 0);
+}
+
+static void assemble_acc(Assembler* assembler) {
+    asm_parser_advance(assembler->parser);
+
+    int64_t dest;
+
+    if(assembler->parser->current.type == ASM_TOKEN_REGISTER) {
+        dest = read_reg(assembler);
+
+        asm_parser_advance(assembler->parser);
+
+        if(dest > 249)
+            return;
+    } else {
+        asm_parser_error_at_current(assembler->parser, "Expected register");
+        return;
+    }
+
+    emit_byte(assembler, OP_ACC);
     emit_byte(assembler, (uint8_t) dest);
     emit_byte(assembler, 0);
     emit_byte(assembler, 0);

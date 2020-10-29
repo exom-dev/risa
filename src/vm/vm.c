@@ -25,6 +25,7 @@ void vm_init(VM* vm) {
     map_init(&vm->globals);
 
     vm->values = NULL;
+    vm->options.replMode = false;
     vm->heapSize = 0;
     vm->heapThreshold = 64 * 1024;
 }
@@ -41,6 +42,25 @@ void vm_delete(VM* vm) {
         dense_delete(dense);
         dense = next;
     }
+}
+
+void vm_clean(VM* vm) {
+    while(vm->frameCount > 1) {
+        CallFrame* frame = &vm->frames[vm->frameCount - 1];
+
+        switch(frame->type) {
+            case FRAME_FUNCTION:
+                dense_delete((DenseValue*) frame->callee.function);
+                break;
+            case FRAME_CLOSURE:
+                dense_delete((DenseValue*) frame->callee.closure);
+                break;
+        }
+    }
+
+    vm_stack_reset(vm);
+
+    gc_check(vm);
 }
 
 VMStatus vm_execute(VM* vm) {
@@ -143,6 +163,8 @@ VMStatus vm_run(VM* vm) {
             }
             case OP_GGLOB: {
                 Value value;
+
+                map_get(&vm->globals, AS_STRING(LEFT_CONST), &value);
 
                 if(!map_get(&vm->globals, AS_STRING(LEFT_CONST), &value)) {
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONST));
@@ -1025,6 +1047,17 @@ VMStatus vm_run(VM* vm) {
                 frame = &vm->frames[vm->frameCount - 1];
 
                 SKIP(3); // Skip the CALL args.
+                break;
+            }
+            case OP_ACC: {
+                if(DEST > 249) {
+                    VM_RUNTIME_ERROR(vm, "Expected register");
+                    return VM_ERROR;
+                }
+
+                vm->acc = DEST_REG;
+
+                SKIP(3);
                 break;
             }
             case OP_DIS: {

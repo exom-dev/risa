@@ -5,6 +5,7 @@
 #include "../common/def.h"
 #include "../data/map.h"
 #include "../value/dense.h"
+#include "../options/options.h"
 
 #define VM_STACK_SIZE CALLFRAME_STACK_SIZE * 251
 
@@ -42,6 +43,10 @@ typedef struct {
     DenseValue* values;
     DenseUpvalue* upvalues;
 
+    Options options;
+
+    Value acc; // The accumulator, used for REPL mode to store the lastReg value.
+
     size_t heapSize;
     size_t heapThreshold;
 } VM;
@@ -52,6 +57,7 @@ typedef enum {
 } VMStatus;
 
 void vm_init(VM* vm);
+void vm_clean(VM* vm);
 void vm_delete(VM* vm);
 
 VMStatus vm_execute(VM* vm);

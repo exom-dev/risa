@@ -64,6 +64,12 @@ void parser_error_at(Parser* parser, Token token, const char* msg) {
 
         mem_lncol(parser->lexer.source, token.index, &ln, &col);
         ERROR("at %zu:%zu in script: %s\n", ln, col, msg);
+    } else {
+        size_t ln;
+        size_t col;
+
+        mem_lncol(parser->lexer.source, token.index, &ln, &col);
+        ERROR("at %zu:%zu in script: Invalid token\n", ln, col);
     }
 
     parser->error = true;

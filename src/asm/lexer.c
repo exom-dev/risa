@@ -46,6 +46,7 @@ AsmToken asm_lexer_next(AsmLexer* lexer) {
             case '\t':
             case '\r':
             case '\n':
+            case ';':
                 ADVANCE(1);
                 break;
             case '/':
@@ -155,6 +156,7 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
         case 'a': case 'A':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
+                    case 'c': case 'C': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "c", ASM_TOKEN_ACC));
                     case 'd': case 'D': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "d", ASM_TOKEN_ADD));
                     case 'r': case 'R': return asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 1, "r", ASM_TOKEN_ARR));
                     default: return asm_lexer_emit(lexer, ASM_TOKEN_IDENTIFIER);

@@ -133,6 +133,8 @@ size_t disassembler_process_instruction(Chunk* chunk, size_t offset) {
             return disassemble_call_instruction("CALL", chunk, offset);
         case OP_RET:
             return disassemble_byte_instruction("RET", chunk, offset);
+        case OP_ACC:
+            return disassemble_byte_instruction("ACC", chunk, offset);
         case OP_DIS:
             return disassemble_byte_instruction("DIS", chunk, offset);
         default:

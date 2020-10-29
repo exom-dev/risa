@@ -8,7 +8,7 @@
 
 RisaCompileStatus risa_compile_string(Compiler* compiler, const char* str) {
     if(compiler_compile(compiler, str) == COMPILER_ERROR)
-        return  RISA_COMPILE_ERROR;
+        return RISA_COMPILE_ERROR;
 
     #ifdef DEBUG_SHOW_DISASSEMBLY
         PRINT("\n<script>");
@@ -32,6 +32,8 @@ RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk) {
 }
 
 RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
+    vm_clean(vm);
+
     CallFrame frame;
 
     frame.type = FRAME_FUNCTION;
@@ -51,48 +53,33 @@ RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
     return RISA_EXECUTE_OK;
 }
 
-Value print(void* vm, uint8_t argc, Value* args) {
-    value_print(args[0]);
-    return args[0];
-}
-
-RisaInterpretStatus risa_interpret_string(const char* str) {
+RisaInterpretStatus risa_interpret_string(VM* vm, const char* str) {
     Compiler compiler;
     compiler_init(&compiler);
 
+    compiler.strings = vm->strings;
+    compiler.options = vm->options;
+
     if(risa_compile_string(&compiler, str) == RISA_COMPILE_ERROR) {
-        compiler_delete(&compiler);
+        //compiler_delete(&compiler);
         chunk_delete(&compiler.function->chunk);
         MEM_FREE(compiler.function);
 
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
-    VM vm;
-    vm_init(&vm);
+    vm->strings = compiler.strings;
 
-    for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
+    /*for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
         DenseString* string = compiler.strings.entries[i].key;
 
         if(string != NULL)
-            vm_register_string(&vm, string);
-    }
+            vm_register_string(vm, string);
+    }*/
 
-    DenseNative* native = dense_native_create(print);
-    DenseString* string = map_find(&vm.strings, "print", 5, map_hash("print", 5));
-
-    if(string == NULL) {
-        string = dense_string_from("print", 5);
-        vm_register_string(&vm, string);
-        vm_register_dense(&vm, (DenseValue*) string);
-    }
-
-    map_set(&vm.globals, string, DENSE_VALUE(native));
-    vm_register_dense(&vm, (DenseValue*) native);
-
-    if(risa_execute_function(&vm, compiler.function) == RISA_EXECUTE_ERROR) {
-        compiler_delete(&compiler);
-        vm_delete(&vm);
+    if(risa_execute_function(vm, compiler.function) == RISA_EXECUTE_ERROR) {
+        //compiler_delete(&compiler);
+        //vm_delete(vm);
 
         #ifdef DEBUG_SHOW_HEAP_SIZE
             PRINT("\n\nHeap size: %zu\n", vm.heapSize);
@@ -101,8 +88,8 @@ RisaInterpretStatus risa_interpret_string(const char* str) {
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
-    compiler_delete(&compiler);
-    vm_delete(&vm);
+    //compiler_delete(&compiler);
+    //vm_delete(&vm);
 
     #ifdef DEBUG_SHOW_HEAP_SIZE
         PRINT("\n\nHeap size: %zu\n", vm.heapSize);

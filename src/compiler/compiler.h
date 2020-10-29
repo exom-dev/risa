@@ -8,6 +8,7 @@
 #include "../data/map.h"
 #include "../common/def.h"
 #include "../value/dense.h"
+#include "../options/options.h"
 
 typedef enum {
     REG_CONSTANT,
@@ -51,6 +52,8 @@ typedef struct Compiler {
 
     RegInfo regs[250];
     uint8_t regIndex;
+
+    Options options;
 
     struct {
         uint8_t reg;

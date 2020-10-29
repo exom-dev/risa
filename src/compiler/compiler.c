@@ -164,6 +164,7 @@ void compiler_init(Compiler* compiler) {
     map_init(&compiler->strings);
 
     compiler->regIndex = 0;
+    compiler->options.replMode = false;
     compiler->last.reg = 0;
     compiler->last.isNew = false;
     compiler->last.isConst = false;
@@ -203,6 +204,13 @@ CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
 
     while(compiler->parser->current.type != TOKEN_EOF) {
         compile_declaration(compiler);
+
+        if(compiler->options.replMode) {
+            emit_byte(compiler, OP_ACC);
+            emit_byte(compiler, compiler->last.reg);
+            emit_byte(compiler, 0);
+            emit_byte(compiler, 0);
+        }
     }
 
     finalize_compilation(compiler);

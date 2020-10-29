@@ -4,8 +4,8 @@
 #include "vm/vm.h"
 #include "compiler/compiler.h"
 
-#define RISA_VERSION "0.1 ALPHA"
-#define RISA_CODENAME "Initus"
+#define RISA_VERSION "0.0.A"
+#define RISA_CODENAME "PREVIEW"
 
 typedef enum {
     RISA_COMPILE_OK,
@@ -26,6 +26,6 @@ typedef enum {
 RisaCompileStatus risa_compile_string(Compiler* compiler, const char* str);
 RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk);
 RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function);
-RisaInterpretStatus risa_interpret_string(const char* str);
+RisaInterpretStatus risa_interpret_string(VM* vm, const char* str);
 
 #endif
