@@ -2,10 +2,10 @@
 #include "common/logging.h"
 
 #include "risa.h"
-#include "memory/mem.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void run_repl();
 void run_file(const char* path);
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
 
 Value print(void* vm, uint8_t argc, Value* args) {
     value_print(args[0]);
-    return args[0];
+    return NULL_VALUE;
 }
 
 VM create_vm() {
@@ -53,14 +53,29 @@ void run_repl() {
 
     vm.options.replMode = true;
 
-    char line[256];
+    char line[1024];
 
     while(1) {
-        PRINT("#> ");
+        PRINT("#>");
 
-        if(!fgets(line, sizeof(line), stdin)) {
+        if(!fgets(line, sizeof(line) - 1, stdin)) {
             PRINT("\n");
             break;
+        }
+
+        size_t length = strlen(line);
+
+        if(line[length - 1] == '\n') {
+            --length;
+            line[length] = '\0';
+        }
+
+        if(strcmp(line, "exit") == 0)
+            exit(0);
+
+        if(line[length - 1] != ';') {
+            line[length] = ';';
+            line[length + 1] = '\0';
         }
 
         RisaInterpretStatus status = risa_interpret_string(&vm, line);
