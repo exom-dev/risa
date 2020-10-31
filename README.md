@@ -109,26 +109,6 @@ ALPHA ::= [a-zA-Z] | "_" ;
 DIGIT ::= [0-9] ;
 ```
 
-# TODO
-
-- ~~functions~~
-- ~~closures~~
-- ~~garbage collector~~
-- ~~break statement~~
-- ~~continue statement~~
-- ~~objects~~
-- ~~arrays~~
-- ~~ternary operator~~
-- ~~function arrow body~~
-- ~~lambda expressions~~
-- ~~string escape sequences~~
-- ~~comma operator~~
-- ~~prefix/postfix inc/dec~~
-- ~~extra equal operators~~
-- ~~compiler optimizations~~
-- ~~assembler + inline assembly~~
-- REPL compilation option
-
 # License <a href="https://github.com/exom-dev/risa/blob/master/LICENSE"><img align="right" src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 
 This project was created by [The Exom Developers](https://github.com/exom-dev).
