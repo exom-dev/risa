@@ -101,7 +101,8 @@ IDENTIFIER ::= ALPHA ( ALPHA | DIGIT )* ;
 
 BYTE    ::= DIGIT+ "b" ;
 INTEGER ::= DIGIT+ ;
-FLOAT   ::= DIGIT+ "." DIGIT+ ;
+FLOAT   ::= DIGIT+ "." DIGIT+ [ "f" ]
+          | DIGIT+ "f";
 
 STRCHAR ::= [#x00-#x09#x0B-#x21#x23-#xFF] | "\\\"" ;
 
