@@ -181,6 +181,7 @@ VMStatus vm_run(VM* vm) {
                     map_erase(&vm->globals, AS_STRING(DEST_CONST));
 
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(DEST_CONST));
+                    return VM_ERROR;
                 }
 
                 SKIP(3);
