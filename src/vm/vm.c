@@ -251,12 +251,14 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_LEN: {
-                if(!value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
-                    VM_RUNTIME_ERROR(vm, "Cannot get length of non-array type");
+                if(value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
+                    DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
+                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
+                    DEST_REG = INT_VALUE(AS_STRING(LEFT_REG)->length);
+                } else {
+                    VM_RUNTIME_ERROR(vm, "Expected string or array");
                     return VM_ERROR;
                 }
-
-                DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
 
                 SKIP(3);
                 break;
@@ -312,6 +314,33 @@ VMStatus vm_run(VM* vm) {
                     }
 
                     DEST_REG = dense_array_get(array, index);
+                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
+                    if(!IS_INT(RIGHT_BY_TYPE)) {
+                        VM_RUNTIME_ERROR(vm, "Index must be int");
+                        return VM_ERROR;
+                    }
+
+                    DenseString* str = AS_STRING(LEFT_REG);
+                    uint32_t index = AS_INT(RIGHT_BY_TYPE);
+
+                    if(index >= str->length) {
+                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                        return VM_ERROR;
+                    }
+
+                    DenseString* result = dense_string_from(str->chars + index, 1);
+                    DenseString* interned = map_find(&vm->strings, result->chars + index, 1, map_hash(str->chars + index, 1));
+
+                    if(interned != NULL) {
+                        MEM_FREE(result);
+                        result = interned;
+                        DEST_REG = DENSE_VALUE(result);
+                    } else {
+                        vm_register_string(vm, result);
+                        vm_register_dense(vm, (DenseValue*) result);
+                        DEST_REG = DENSE_VALUE(result);
+                        gc_check(vm);
+                    }
                 } else if(value_is_dense_of_type(LEFT_REG, DVAL_OBJECT)) {
                     if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
                         VM_RUNTIME_ERROR(vm, "Object key must be string");
@@ -516,7 +545,8 @@ VMStatus vm_run(VM* vm) {
                             result = interned;
                             DEST_REG = DENSE_VALUE(result);
                         } else {
-                            vm_register_dense(vm, (DenseValue *) result);
+                            vm_register_string(vm, result);
+                            vm_register_dense(vm, (DenseValue*) result);
                             DEST_REG = DENSE_VALUE(result);
                             gc_check(vm);
                         }

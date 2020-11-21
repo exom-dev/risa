@@ -2133,8 +2133,10 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     if(compiler->last.isNew/*compiler->regs[compiler->last.reg].type == REG_TEMP*/) {
         destReg = compiler->last.reg;
 
-        if(isLeftNew)
+        if(isLeftNew) { //TODO: check if this works for all cases.
+            destReg = leftReg;
             register_free(compiler);
+        }
     } else if(isLeftNew/*compiler->regs[leftReg].type == REG_TEMP*/) {
         destReg = leftReg;
     } else {
