@@ -70,8 +70,10 @@ void run_repl() {
             line[length] = '\0';
         }
 
-        if(strcmp(line, "exit") == 0)
+        if(strcmp(line, "exit") == 0) {
+            vm_delete(&vm);
             exit(0);
+        }
 
         if(line[length - 1] != ';') {
             line[length] = ';';
@@ -113,6 +115,8 @@ void run_file(const char* path) {
     RisaInterpretStatus status = risa_interpret_string(&vm, data);
 
     MEM_FREE(data);
+
+    vm_delete(&vm);
 
     if(status == RISA_INTERPRET_OK)
         exit(0);
