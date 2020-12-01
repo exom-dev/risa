@@ -1,12 +1,12 @@
 #include "vm.h"
 
-void  vm_stack_reset(VM* vm) {
+void vm_stack_reset(VM* vm) {
     vm->frameCount = 0;
     vm->stackTop = vm->stack;
     vm->upvalues = NULL;
 }
 
-void  vm_stack_push(VM* vm, Value value) {
+void vm_stack_push(VM* vm, Value value) {
     *vm->stackTop = value;
     ++vm->stackTop;
 }

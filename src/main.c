@@ -31,17 +31,7 @@ VM create_vm() {
     VM vm;
     vm_init(&vm);
 
-    DenseNative* native = dense_native_create(print);
-    DenseString* string = map_find(&vm.strings, "print", 5, map_hash("print", 5));
-
-    if(string == NULL) {
-        string = dense_string_from("print", 5);
-        vm_register_string(&vm, string);
-        vm_register_dense(&vm, (DenseValue*) string);
-    }
-
-    map_set(&vm.globals, string, DENSE_VALUE(native));
-    vm_register_dense(&vm, (DenseValue*) native);
+    vm_global_set_native(&vm, "print", 5, print);
 
     return vm;
 }
