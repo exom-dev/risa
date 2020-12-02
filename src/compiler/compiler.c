@@ -1329,7 +1329,7 @@ static void compile_return_expression(Compiler* compiler) {
     if(compiler->parser->current.type == TOKEN_SEMICOLON) {
         emit_return(compiler);
     } else {
-        compile_expression(compiler);
+        compile_expression_precedence(compiler, PREC_COMMA + 1);
 
         emit_byte(compiler, OP_RET);
         emit_byte(compiler, compiler->last.reg);
