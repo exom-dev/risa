@@ -1,58 +1,59 @@
 #include "dense.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
-void dense_print(DenseValue* dense) {
+void dense_print(RisaIO* io, DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
-            PRINT("%s", ((DenseString*) dense)->chars);
+            RISA_OUT((*io), "%s", ((DenseString*) dense)->chars);
             break;
         case DVAL_ARRAY:
-            PRINT("[");
+            RISA_OUT((*io), "[");
             for(uint32_t i = 0; i < ((DenseArray*) dense)->data.size; ++i) {
-                value_print(((DenseArray*) dense)->data.values[i]);
+                value_print(io, ((DenseArray*) dense)->data.values[i]);
                 if(i < ((DenseArray*) dense)->data.size - 1)
-                    PRINT(", ");
+                    RISA_OUT((*io), ", ");
             }
-            PRINT("]");
+            RISA_OUT((*io), "]");
             break;
         case DVAL_OBJECT: {
             bool first = true;
 
-            PRINT("{ ");
+            RISA_OUT((*io), "{ ");
             for (uint32_t i = 0; i < ((DenseObject *) dense)->data.capacity; ++i) {
                 if(((DenseObject *) dense)->data.entries[i].key != NULL) {
                     if(first)
                         first = false;
-                    else PRINT(", ");
+                    else RISA_OUT((*io), ", ");
 
-                    PRINT("\"");
-                    dense_print((DenseValue *) (((DenseObject *) dense)->data.entries[i].key));
-                    PRINT("\": ");
+                    RISA_OUT((*io), "\"");
+                    dense_print(io, (DenseValue *) (((DenseObject *) dense)->data.entries[i].key));
+                    RISA_OUT((*io), "\": ");
 
-                    value_print(((DenseObject *) dense)->data.entries[i].value);
+                    value_print(io, ((DenseObject *) dense)->data.entries[i].value);
                 }
             }
-            PRINT(" }");
+            RISA_OUT((*io), " }");
             break;
         }
         case DVAL_UPVALUE:
-            PRINT("<upval>");
+            RISA_OUT((*io), "<upval>");
             break;
         case DVAL_FUNCTION:
             if(((DenseFunction*) dense)->name == NULL)
-                PRINT("<script>");
-            else PRINT("<fn %s>", ((DenseFunction*) dense)->name->chars);
+                RISA_OUT((*io), "<script>");
+            else RISA_OUT((*io), "<fn %s>", ((DenseFunction*) dense)->name->chars);
             break;
         case DVAL_CLOSURE:
             if(((DenseClosure*) dense)->function->name == NULL)
-                PRINT("<script>");
-            else PRINT("<fn %s>", ((DenseClosure*) dense)->function->name->chars);
+                RISA_OUT((*io), "<script>");
+            else RISA_OUT((*io), "<fn %s>", ((DenseClosure*) dense)->function->name->chars);
             break;
         case DVAL_NATIVE:
-            PRINT("<native fn>");
+            RISA_OUT((*io), "<native fn>");
             break;
         default:
-            PRINT("UNK");
+            RISA_OUT((*io), "UNK");
+            break;
     }
 }
 
@@ -95,6 +96,8 @@ Value  dense_clone(DenseValue* dense) {
         case DVAL_CLOSURE:
         case DVAL_NATIVE:
             return DENSE_VALUE(dense);
+        default:
+            return NULL_VALUE; // Never reached; written to suppress warnings.
     }
 }
 
@@ -115,33 +118,35 @@ size_t dense_size(DenseValue* dense) {
             return sizeof(DenseNative);
         case DVAL_CLOSURE:
             return ((DenseClosure*) dense)->upvalueCount * sizeof(DenseUpvalue) + sizeof(DenseClosure);
+        default:
+            return 0;  // Never reached; written to suppress warnings.
     }
 }
 
 void dense_delete(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
-            MEM_FREE(dense);
+            RISA_MEM_FREE(dense);
             break;
         case DVAL_ARRAY:
             dense_array_delete((DenseArray*) dense);
-            MEM_FREE(dense);
+            RISA_MEM_FREE(dense);
             break;
         case DVAL_OBJECT:
             dense_object_delete((DenseObject*) dense);
-            MEM_FREE(dense);
+            RISA_MEM_FREE(dense);
             break;
         case DVAL_UPVALUE:
         case DVAL_NATIVE:
-            MEM_FREE(dense);
+            RISA_MEM_FREE(dense);
             break;
         case DVAL_FUNCTION:
             chunk_delete(&((DenseFunction*) dense)->chunk);
-            MEM_FREE(dense);
+            RISA_MEM_FREE(dense);
             break;
         case DVAL_CLOSURE:
-            MEM_FREE(((DenseClosure *) dense)->upvalues);
-            MEM_FREE(dense);
+            RISA_MEM_FREE(((DenseClosure *) dense)->upvalues);
+            RISA_MEM_FREE(dense);
             break;
     }
 }

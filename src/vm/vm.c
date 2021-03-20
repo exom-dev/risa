@@ -3,7 +3,7 @@
 #include "../memory/gc.h"
 #include "../memory/mem.h"
 #include "../chunk/bytecode.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 #include "../value/dense.h"
 #include "../asm/disassembler.h"
 
@@ -19,15 +19,17 @@ static DenseUpvalue* upvalue_capture(VM* vm, Value* local);
 static void          upvalue_close_from(VM* vm, Value* slot);
 
 void vm_init(VM* vm) {
+    risa_io_init(&vm->io);
+
     vm_stack_reset(vm);
 
     map_init(&vm->strings);
     map_init(&vm->globals);
 
     vm->values = NULL;
-    vm->options.replMode = false;
+    vm->options.replMode = false; // TODO: Split compiler and vm options into separate structs.
     vm->heapSize = 0;
-    vm->heapThreshold = 64 * 1024;
+    vm->heapThreshold = VM_HEAP_INITIAL_THRESHOLD;
 }
 
 void vm_delete(VM* vm) {
@@ -70,9 +72,6 @@ VMStatus vm_execute(VM* vm) {
 VMStatus vm_run(VM* vm) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
 
-    #define TYPE_MASK 0xC0
-    #define INSTRUCTION_MASK 0x3F
-
     #define NEXT_BYTE() (*frame->ip++)
     #define NEXT_CONSTANT() (FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
 
@@ -90,11 +89,11 @@ VMStatus vm_run(VM* vm) {
     #define LEFT_REG  (frame->regs[LEFT])
     #define RIGHT_REG (frame->regs[RIGHT])
 
-    #define LEFT_TYPE_MASK 0x80
-    #define RIGHT_TYPE_MASK 0x40
+    #define RISA_TODLR_LEFT_TYPE_MASK 0x80
+    #define RISA_TODLR_RIGHT_TYPE_MASK 0x40
 
-    #define LEFT_BY_TYPE  (types & LEFT_TYPE_MASK ? LEFT_CONST : LEFT_REG)
-    #define RIGHT_BY_TYPE (types & RIGHT_TYPE_MASK ? RIGHT_CONST : RIGHT_REG)
+    #define LEFT_BY_TYPE  (types & RISA_TODLR_TYPE_LEFT_MASK ? LEFT_CONST : LEFT_REG)
+    #define RIGHT_BY_TYPE (types & RISA_TODLR_TYPE_RIGHT_MASK ? RIGHT_CONST : RIGHT_REG)
 
     #define SKIP(count) (frame->ip += count)
     #define BSKIP(count) (frame->ip -= count)
@@ -103,18 +102,18 @@ VMStatus vm_run(VM* vm) {
         #ifdef DEBUG_TRACE_EXECUTION
             debug_disassemble_instruction(&FRAME_FUNCTION(*frame)->chunk, (uint32_t) (frame->ip - FRAME_FUNCTION(*frame)->chunk.bytecode));
 
-            PRINT("          ");
+            RISA_OUT(vm->io, "          ");
             for(Value* entry = vm->stack; entry < vm->stackTop + 7; ++entry) {
-                PRINT("[ ");
+                RISA_OUT(vm->io, "[ ");
                 value_print(*entry);
-                PRINT(" ]");
+                RISA_OUT(vm->io, " ]");
             }
-            PRINT("\n");
+            RISA_OUT(vm->io, "\n");
         #endif
 
         uint8_t instruction = NEXT_BYTE();
-        uint8_t types = instruction & TYPE_MASK;
-        instruction &= INSTRUCTION_MASK;
+        uint8_t types = instruction & RISA_TODLR_TYPE_LEFTRIGHT_MASK;
+        instruction &= RISA_TODLR_INSTRUCTION_MASK;
 
         switch(instruction) {
             case OP_CNST: {
@@ -197,7 +196,7 @@ VMStatus vm_run(VM* vm) {
                     return VM_ERROR;
                 }
 
-                DEST_REG = *frame->callee.closure->upvalues[LEFT]->ref;
+                DEST_REG = *(frame->callee.closure->upvalues[LEFT]->ref);
 
                 SKIP(3);
                 break;
@@ -332,7 +331,7 @@ VMStatus vm_run(VM* vm) {
                     DenseString* interned = map_find(&vm->strings, result->chars + index, 1, map_hash(str->chars + index, 1));
 
                     if(interned != NULL) {
-                        MEM_FREE(result);
+                        RISA_MEM_FREE(result);
                         result = interned;
                         DEST_REG = DENSE_VALUE(result);
                     } else {
@@ -541,7 +540,7 @@ VMStatus vm_run(VM* vm) {
                         DenseString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
 
                         if(interned != NULL) {
-                            MEM_FREE(result);
+                            RISA_MEM_FREE(result);
                             result = interned;
                             DEST_REG = DENSE_VALUE(result);
                         } else {
@@ -1107,16 +1106,23 @@ VMStatus vm_run(VM* vm) {
                     }
                 }
 
-                PRINT("\n");
-                dense_print((DenseValue*) func);
-                disassembler_process_chunk(&func->chunk);
-                PRINT("\n\n");
+                RISA_OUT(vm->io, "\n");
+                dense_print(&vm->io, (DenseValue*) func);
+
+                RisaDisassembler disasm;
+                disassembler_init(&disasm);
+                risa_io_clone(&disasm.io, &vm->io);
+
+                disassembler_load(&disasm, &func->chunk);
+                disassembler_run(&disasm);
+                RISA_OUT(vm->io, "\n\n");
 
                 SKIP(3);
                 break;
             }
             default: {
-
+                VM_RUNTIME_ERROR(vm, "Illegal instruction");
+                return VM_ERROR;
             }
         }
     }

@@ -1,9 +1,10 @@
 #include "parser.h"
 
 #include "../lib/mem_index.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
 void parser_init(Parser* parser) {
+    risa_io_init(&parser->io);
     parser->error = false;
     parser->panic = false;
 }
@@ -57,19 +58,19 @@ void parser_error_at(Parser* parser, Token token, const char* msg) {
     parser->panic = true;
 
     if(token.type == TOKEN_EOF)
-        ERROR("at EOF: %s\n", msg);
+        RISA_ERROR(parser->io, "at EOF: %s\n", msg);
     else if(token.type != TOKEN_ERROR) {
         size_t ln;
         size_t col;
 
         mem_lncol(parser->lexer.source, token.index, &ln, &col);
-        ERROR("at %zu:%zu in script: %s\n", ln, col, msg);
+        RISA_ERROR(parser->io, "at %zu:%zu in script: %s\n", ln, col, msg);
     } else {
         size_t ln;
         size_t col;
 
         mem_lncol(parser->lexer.source, token.index, &ln, &col);
-        ERROR("at %zu:%zu in script: Invalid token\n", ln, col);
+        RISA_ERROR(parser->io, "at %zu:%zu in script: Invalid token\n", ln, col);
     }
 
     parser->error = true;

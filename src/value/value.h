@@ -1,7 +1,8 @@
 #ifndef RISA_VALUE_H_GUARD
 #define RISA_VALUE_H_GUARD
 
-#include "../common/headers.h"
+#include "../io/io.h"
+#include "../def/types.h"
 
 typedef enum {
     VAL_NULL,
@@ -54,11 +55,11 @@ typedef struct {
 #define FLOAT_VALUE(value) ((Value) { VAL_FLOAT, { .floating = value } })
 #define DENSE_VALUE(value) ((Value) { VAL_DENSE, { .dense = (DenseValue*) value } })
 
-#define AS_BOOL(value)    ((value).as.boolean)
-#define AS_BYTE(value)    ((value).as.byte)
-#define AS_INT(value)     ((value).as.integer)
-#define AS_FLOAT(value)   ((value).as.floating)
-#define AS_DENSE(value)   ((value).as.dense)
+#define AS_BOOL(value)  ((value).as.boolean)
+#define AS_BYTE(value)  ((value).as.byte)
+#define AS_INT(value)   ((value).as.integer)
+#define AS_FLOAT(value) ((value).as.floating)
+#define AS_DENSE(value) ((value).as.dense)
 
 #define IS_NULL(value)  ((value).type == VAL_NULL)
 #define IS_BOOL(value)  ((value).type == VAL_BOOL)
@@ -67,7 +68,7 @@ typedef struct {
 #define IS_FLOAT(value) ((value).type == VAL_FLOAT)
 #define IS_DENSE(value) ((value).type == VAL_DENSE)
 
-void  value_print(Value value);
+void  value_print(RisaIO* io, Value value);
 Value value_clone(Value value);
 bool  value_is_falsy(Value value);
 bool  value_equals(Value left, Value right);

@@ -1,6 +1,6 @@
 #include "gc.h"
 #include "../vm/vm.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
 #include <string.h>
 

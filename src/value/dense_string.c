@@ -10,7 +10,7 @@ uint32_t dense_string_hash(DenseString* string) {
 }
 
 DenseString* dense_string_from(const char* chars, uint32_t length) {
-    DenseString* string = MEM_ALLOC(sizeof(DenseString) + length + 1);
+    DenseString* string = RISA_MEM_ALLOC(sizeof(DenseString) + length + 1);
 
     string->dense.type = DVAL_STRING;
     string->dense.link = NULL;
@@ -29,7 +29,7 @@ DenseString* dense_string_from(const char* chars, uint32_t length) {
 DenseString* dense_string_concat(DenseString* left, DenseString* right) {
     uint32_t length = left->length + right->length;
 
-    DenseString* string = MEM_ALLOC(sizeof(DenseString) + length + 1);
+    DenseString* string = RISA_MEM_ALLOC(sizeof(DenseString) + length + 1);
 
     string->dense.type = DVAL_STRING;
     string->dense.link = NULL;
@@ -47,5 +47,5 @@ DenseString* dense_string_concat(DenseString* left, DenseString* right) {
 }
 
 void dense_string_delete(DenseString* string) {
-    MEM_FREE(string);
+    RISA_MEM_FREE(string);
 }

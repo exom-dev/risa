@@ -1,10 +1,12 @@
 #ifndef RISA_PARSER_H_GUARD
 #define RISA_PARSER_H_GUARD
 
+#include "../io/io.h"
 #include "../lexer/lexer.h"
-#include "../common/headers.h"
+#include "../def/types.h"
 
 typedef struct {
+    RisaIO io;
     Lexer lexer;
 
     Token current;

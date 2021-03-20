@@ -1,7 +1,7 @@
 #ifndef RISA_ASM_LEXER_H_GUARD
 #define RISA_ASM_LEXER_H_GUARD
 
-#include "../common/headers.h"
+#include "../def/types.h"
 
 typedef enum {
     ASM_TOKEN_DOT, ASM_TOKEN_LEFT_PAREN, ASM_TOKEN_RIGHT_PAREN, ASM_TOKEN_LEFT_BRACE, ASM_TOKEN_RIGHT_BRACE,

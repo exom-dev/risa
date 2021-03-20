@@ -1,13 +1,12 @@
 #ifndef RISA_VM_H_GUARD
 #define RISA_VM_H_GUARD
 
+#include "../io/io.h"
 #include "../chunk/chunk.h"
-#include "../common/def.h"
+#include "../def/def.h"
 #include "../data/map.h"
 #include "../value/dense.h"
 #include "../options/options.h"
-
-#define VM_STACK_SIZE CALLFRAME_STACK_SIZE * 251
 
 typedef enum {
     FRAME_FUNCTION,
@@ -31,6 +30,7 @@ typedef struct {
 #define FRAME_FUNCTION(frame) ((frame).type == FRAME_FUNCTION ? (frame).callee.function : (frame).callee.closure->function)
 
 typedef struct {
+    RisaIO io;
     CallFrame frames[CALLFRAME_STACK_SIZE];
     uint32_t frameCount;
 

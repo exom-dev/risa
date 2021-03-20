@@ -1,26 +1,26 @@
 #include "value.h"
 #include "dense.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
-void value_print(Value value) {
+void value_print(RisaIO* io, Value value) {
     switch(value.type) {
         case VAL_NULL:
-            PRINT("null");
+            RISA_OUT((*io), "null");
             break;
         case VAL_BOOL:
-            PRINT(AS_BOOL(value) ? "true" : "false");
+            RISA_OUT((*io), AS_BOOL(value) ? "true" : "false");
             break;
         case VAL_BYTE:
-            PRINT("%hhu", AS_BYTE(value));
+            RISA_OUT((*io), "%hhu", AS_BYTE(value));
             break;
         case VAL_INT:
-            PRINT("%lld", AS_INT(value));
+            RISA_OUT((*io), "%lld", AS_INT(value));
             break;
         case VAL_FLOAT:
-            PRINT("%f", AS_FLOAT(value));
+            RISA_OUT((*io), "%f", AS_FLOAT(value));
             break;
         case VAL_DENSE:
-            dense_print(AS_DENSE(value));
+            dense_print(io, AS_DENSE(value));
             break;
     }
 }
@@ -35,6 +35,8 @@ Value value_clone(Value value) {
             return value;
         case VAL_DENSE:
             return dense_clone(AS_DENSE(value));
+        default:
+            return NULL_VALUE;  // Never reached; written to suppress warnings.
     }
 }
 

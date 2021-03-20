@@ -1,7 +1,7 @@
 #ifndef MEM_INDEX_H_GUARD
 #define MEM_INDEX_H_GUARD
 
-#include "../common/headers.h"
+#include "../def/types.h"
 
 /// Gets the line and column from an index. Counts LF, ignores CR.
 void mem_lncol(const char* source, size_t index, size_t* ln, size_t* col);

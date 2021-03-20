@@ -18,7 +18,7 @@ void map_init(Map* map) {
 }
 
 void map_delete(Map* map) {
-    MEM_FREE(map->entries);
+    RISA_MEM_FREE(map->entries);
     map_init(map);
 }
 
@@ -152,7 +152,7 @@ static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key) 
 static void map_adjust_capacity(Map* map) {
     if(map->count + 1 > map->capacity * MAP_MAX_LOAD) {
         uint32_t capacity = map->capacity < MAP_START_SIZE ? MAP_START_SIZE : 2 * map->capacity;
-        Entry* entries = MEM_ALLOC(capacity * sizeof(Entry));
+        Entry* entries = RISA_MEM_ALLOC(capacity * sizeof(Entry));
 
         for(uint32_t i = 0; i < capacity; ++i) {
             entries[i].key = NULL;
@@ -172,7 +172,7 @@ static void map_adjust_capacity(Map* map) {
             ++map->count;
         }
 
-        MEM_FREE(map->entries);
+        RISA_MEM_FREE(map->entries);
         map->entries = entries;
         map->capacity = capacity;
     }

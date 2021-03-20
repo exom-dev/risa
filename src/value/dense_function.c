@@ -1,7 +1,7 @@
 #include "dense.h"
 
 DenseFunction* dense_function_create() {
-    DenseFunction* function = (DenseFunction*) MEM_ALLOC(sizeof(DenseFunction));
+    DenseFunction* function = (DenseFunction*) RISA_MEM_ALLOC(sizeof(DenseFunction));
 
     dense_function_init(function);
     return function;

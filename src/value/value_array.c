@@ -10,12 +10,12 @@ void value_array_init(ValueArray* array) {
 
 void value_array_write(ValueArray* array, Value value) {
     while(array->capacity <= array->size)
-        array->values = (Value*) MEM_EXPAND(array->values, &array->capacity, sizeof(Value));
+        array->values = (Value*) RISA_MEM_EXPAND(array->values, &array->capacity, sizeof(Value));
 
     array->values[array->size++] = value;
 }
 
 void value_array_delete(ValueArray* array) {
-    MEM_FREE(array->values);
+    RISA_MEM_FREE(array->values);
     value_array_init(array);
 }

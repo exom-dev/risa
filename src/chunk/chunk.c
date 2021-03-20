@@ -1,7 +1,6 @@
 #include "chunk.h"
 
 #include "../memory/mem.h"
-#include "../common/logging.h"
 
 void chunk_init(Chunk* chunk) {
     chunk->size = 0;
@@ -14,8 +13,8 @@ void chunk_init(Chunk* chunk) {
 
 void chunk_write(Chunk* chunk, uint8_t byte, uint32_t index) {
     while(chunk->capacity <= chunk->size) {
-        chunk->bytecode = (uint8_t*) MEM_EXPAND(chunk->bytecode, &chunk->capacity, sizeof(uint8_t));
-        chunk->indices = (uint32_t*) MEM_REALLOC(chunk->indices, chunk->capacity, sizeof(uint32_t));
+        chunk->bytecode = (uint8_t*) RISA_MEM_EXPAND(chunk->bytecode, &chunk->capacity, sizeof(uint8_t));
+        chunk->indices = (uint32_t*) RISA_MEM_REALLOC(chunk->indices, chunk->capacity, sizeof(uint32_t));
     }
 
     chunk->bytecode[chunk->size] = byte;
@@ -33,8 +32,8 @@ size_t chunk_write_constant(Chunk* chunk, Value constant) {
 }
 
 void chunk_delete(Chunk* chunk) {
-    MEM_FREE(chunk->bytecode);
-    MEM_FREE(chunk->indices);
+    RISA_MEM_FREE(chunk->bytecode);
+    RISA_MEM_FREE(chunk->indices);
 
     value_array_delete(&chunk->constants);
 

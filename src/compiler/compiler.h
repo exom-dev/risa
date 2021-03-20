@@ -3,10 +3,11 @@
 
 #include "parser.h"
 
+#include "../io/io.h"
 #include "../chunk/chunk.h"
 #include "../lexer/lexer.h"
 #include "../data/map.h"
-#include "../common/def.h"
+#include "../def/def.h"
 #include "../value/dense.h"
 #include "../options/options.h"
 
@@ -44,6 +45,8 @@ typedef struct {
 } Leap;
 
 typedef struct Compiler {
+    RisaIO io;
+
     struct Compiler* super;
     DenseFunction* function;
 
@@ -56,13 +59,13 @@ typedef struct Compiler {
     Options options;
 
     struct {
-        uint8_t reg;
-        bool isNew;
-        bool isConst;
-        bool isLvalue;
-        bool isPostIncrement;
-        bool isEqualOp;
-        bool canOverwrite;
+        uint8_t reg;          // In which register the last value resides.
+        bool isNew;           // Whether or not the last value resides in a newly-reserved register.
+        bool isConst;         // Whether or not the last value is a constant.
+        bool isLvalue;        // Whether or not the last value is a lvalue.
+        bool isPostIncrement; // Whether or not the last value is the result of a post increment operation.
+        bool isEqualOp;       // Whether or not the last value is the result of an equality operation.
+        bool canOverwrite;    // Whether or not the last value can overwrite a previously-used register (TODO: explain this better).
 
         struct {
             enum LValType {

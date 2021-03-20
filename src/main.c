@@ -1,29 +1,38 @@
-#include "common/headers.h"
-#include "common/logging.h"
-
 #include "risa.h"
+
+#include "def/types.h"
+#include "io/log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void run_repl();
-void run_file(const char* path);
+#define TERMINATE(io, code, fmt, ...) \
+    do {\
+        RISA_ERROR(io, fmt, ##__VA_ARGS__ ); \
+        exit(code); \
+    } while(0)
+
+void run_repl(RisaIO io);
+void run_file(RisaIO io, const char* path);
 
 VM create_vm();
 
-void print_info();
+void print_info(RisaIO io);
 
 int main(int argc, char** argv) {
+    RisaIO io;
+    risa_io_init(&io);
+
     if(argc == 1)
-        run_repl();
+        run_repl(io);
     else if(argc == 2)
-        run_file(argv[1]);
-    else TERMINATE(64, "Invalid arguments");
+        run_file(io, argv[1]);
+    else TERMINATE(io, 64, "Invalid arguments");
 }
 
 Value print(void* vm, uint8_t argc, Value* args) {
-    value_print(args[0]);
+    value_print(&((VM*) vm)->io, args[0]);
     return NULL_VALUE;
 }
 
@@ -36,8 +45,8 @@ VM create_vm() {
     return vm;
 }
 
-void run_repl() {
-    print_info();
+void run_repl(RisaIO io) {
+    print_info(io);
 
     VM vm = create_vm();
 
@@ -46,10 +55,10 @@ void run_repl() {
     char line[1024];
 
     while(1) {
-        PRINT("#>");
+        RISA_OUT(io, "#>");
 
         if(!fgets(line, sizeof(line) - 1, stdin)) {
-            PRINT("\n");
+            RISA_IO_STDOUT("\n");
             break;
         }
 
@@ -73,29 +82,29 @@ void run_repl() {
         RisaInterpretStatus status = risa_interpret_string(&vm, line);
 
         if(status == RISA_INTERPRET_OK && vm.acc.type != VAL_NULL)
-            value_print(vm.acc);
-        PRINT("\n");
+            value_print(&vm.io, vm.acc);
+        RISA_OUT(io, "\n");
     }
 }
 
-void run_file(const char* path) {
+void run_file(RisaIO io, const char* path) {
     VM vm = create_vm();
 
     FILE* file = fopen(path, "rb");
 
     if(file == NULL)
-        TERMINATE(74, "Cannot open file '%s'\n", path);
+        TERMINATE(io, 74, "Cannot open file '%s'\n", path);
 
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    char* data = (char*) MEM_ALLOC(size + 1);
+    char* data = (char*) RISA_MEM_ALLOC(size + 1);
 
     if(fread(data, sizeof(char), size, file) < size) {
         fclose(file);
-        MEM_FREE(data);
-        TERMINATE(74, "Cannot read file '%s'\n", path);
+        RISA_MEM_FREE(data);
+        TERMINATE(io, 74, "Cannot read file '%s'\n", path);
     }
 
     data[size] = '\0';
@@ -104,7 +113,7 @@ void run_file(const char* path) {
 
     RisaInterpretStatus status = risa_interpret_string(&vm, data);
 
-    MEM_FREE(data);
+    RISA_MEM_FREE(data);
 
     vm_delete(&vm);
 
@@ -116,21 +125,23 @@ void run_file(const char* path) {
         exit(1);
 }
 
-void print_info() {
-    PRINT("Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
-    PRINT("(c) 2020 The Exom Developers (exom.dev)\n\n");
+void print_info(RisaIO io) {
+    RISA_OUT(io, "Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
+    RISA_OUT(io, "(c) 2020 The Exom Developers (exom.dev)\n\n");
 
-    PRINT("     _____________________      _______\n");
-    PRINT("    |#####################\\    /######/\n");
-    PRINT("    |######################\\  /######/\n");
-    PRINT("    |#######################\\/######/\n");
-    PRINT("    |#####|  _______   \\###########/\n");
-    PRINT("    |#####| |######/    \\#########/\n");
-    PRINT("    |#####| |#####/      \\#######/\n");
-    PRINT("    |#####| |####/       /#######\\\n");
-    PRINT("    |#####|             /#########\\\n");
-    PRINT("    |#####|____________/###########\\\n");
-    PRINT("    |#######################/\\######\\\n");
-    PRINT("    |######################/  \\######\\\n");
-    PRINT("    |#####################/    \\######\\\n\n");
+    RISA_OUT(io, "     _____________________      _______\n");
+    RISA_OUT(io, "    |#####################\\    /######/\n");
+    RISA_OUT(io, "    |######################\\  /######/\n");
+    RISA_OUT(io, "    |#######################\\/######/\n");
+    RISA_OUT(io, "    |#####|  _______   \\###########/\n");
+    RISA_OUT(io, "    |#####| |######/    \\#########/\n");
+    RISA_OUT(io, "    |#####| |#####/      \\#######/\n");
+    RISA_OUT(io, "    |#####| |####/       /#######\\\n");
+    RISA_OUT(io, "    |#####|             /#########\\\n");
+    RISA_OUT(io, "    |#####|____________/###########\\\n");
+    RISA_OUT(io, "    |#######################/\\######\\\n");
+    RISA_OUT(io, "    |######################/  \\######\\\n");
+    RISA_OUT(io, "    |#####################/    \\######\\\n\n");
 }
+
+#undef TERMINATE

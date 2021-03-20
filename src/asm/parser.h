@@ -2,9 +2,11 @@
 #define RISA_ASM_PARSER_H_GUARD
 
 #include "lexer.h"
-#include "../common/headers.h"
+#include "../io/io.h"
+#include "../def/types.h"
 
 typedef struct {
+    RisaIO io;
     AsmLexer lexer;
 
     AsmToken current;

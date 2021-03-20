@@ -1,18 +1,13 @@
 #include "compiler.h"
-#include "parser.h"
 
-#include "../value/dense.h"
 #include "../chunk/bytecode.h"
-#include "../common/logging.h"
-#include "../lexer/lexer.h"
+#include "../io/log.h"
 
 #include "../asm/assembler.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-
-#define INSTRUCTION_MASK 0x3F
 
 static void compile_byte(Compiler*, bool);
 static void compile_int(Compiler*, bool);
@@ -157,6 +152,8 @@ Rule EXPRESSION_RULES[] = {
 };
 
 void compiler_init(Compiler* compiler) {
+    risa_io_init(&compiler->io);
+
     compiler->super = NULL;
     compiler->function = dense_function_create();
 
@@ -194,6 +191,7 @@ void compiler_delete(Compiler* compiler) {
 CompilerStatus compiler_compile(Compiler* compiler, const char* str) {
     Parser parser;
     parser_init(&parser);
+    risa_io_clone(&parser.io, &compiler->io); // Use the same IO interface for the parser.
 
     compiler->parser = &parser;
 
@@ -334,7 +332,7 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
             if (*(ptr++) == '\\')
                 ++escapeCount;
 
-        char *str = (char *) MEM_ALLOC(length + 1 - escapeCount);
+        char *str = (char *) RISA_MEM_ALLOC(length + 1 - escapeCount);
         uint32_t index = 0;
 
         for (uint32_t i = 0; i < length; ++i) {
@@ -372,7 +370,7 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
                             str[index++] = '\"';
                             break;
                         default:
-                            WARNING("Invalid escape sequence at index %d", compiler->parser->previous.index + 1 + i);
+                            RISA_WARNING(compiler->io, "Invalid escape sequence at index %d", compiler->parser->previous.index + 1 + i);
                             break;
                     }
                     ++i;
@@ -398,7 +396,7 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
             map_set(&super->strings, interned, NULL_VALUE);
         }
 
-        MEM_FREE(str);
+        RISA_MEM_FREE(str);
 
         emit_constant(compiler, DENSE_VALUE(interned));
 
@@ -525,7 +523,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                     incOffset += 8; // Jump over MOV.
 
                     if(chunk.size - incOffset >= chunkSize) {
-                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_GET) {
+                        if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_GET) {
                             parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not GET (report this to the developers)");
                             return;
                         }
@@ -536,7 +534,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                     incOffset -= 4 + 8;
 
                     if(incOffset > 0) {
-                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SET) {
+                        if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_SET) {
                             parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC successor is not SET (report this to the developers)");
                             return;
                         }
@@ -547,7 +545,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                     incOffset -= 4;
 
                     if(incOffset > 0) {
-                        if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SGLOB) {
+                        if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_SGLOB) {
                             parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but SET successor is not SGLOB (report this to the developers)");
                             return;
                         }
@@ -555,20 +553,21 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                         chunk.bytecode[chunk.size - incOffset + 2] = tmp;
                     }
                 } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
-            } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp) { // Can directly assign to local.
+            } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & RISA_TODLR_INSTRUCTION_MASK) && !compiler->last.isEqualOp) { // Can directly assign to local.
                 chunk.bytecode[chunk.size - 4 + 1] = index;  // Do it.
                 compiler->last.reg = index;
             } else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
         } else {
             if(set == OP_SGLOB) {
                 Chunk* chunk = &compiler->function->chunk;
+
                 if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
                     compiler->last.reg = chunk->bytecode[chunk->size - 2];
                     compiler->last.isConst = true;
                     chunk->size -= 4;
                 }
 
-                #define L_TYPE (compiler->last.isConst * 0x80)
+                #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
                 set |= L_TYPE;
                 #undef L_TYPE
             }
@@ -667,7 +666,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
                 compiler->function->chunk.size -= 4;
             }
 
-            #define L_TYPE (compiler->last.isConst * 0x80)
+            #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
             emit_byte(compiler, OP_PARR | L_TYPE);
             emit_byte(compiler, reg);
@@ -781,7 +780,7 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
                 compiler->function->chunk.size -= 4;
             }
 
-            #define LR_TYPES ((isConst * 0x80) | (compiler->last.isConst * 0x40))
+            #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
 
             emit_byte(compiler, OP_SET | LR_TYPES);
             emit_byte(compiler, reg);
@@ -892,7 +891,7 @@ static void compile_variable_declaration(Compiler* compiler) {
                 incOffset += 8; // Jump over MOV.
 
                 if(chunk.size - incOffset >= chunkSize) {
-                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_GET) {
+                    if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_GET) {
                         parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC predecessor is not GET (report this to the developers)");
                         return;
                     }
@@ -903,7 +902,7 @@ static void compile_variable_declaration(Compiler* compiler) {
                 incOffset -= 4 + 8;
 
                 if(incOffset > 0) {
-                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SET) {
+                    if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_SET) {
                         parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but INC successor is not SET (report this to the developers)");
                         return;
                     }
@@ -914,7 +913,7 @@ static void compile_variable_declaration(Compiler* compiler) {
                 incOffset -= 4;
 
                 if(incOffset > 0) {
-                    if((chunk.bytecode[chunk.size - incOffset] & INSTRUCTION_MASK) != OP_SGLOB) {
+                    if((chunk.bytecode[chunk.size - incOffset] & RISA_TODLR_INSTRUCTION_MASK) != OP_SGLOB) {
                         parser_error_at_current(compiler->parser, "PANIC: Last was marked as postfix, but SET successor is not SGLOB (report this to the developers)");
                         return;
                     }
@@ -922,7 +921,7 @@ static void compile_variable_declaration(Compiler* compiler) {
                     chunk.bytecode[chunk.size - incOffset + 2] = tmp;
                 }
             } else chunk.bytecode[chunk.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
-        } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & INSTRUCTION_MASK)&& !compiler->last.isEqualOp) { // Can directly assign to local.
+        } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & RISA_TODLR_INSTRUCTION_MASK) && !compiler->last.isEqualOp) { // Can directly assign to local.
             chunk.bytecode[chunk.size - 4 + 1] = compiler->localCount - 1;  // Do it.
             compiler->last.reg = index;
         } else emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the result.
@@ -958,7 +957,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         chunk->size -= 4;
     }
 
-    #define L_TYPE (compiler->last.isConst * 0x80)
+    #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     emit_byte(compiler, OP_DGLOB | L_TYPE);
     emit_byte(compiler, index);
@@ -995,7 +994,7 @@ static void compile_function_declaration(Compiler* compiler) {
 
     register_free(compiler);
 
-    #define L_TYPE (compiler->last.isConst * 0x80)
+    #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     emit_byte(compiler, OP_DGLOB | L_TYPE);
     emit_byte(compiler, index);
@@ -1659,7 +1658,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         parser_advance(compiler->parser);
         compile_expression(compiler);
 
-        #define L_TYPE (identifierConst * 0x80)
+        #define L_TYPE (identifierConst * RISA_TODLR_TYPE_LEFT_MASK)
 
         emit_byte(compiler, OP_SET | L_TYPE);
         emit_byte(compiler, leftReg);
@@ -1700,7 +1699,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
 
             compiler->last.isLvalue = false;
         } else {
-            #define R_TYPE (identifierConst * 0x40)
+            #define R_TYPE (identifierConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
             emit_byte(compiler, OP_GET | R_TYPE);
             emit_byte(compiler, destReg);
@@ -1759,7 +1758,7 @@ static uint8_t compile_arguments(Compiler* compiler) {
 
             if(chunkSize == compiler->function->chunk.size)
                 emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
-            else if(op_has_direct_dest(compiler->function->chunk.bytecode[compiler->function->chunk.size - 4] & INSTRUCTION_MASK) && !compiler->last.isEqualOp)
+            else if(op_has_direct_dest(compiler->function->chunk.bytecode[compiler->function->chunk.size - 4] & RISA_TODLR_INSTRUCTION_MASK) && !compiler->last.isEqualOp)
                 compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = compiler->regIndex - 1;
             else emit_mov(compiler, compiler->regIndex - 1, compiler->last.reg);
 
@@ -1921,7 +1920,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         parser_advance(compiler->parser);
         compile_expression(compiler);
 
-        #define L_TYPE (isRightConst * 0x80)
+        #define L_TYPE (isRightConst * RISA_TODLR_TYPE_LEFT_MASK)
 
         emit_byte(compiler, OP_SET | L_TYPE);
         emit_byte(compiler, leftReg);
@@ -1956,7 +1955,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
             destReg = compiler->regIndex - 1;
         }
 
-        #define R_TYPE (compiler->last.isConst * 0x40)
+        #define R_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
         emit_byte(compiler, isLength ? OP_LEN : OP_GET | R_TYPE);
         emit_byte(compiler, destReg);
@@ -2016,7 +2015,7 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
         destReg = compiler->regIndex - 1;
     } else destReg = compiler->last.reg;
 
-    #define L_TYPE (compiler->last.isConst * 0x80)
+    #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     switch(operator) {
         case TOKEN_BANG:
@@ -2072,8 +2071,8 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     }
 
     // The GT and GTE instructions are simulated with reversed LT and LTE. Therefore, switch the operands and use the REV def.
-    #define LR_TYPES ((isLeftConst * 0x80) | (compiler->last.isConst * 0x40))
-    #define LR_TYPES_REV ((compiler->last.isConst * 0x80) | (isLeftConst * 0x40))
+    #define LR_TYPES ((isLeftConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
+    #define LR_TYPES_REV ((compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK) | (isLeftConst * RISA_TODLR_TYPE_RIGHT_MASK))
 
     switch(operatorType) {
         case TOKEN_PLUS:
@@ -2133,7 +2132,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     if(compiler->last.isNew/*compiler->regs[compiler->last.reg].type == REG_TEMP*/) {
         destReg = compiler->last.reg;
 
-        if(isLeftNew) { //TODO: check if this works for all cases.
+        if(isLeftNew) { // TODO: check if this works for all cases.
             destReg = leftReg;
             register_free(compiler);
         }
@@ -2206,7 +2205,7 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
         compiler->function->chunk.size -= 4;
     }
 
-    #define R_TYPE (compiler->last.isConst * 0x40)
+    #define R_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
     switch(operator) {
         case TOKEN_PLUS_EQUAL:
@@ -2246,7 +2245,7 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
     // Load the lval meta.
     memcpy(&compiler->last.lvalMeta, meta, sizeof(compiler->last.lvalMeta));
 
-    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
+    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     switch(compiler->last.lvalMeta.type) {
         case LVAL_LOCAL_PROP:
@@ -2321,7 +2320,7 @@ static void compile_prefix(Compiler* compiler, bool allowAssignment) {
             return;
     }
 
-    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
+    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     switch(compiler->last.lvalMeta.type) {
         case LVAL_LOCAL_PROP:
@@ -2399,7 +2398,7 @@ static void compile_postfix(Compiler* compiler, bool allowAssignment) {
             return;
     }
 
-    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * 0x80)
+    #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
     switch(compiler->last.lvalMeta.type) {
         case LVAL_LOCAL_PROP:
@@ -2768,4 +2767,4 @@ static void finalize_compilation(Compiler* compiler) {
     emit_return(compiler);
 }
 
-#undef INSTRUCTION_MASK
+#undef RISA_TODLR_INSTRUCTION_MASK

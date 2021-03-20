@@ -1,7 +1,8 @@
 #ifndef RISA_DENSE_H
 #define RISA_DENSE_H
 
-#include "../common/headers.h"
+#include "../io/io.h"
+#include "../def/types.h"
 #include "../chunk/chunk.h"
 #include "../memory/mem.h"
 #include "../data/map.h"
@@ -70,7 +71,7 @@ typedef struct {
 #define AS_CLOSURE(value)  ((DenseClosure*) ((value).as.dense))
 #define AS_NATIVE(value)   ((DenseNative*) ((value).as.dense))
 
-void   dense_print(DenseValue* dense);
+void   dense_print(RisaIO* io, DenseValue* dense);
 Value  dense_clone(DenseValue* dense);
 size_t dense_size(DenseValue* dense);
 void   dense_delete(DenseValue* dense);

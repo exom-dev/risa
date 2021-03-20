@@ -1,7 +1,7 @@
 #ifndef RISA_CHUNK_H
 #define RISA_CHUNK_H
 
-#include "../common/headers.h"
+#include "../def/types.h"
 #include "../value/value.h"
 
 typedef struct {

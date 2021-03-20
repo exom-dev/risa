@@ -3,8 +3,8 @@
 #include "chunk/chunk.h"
 #include "compiler/compiler.h"
 #include "asm/disassembler.h"
-#include "common/logging.h"
-#include "common/def.h"
+#include "io/log.h"
+#include "def/def.h"
 
 RisaCompileStatus risa_compile_string(Compiler* compiler, const char* str) {
     if(compiler_compile(compiler, str) == COMPILER_ERROR)
@@ -63,7 +63,7 @@ RisaInterpretStatus risa_interpret_string(VM* vm, const char* str) {
     if(risa_compile_string(&compiler, str) == RISA_COMPILE_ERROR) {
         //compiler_delete(&compiler);
         chunk_delete(&compiler.function->chunk);
-        MEM_FREE(compiler.function);
+        RISA_MEM_FREE(compiler.function);
 
         return RISA_INTERPRET_COMPILE_ERROR;
     }

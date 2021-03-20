@@ -1,7 +1,7 @@
 #include "dense.h"
 
 DenseObject* dense_object_create() {
-    DenseObject* object = (DenseObject*) MEM_ALLOC(sizeof(DenseObject));
+    DenseObject* object = (DenseObject*) RISA_MEM_ALLOC(sizeof(DenseObject));
 
     dense_object_init(object);
     return object;

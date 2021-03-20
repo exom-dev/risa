@@ -1,7 +1,7 @@
 #ifndef RISA_LEXER_H_GUARD
 #define RISA_LEXER_H_GUARD
 
-#include "../common/headers.h"
+#include "../def/types.h"
 
 typedef enum {
     TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,

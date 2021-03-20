@@ -1,7 +1,7 @@
 #include "dense.h"
 
 DenseArray* dense_array_create() {
-    DenseArray* array = (DenseArray*) MEM_ALLOC(sizeof(DenseArray));
+    DenseArray* array = (DenseArray*) RISA_MEM_ALLOC(sizeof(DenseArray));
 
     dense_array_init(array);
     return array;

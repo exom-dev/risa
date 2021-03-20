@@ -5,7 +5,7 @@
 
 #include "../value/dense.h"
 #include "../chunk/bytecode.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -97,6 +97,7 @@ static uint16_t     create_string_constant(Assembler*, const char*, uint32_t);
 static DenseString* create_string_entry(Assembler* assembler, const char* start, uint32_t length);
 
 void assembler_init(Assembler* assembler) {
+    risa_io_init(&assembler->io);
     assembler->super = NULL;
     assembler->strings = NULL;
 
@@ -121,6 +122,7 @@ void assembler_delete(Assembler* assembler) {
 AssemblerStatus assembler_assemble(Assembler* assembler, const char* str, const char* stoppers) {
     AsmParser parser;
     asm_parser_init(&parser);
+    risa_io_clone(&parser.io, &assembler->io); // Use the same IO interface for the parser.
 
     assembler->parser = &parser;
 
@@ -736,7 +738,7 @@ static void assemble_dglob(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_DGLOB | 0x40);
+        emit_byte(assembler, OP_DGLOB | RISA_TODLR_TYPE_RIGHT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -805,7 +807,7 @@ static void assemble_sglob(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_SGLOB | 0x40);
+        emit_byte(assembler, OP_SGLOB | RISA_TODLR_TYPE_RIGHT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1038,7 +1040,7 @@ static void assemble_parr(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_PARR | 0x40);
+        emit_byte(assembler, OP_PARR | RISA_TODLR_TYPE_RIGHT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1146,7 +1148,7 @@ static void assemble_get(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_GET | 0x80);
+        emit_byte(assembler, OP_GET | RISA_TODLR_TYPE_LEFT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1188,7 +1190,7 @@ static void assemble_set(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_SET | 0x40);
+        emit_byte(assembler, OP_SET | RISA_TODLR_TYPE_RIGHT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1305,7 +1307,7 @@ static void assemble_not(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_NOT | 0x80);
+        emit_byte(assembler, OP_NOT | RISA_TODLR_TYPE_LEFT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1347,7 +1349,7 @@ static void assemble_bnot(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_BNOT | 0x80);
+        emit_byte(assembler, OP_BNOT | RISA_TODLR_TYPE_LEFT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1389,7 +1391,7 @@ static void assemble_neg(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_NEG | 0x80);
+        emit_byte(assembler, OP_NEG | RISA_TODLR_TYPE_LEFT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
@@ -1482,7 +1484,7 @@ static void assemble_add(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_ADD | 0x40);
+            emit_byte(assembler, OP_ADD | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1500,7 +1502,7 @@ static void assemble_add(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_ADD | 0x80);
+            emit_byte(assembler, OP_ADD | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1509,7 +1511,7 @@ static void assemble_add(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_ADD | 0xC0);
+            emit_byte(assembler, OP_ADD | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1561,7 +1563,7 @@ static void assemble_sub(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SUB | 0x40);
+            emit_byte(assembler, OP_SUB | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1579,7 +1581,7 @@ static void assemble_sub(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_SUB | 0x80);
+            emit_byte(assembler, OP_SUB | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1588,7 +1590,7 @@ static void assemble_sub(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SUB | 0xC0);
+            emit_byte(assembler, OP_SUB | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1640,7 +1642,7 @@ static void assemble_mul(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MUL | 0x40);
+            emit_byte(assembler, OP_MUL | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1658,7 +1660,7 @@ static void assemble_mul(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_MUL | 0x80);
+            emit_byte(assembler, OP_MUL | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1667,7 +1669,7 @@ static void assemble_mul(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MUL | 0xC0);
+            emit_byte(assembler, OP_MUL | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1719,7 +1721,7 @@ static void assemble_div(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_DIV | 0x40);
+            emit_byte(assembler, OP_DIV | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1737,7 +1739,7 @@ static void assemble_div(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_DIV | 0x80);
+            emit_byte(assembler, OP_DIV | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1746,7 +1748,7 @@ static void assemble_div(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_DIV | 0xC0);
+            emit_byte(assembler, OP_DIV | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1798,7 +1800,7 @@ static void assemble_mod(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MOD | 0x40);
+            emit_byte(assembler, OP_MOD | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1816,7 +1818,7 @@ static void assemble_mod(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_MOD | 0x80);
+            emit_byte(assembler, OP_MOD | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1825,7 +1827,7 @@ static void assemble_mod(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MOD | 0xC0);
+            emit_byte(assembler, OP_MOD | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1877,7 +1879,7 @@ static void assemble_shl(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHL | 0x40);
+            emit_byte(assembler, OP_SHL | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1895,7 +1897,7 @@ static void assemble_shl(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_SHL | 0x80);
+            emit_byte(assembler, OP_SHL | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1904,7 +1906,7 @@ static void assemble_shl(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHL | 0xC0);
+            emit_byte(assembler, OP_SHL | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -1956,7 +1958,7 @@ static void assemble_shr(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHR | 0x40);
+            emit_byte(assembler, OP_SHR | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -1974,7 +1976,7 @@ static void assemble_shr(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_SHR | 0x80);
+            emit_byte(assembler, OP_SHR | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -1983,7 +1985,7 @@ static void assemble_shr(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHR | 0xC0);
+            emit_byte(assembler, OP_SHR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2035,7 +2037,7 @@ static void assemble_lt(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LT | 0x40);
+            emit_byte(assembler, OP_LT | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2053,7 +2055,7 @@ static void assemble_lt(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_LT | 0x80);
+            emit_byte(assembler, OP_LT | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2062,7 +2064,7 @@ static void assemble_lt(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LT | 0xC0);
+            emit_byte(assembler, OP_LT | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2114,7 +2116,7 @@ static void assemble_lte(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LTE | 0x40);
+            emit_byte(assembler, OP_LTE | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2132,7 +2134,7 @@ static void assemble_lte(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_LTE | 0x80);
+            emit_byte(assembler, OP_LTE | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2141,7 +2143,7 @@ static void assemble_lte(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LTE | 0xC0);
+            emit_byte(assembler, OP_LTE | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2193,7 +2195,7 @@ static void assemble_eq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_EQ | 0x40);
+            emit_byte(assembler, OP_EQ | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2211,7 +2213,7 @@ static void assemble_eq(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_EQ | 0x80);
+            emit_byte(assembler, OP_EQ | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2220,7 +2222,7 @@ static void assemble_eq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_EQ | 0xC0);
+            emit_byte(assembler, OP_EQ | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2272,7 +2274,7 @@ static void assemble_neq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_NEQ | 0x40);
+            emit_byte(assembler, OP_NEQ | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2290,7 +2292,7 @@ static void assemble_neq(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_NEQ | 0x80);
+            emit_byte(assembler, OP_NEQ | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2299,7 +2301,7 @@ static void assemble_neq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_NEQ | 0xC0);
+            emit_byte(assembler, OP_NEQ | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2351,7 +2353,7 @@ static void assemble_band(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BAND | 0x40);
+            emit_byte(assembler, OP_BAND | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2369,7 +2371,7 @@ static void assemble_band(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_BAND | 0x80);
+            emit_byte(assembler, OP_BAND | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2378,7 +2380,7 @@ static void assemble_band(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BAND | 0xC0);
+            emit_byte(assembler, OP_BAND | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2430,7 +2432,7 @@ static void assemble_bxor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BXOR | 0x40);
+            emit_byte(assembler, OP_BXOR | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2448,7 +2450,7 @@ static void assemble_bxor(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_BXOR | 0x80);
+            emit_byte(assembler, OP_BXOR | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2457,7 +2459,7 @@ static void assemble_bxor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BXOR | 0xC0);
+            emit_byte(assembler, OP_BXOR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2509,7 +2511,7 @@ static void assemble_bor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BOR | 0x40);
+            emit_byte(assembler, OP_BOR | RISA_TODLR_TYPE_RIGHT_MASK);
         }
     } else {
         left = read_any_const(assembler);
@@ -2527,7 +2529,7 @@ static void assemble_bor(Assembler* assembler) {
             if(right > 249)
                 return;
 
-            emit_byte(assembler, OP_BOR | 0x80);
+            emit_byte(assembler, OP_BOR | RISA_TODLR_TYPE_LEFT_MASK);
         } else {
             right = read_any_const(assembler);
 
@@ -2536,7 +2538,7 @@ static void assemble_bor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BOR | 0xC0);
+            emit_byte(assembler, OP_BOR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
         }
     }
 
@@ -2939,7 +2941,7 @@ static uint16_t read_string(Assembler* assembler) {
         if(*(ptr++) == '\\')
             ++escapeCount;
 
-    char* str = (char*) MEM_ALLOC(length + 1 - escapeCount);
+    char* str = (char*) RISA_MEM_ALLOC(length + 1 - escapeCount);
     uint32_t index = 0;
 
     for(uint32_t i = 0; i < length; ++i) {
@@ -2977,7 +2979,7 @@ static uint16_t read_string(Assembler* assembler) {
                         str[index++] = '\"';
                         break;
                     default:
-                        WARNING("Invalid escape sequence at index %d", assembler->parser->current.index + 1 + i);
+                        RISA_WARNING(assembler->io, "Invalid escape sequence at index %d", assembler->parser->current.index + 1 + i);
                         break;
                 }
                 ++i;
@@ -3003,7 +3005,7 @@ static uint16_t read_string(Assembler* assembler) {
         map_set(super->strings, interned, NULL_VALUE);
     }
 
-    MEM_FREE(str);
+    RISA_MEM_FREE(str);
 
     return create_constant(assembler, DENSE_VALUE(interned));
 }

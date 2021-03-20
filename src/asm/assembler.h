@@ -4,9 +4,10 @@
 #include "parser.h"
 #include "lexer.h"
 
+#include "../io/io.h"
 #include "../chunk/chunk.h"
 #include "../data/map.h"
-#include "../common/def.h"
+#include "../def/def.h"
 #include "../value/dense.h"
 
 typedef enum {
@@ -15,6 +16,7 @@ typedef enum {
 } AsmMode;
 
 typedef struct Assembler {
+    RisaIO io;
     struct Assembler* super;
 
     Chunk chunk;

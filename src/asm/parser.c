@@ -1,9 +1,10 @@
 #include "parser.h"
 
 #include "../lib/mem_index.h"
-#include "../common/logging.h"
+#include "../io/log.h"
 
 void asm_parser_init(AsmParser* parser) {
+    risa_io_init(&parser->io);
     parser->error = false;
     parser->panic = false;
 }
@@ -57,13 +58,13 @@ void asm_parser_error_at(AsmParser* parser, AsmToken token, const char* msg) {
     parser->panic = true;
 
     if(token.type == ASM_TOKEN_EOF)
-        ERROR("at EOF: %s\n", msg);
+        RISA_ERROR(parser->io, "at EOF: %s\n", msg);
     else if(token.type != ASM_TOKEN_ERROR) {
         size_t ln;
         size_t col;
 
         mem_lncol(parser->lexer.source, token.index, &ln, &col);
-        ERROR("at %zu:%zu in script: %s\n", ln, col, msg);
+        RISA_ERROR(parser->io, "at %zu:%zu in script: %s\n", ln, col, msg);
     }
 
     parser->error = true;
