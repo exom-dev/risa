@@ -112,7 +112,7 @@ VMStatus vm_run(VM* vm) {
         #endif
 
         uint8_t instruction = NEXT_BYTE();
-        uint8_t types = instruction & RISA_TODLR_TYPE_LEFTRIGHT_MASK;
+        uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
         instruction &= RISA_TODLR_INSTRUCTION_MASK;
 
         switch(instruction) {

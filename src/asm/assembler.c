@@ -1511,7 +1511,7 @@ static void assemble_add(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_ADD | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_ADD | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1590,7 +1590,7 @@ static void assemble_sub(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SUB | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_SUB | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1669,7 +1669,7 @@ static void assemble_mul(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MUL | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_MUL | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1748,7 +1748,7 @@ static void assemble_div(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_DIV | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_DIV | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1827,7 +1827,7 @@ static void assemble_mod(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_MOD | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_MOD | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1906,7 +1906,7 @@ static void assemble_shl(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHL | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_SHL | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -1985,7 +1985,7 @@ static void assemble_shr(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_SHR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_SHR | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2064,7 +2064,7 @@ static void assemble_lt(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LT | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_LT | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2143,7 +2143,7 @@ static void assemble_lte(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_LTE | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_LTE | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2222,7 +2222,7 @@ static void assemble_eq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_EQ | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_EQ | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2301,7 +2301,7 @@ static void assemble_neq(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_NEQ | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_NEQ | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2380,7 +2380,7 @@ static void assemble_band(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BAND | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_BAND | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2459,7 +2459,7 @@ static void assemble_bxor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BXOR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_BXOR | RISA_TODLR_TYPE_MASK);
         }
     }
 
@@ -2538,7 +2538,7 @@ static void assemble_bor(Assembler* assembler) {
                 return;
             }
 
-            emit_byte(assembler, OP_BOR | RISA_TODLR_TYPE_LEFTRIGHT_MASK);
+            emit_byte(assembler, OP_BOR | RISA_TODLR_TYPE_MASK);
         }
     }
 

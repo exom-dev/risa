@@ -75,7 +75,7 @@ static void disassembler_process_instruction(RisaDisassembler* disassembler) {
     RISA_OUT(disassembler->io, "%04zu %4u ", RISA_DISASM_OFFSET, RISA_DISASM_CHUNK->indices[RISA_DISASM_OFFSET]);
 
     uint8_t instruction = RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET];
-    uint8_t types = instruction & RISA_TODLR_TYPE_LEFTRIGHT_MASK;
+    uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
     instruction &= RISA_TODLR_INSTRUCTION_MASK;
 
     switch(instruction) {
