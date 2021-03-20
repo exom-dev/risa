@@ -396,7 +396,7 @@ static void assemble_byte_data(Assembler* assembler) {
         uint16_t index = read_int(assembler);
         asm_parser_advance(assembler->parser);
 
-        if(index == (uint16_t) -1u)
+        if(index == UINT16_MAX)
             return;
         if(AS_INT(assembler->chunk.constants.values[index]) > 255) {
             asm_parser_error_at_current(assembler->parser, "Byte value out of range (0-255)");
@@ -2822,7 +2822,7 @@ static uint16_t read_byte(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = read_identifier(assembler);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
             return -1;
         } else {
@@ -2851,7 +2851,7 @@ static uint16_t read_int(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = read_identifier(assembler);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
             return -1;
         } else {
@@ -2880,7 +2880,7 @@ static uint16_t read_float(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = read_identifier(assembler);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
             return -1;
         } else {
@@ -2909,15 +2909,15 @@ static uint16_t read_string(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = read_identifier(assembler);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
-            return (uint16_t) -1u;
+            return UINT16_MAX;
         } else {
             Value* value = &assembler->chunk.constants.values[index];
 
             if(!value_is_dense_of_type(*value, DVAL_STRING)) {
                 asm_parser_error_at_current(assembler->parser, "Expected string");
-                return (uint16_t) -1u;
+                return UINT16_MAX;
             }
 
             return index;
@@ -2926,7 +2926,7 @@ static uint16_t read_string(Assembler* assembler) {
 
     if(assembler->parser->current.type != ASM_TOKEN_STRING) {
         asm_parser_error_at_current(assembler->parser, "Expected string");
-        return (uint16_t) -1u;
+        return UINT16_MAX;
     }
 
     const char* start = assembler->parser->current.start + 1;
@@ -3045,7 +3045,7 @@ static int64_t read_number(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = identifier_resolve(assembler, &assembler->parser->current);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
             return -1;
         } else {
@@ -3085,7 +3085,7 @@ static bool read_bool(Assembler* assembler) {
     if(assembler->parser->current.type == ASM_TOKEN_IDENTIFIER) {
         uint16_t index = identifier_resolve(assembler, &assembler->parser->current);
 
-        if(index == (uint16_t) -1u) {
+        if(index == UINT16_MAX) {
             asm_parser_error_at_current(assembler->parser, "Identifier does not exist");
             return -1;
         } else {
