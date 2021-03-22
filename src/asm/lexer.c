@@ -1,5 +1,7 @@
 #include "lexer.h"
 
+#include "../lib/charlib.h"
+
 #include <string.h>
 
 #define PEEK(i) lexer->current[i]
@@ -9,10 +11,6 @@
 #define AT_END(i) (lexer->current[i] == '\0' || (lexer->stoppers != NULL && (!lexer->ignoreStoppers && strchr(lexer->stoppers, lexer->current[i]) != NULL)))
 #define MATCH(c) \
     ((AT_END(0) || *lexer->current != c) ? false : (ADVANCE(1), true))
-
-static bool asm_is_digit(char);
-static bool asm_is_alpha(char);
-static bool asm_stricmp(const char*, const char*, size_t);
 
 AsmToken asm_next_identifier(AsmLexer* lexer);
 AsmToken asm_next_number(AsmLexer* lexer);
@@ -83,9 +81,9 @@ AsmToken asm_lexer_next(AsmLexer* lexer) {
 
     char c = NEXT();
 
-    if(asm_is_alpha(c))
+    if(risa_lib_charlib_is_alphascore(c))
         return asm_next_identifier(lexer);
-    if(asm_is_digit(c))
+    if(risa_lib_charlib_is_digit(c))
         return asm_next_number(lexer);
 
     switch(c) {
@@ -119,37 +117,12 @@ AsmToken asm_lexer_error(AsmLexer* lexer, const char* msg) {
     return token;
 }
 
-bool asm_is_digit(char c) {
-    return c >= '0' && c <= '9';
-}
-
-bool asm_is_alpha(char c) {
-    return (c >= 'a' && c <= 'z')
-        || (c >= 'A' && c <= 'Z')
-        || (c == '_');
-}
-
-static bool asm_stricmp(const char* left, const char* right, size_t length) {
-    #define LWR(c) (c >= 'A' && c <= 'Z' ? c + 32 : c)
-
-    const char* leftLimit = left + length;
-
-    while(LWR(*left) == LWR(*right) && left < leftLimit) {
-        ++left;
-        ++right;
-    }
-
-    return left == leftLimit;
-
-    #undef LWR
-}
-
 AsmToken asm_next_identifier(AsmLexer* lexer) {
     #define CLASSIFY_INSENS(index, length, str, type) \
         (((lexer->current - lexer->start == index + length) && \
-        (asm_stricmp(lexer->start + index, str, length))) ? type : ASM_TOKEN_IDENTIFIER)
+        (risa_lib_charlib_strnicmp(lexer->start + index, str, length))) ? type : ASM_TOKEN_IDENTIFIER)
 
-    while(!AT_END(0) && (asm_is_alpha(PEEK(0)) || asm_is_digit(PEEK(0))))
+    while(!AT_END(0) && (risa_lib_charlib_is_alphascore(PEEK(0)) || risa_lib_charlib_is_digit(PEEK(0))))
         ADVANCE(1);
 
     switch(*lexer->start) {
@@ -289,17 +262,17 @@ AsmToken asm_next_identifier(AsmLexer* lexer) {
 AsmToken asm_next_number(AsmLexer* lexer) {
     AsmTokenType type = ASM_TOKEN_INT;
 
-    while(!AT_END(0) && asm_is_digit(PEEK(0)))
+    while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
         ADVANCE(1);
 
     switch(PEEK(0)) {
         case '.':
             type = ASM_TOKEN_FLOAT;
 
-            if(!AT_END(1) && asm_is_digit(PEEK(1))) {
+            if(!AT_END(1) && risa_lib_charlib_is_digit(PEEK(1))) {
                 ADVANCE(1);
 
-                while(!AT_END(0) && asm_is_digit(PEEK(0)))
+                while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
                     ADVANCE(1);
 
                 if((!AT_END(0) && PEEK(0) == 'f') || (!AT_END(0) && PEEK(0) == 'F'))

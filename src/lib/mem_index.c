@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-void mem_lncol(const char* source, size_t index, size_t* ln, size_t* col) {
+void risa_lib_mem_lncol(const char* source, size_t index, size_t* ln, size_t* col) {
     size_t  l = 1;
     size_t  c = 1;
     char current;
@@ -27,7 +27,7 @@ void mem_lncol(const char* source, size_t index, size_t* ln, size_t* col) {
     *col = c;
 }
 
-char* mem_chunk(const char* source, size_t index, size_t size, size_t chunk, size_t* chunkIndex, size_t* chunkSize) {
+char* risa_lib_mem_chunk(const char* source, size_t index, size_t size, size_t chunk, size_t* chunkIndex, size_t* chunkSize) {
     size_t startIndex;
     size_t endIndex;
 
@@ -55,7 +55,7 @@ char* mem_chunk(const char* source, size_t index, size_t size, size_t chunk, siz
     return data;
 }
 
-char* mem_lnchunk(const char* source, size_t index, size_t size, size_t chunk, size_t* chunkIndex, size_t* chunkSize) {
+char* risa_lib_mem_lnchunk(const char* source, size_t index, size_t size, size_t chunk, size_t* chunkIndex, size_t* chunkSize) {
     const char* start = source + index;
     const char* end = source + index;
 

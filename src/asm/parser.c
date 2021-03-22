@@ -63,7 +63,7 @@ void asm_parser_error_at(AsmParser* parser, AsmToken token, const char* msg) {
         size_t ln;
         size_t col;
 
-        mem_lncol(parser->lexer.source, token.index, &ln, &col);
+        risa_lib_mem_lncol(parser->lexer.source, token.index, &ln, &col);
         RISA_ERROR(parser->io, "at %zu:%zu in script: %s\n", ln, col, msg);
     }
 

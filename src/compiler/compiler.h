@@ -134,7 +134,7 @@ typedef void (*RuleHandler)(Compiler*, bool);
 
 typedef struct {
     RuleHandler prefix;
-    RuleHandler inpostfix;
+    RuleHandler inpostfix; // infix or postfix
 
     Precedence precedence;
 } Rule;

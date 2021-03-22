@@ -1,6 +1,6 @@
 #include "lexer.h"
 
-#include "../memory/mem.h"
+#include "../lib/charlib.h"
 
 #include <string.h>
 
@@ -11,9 +11,6 @@
 #define AT_END(i) (lexer->current[i] == '\0')
 #define MATCH(c) \
         ((AT_END(0) || *lexer->current != c) ? false : (ADVANCE(1), true)) \
-
-bool is_digit(char c);
-bool is_alpha(char c);
 
 Token next_identifier(Lexer* lexer);
 Token next_number(Lexer* lexer);
@@ -81,9 +78,9 @@ Token lexer_next(Lexer* lexer) {
 
     char c = NEXT();
 
-    if(is_alpha(c))
+    if(risa_lib_charlib_is_alphascore(c))
         return next_identifier(lexer);
-    if(is_digit(c))
+    if(risa_lib_charlib_is_digit(c))
         return next_number(lexer);
 
     switch(c) {
@@ -151,22 +148,12 @@ bool identifier_equals(Token* left, Token* right) {
     return memcmp(left->start, right->start, left->size) == 0;
 }
 
-bool is_digit(char c) {
-    return c >= '0' && c <= '9';
-}
-
-bool is_alpha(char c) {
-    return (c >= 'a' && c <= 'z') ||
-           (c >= 'A' && c <= 'Z') ||
-           (c == '_');
-}
-
 Token next_identifier(Lexer* lexer) {
     #define CLASSIFY(index, length, str, type) \
         ((lexer->current - lexer->start == index + length) && \
          (memcmp(lexer->start + index, str, length) == 0)) ? type : TOKEN_IDENTIFIER
 
-    while(!AT_END(0) && (is_alpha(PEEK(0)) || is_digit(PEEK(0))))
+    while(!AT_END(0) && (risa_lib_charlib_is_alphascore(PEEK(0)) || risa_lib_charlib_is_digit(PEEK(0))))
         ADVANCE(1);
 
     switch(*lexer->start) {
@@ -205,17 +192,17 @@ Token next_identifier(Lexer* lexer) {
 Token next_number(Lexer* lexer) {
     TokenType type = TOKEN_INT;
 
-    while(!AT_END(0) && is_digit(PEEK(0)))
+    while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
         ADVANCE(1);
 
     switch(PEEK(0)) {
         case '.':
             type = TOKEN_FLOAT;
 
-            if(!AT_END(1) && is_digit(PEEK(1))) {
+            if(!AT_END(1) && risa_lib_charlib_is_digit(PEEK(1))) {
                 ADVANCE(1);
 
-                while(!AT_END(0) && is_digit(PEEK(0)))
+                while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
                     ADVANCE(1);
 
                 if(!AT_END(0) && PEEK(0) == 'f')
