@@ -556,7 +556,9 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             } else if(op_has_direct_dest(chunk.bytecode[chunk.size - 4] & RISA_TODLR_INSTRUCTION_MASK) && !compiler->last.isEqualOp) { // Can directly assign to local.
                 chunk.bytecode[chunk.size - 4 + 1] = index;  // Do it.
                 compiler->last.reg = index;
-            } else compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;
+            } else {
+                emit_mov(compiler, index, chunk.bytecode[chunk.size - 3]);
+            }/*compiler->function->chunk.bytecode[compiler->function->chunk.size - 3] = index;*/
         } else {
             if(set == OP_SGLOB) {
                 Chunk* chunk = &compiler->function->chunk;
@@ -2161,7 +2163,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
 
 static void compile_ternary(Compiler* compiler, bool allowAssignment) {
     emit_byte(compiler, OP_TEST);
-    emit_byte(compiler, compiler->regIndex - 1);
+    emit_byte(compiler, compiler->last.reg);
     emit_byte(compiler, 0);
     emit_byte(compiler, 0);
 
