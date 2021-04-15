@@ -1,0 +1,7 @@
+#ifndef RISA_MACRO_H_GUARD
+#define RISA_MACRO_H_GUARD
+
+#define RISA_STRINGIFY_INTERNAL(str) #str
+#define RISA_STRINGIFY(str) RISA_STRINGIFY_INTERNAL(str)
+
+#endif

@@ -16,6 +16,62 @@ AsmToken asm_next_identifier(AsmLexer* lexer);
 AsmToken asm_next_number(AsmLexer* lexer);
 AsmToken asm_next_string(AsmLexer* lexer);
 
+OpCode asm_token_to_opcode(AsmTokenType token) {
+    switch(token) {
+        case ASM_TOKEN_CNST   : return OP_CNST   ;
+        case ASM_TOKEN_CNSTW  : return OP_CNSTW  ;
+        case ASM_TOKEN_MOV    : return OP_MOV    ;
+        case ASM_TOKEN_CLONE  : return OP_CLONE  ;
+        case ASM_TOKEN_DGLOB  : return OP_DGLOB  ;
+        case ASM_TOKEN_GGLOB  : return OP_GGLOB  ;
+        case ASM_TOKEN_SGLOB  : return OP_SGLOB  ;
+        case ASM_TOKEN_UPVAL  : return OP_UPVAL  ;
+        case ASM_TOKEN_GUPVAL : return OP_GUPVAL ;
+        case ASM_TOKEN_SUPVAL : return OP_SUPVAL ;
+        case ASM_TOKEN_CUPVAL : return OP_CUPVAL ;
+        case ASM_TOKEN_CLSR   : return OP_CLSR   ;
+        case ASM_TOKEN_ARR    : return OP_ARR    ;
+        case ASM_TOKEN_PARR   : return OP_PARR   ;
+        case ASM_TOKEN_LEN    : return OP_LEN    ;
+        case ASM_TOKEN_OBJ    : return OP_OBJ    ;
+        case ASM_TOKEN_GET    : return OP_GET    ;
+        case ASM_TOKEN_SET    : return OP_SET    ;
+        case ASM_TOKEN_NULL   : return OP_NULL   ;
+        case ASM_TOKEN_TRUE   : return OP_TRUE   ;
+        case ASM_TOKEN_FALSE  : return OP_FALSE  ;
+        case ASM_TOKEN_NOT    : return OP_NOT    ;
+        case ASM_TOKEN_BNOT   : return OP_BNOT   ;
+        case ASM_TOKEN_NEG    : return OP_NEG    ;
+        case ASM_TOKEN_INC    : return OP_INC    ;
+        case ASM_TOKEN_DEC    : return OP_DEC    ;
+        case ASM_TOKEN_ADD    : return OP_ADD    ;
+        case ASM_TOKEN_SUB    : return OP_SUB    ;
+        case ASM_TOKEN_MUL    : return OP_MUL    ;
+        case ASM_TOKEN_DIV    : return OP_DIV    ;
+        case ASM_TOKEN_MOD    : return OP_MOD    ;
+        case ASM_TOKEN_SHL    : return OP_SHL    ;
+        case ASM_TOKEN_SHR    : return OP_SHR    ;
+        case ASM_TOKEN_LT     : return OP_LT     ;
+        case ASM_TOKEN_LTE    : return OP_LTE    ;
+        case ASM_TOKEN_EQ     : return OP_EQ     ;
+        case ASM_TOKEN_NEQ    : return OP_NEQ    ;
+        case ASM_TOKEN_BAND   : return OP_BAND   ;
+        case ASM_TOKEN_BXOR   : return OP_BXOR   ;
+        case ASM_TOKEN_BOR    : return OP_BOR    ;
+        case ASM_TOKEN_TEST   : return OP_TEST   ;
+        case ASM_TOKEN_NTEST  : return OP_NTEST  ;
+        case ASM_TOKEN_JMP    : return OP_JMP    ;
+        case ASM_TOKEN_JMPW   : return OP_JMPW   ;
+        case ASM_TOKEN_BJMP   : return OP_BJMP   ;
+        case ASM_TOKEN_BJMPW  : return OP_BJMPW  ;
+        case ASM_TOKEN_CALL   : return OP_CALL   ;
+        case ASM_TOKEN_RET    : return OP_RET    ;
+        case ASM_TOKEN_ACC    : return OP_ACC    ;
+        case ASM_TOKEN_DIS    : return OP_DIS    ;
+        default               : return OP_CNST   ;
+    }
+}
+
 void asm_lexer_init(AsmLexer* lexer) {
     lexer->source = NULL;
     lexer->start = NULL;

@@ -2,6 +2,7 @@
 #define RISA_ASM_LEXER_H_GUARD
 
 #include "../def/types.h"
+#include "../chunk/bytecode.h"
 
 typedef enum {
     ASM_TOKEN_DOT, ASM_TOKEN_LEFT_PAREN, ASM_TOKEN_RIGHT_PAREN, ASM_TOKEN_LEFT_BRACE, ASM_TOKEN_RIGHT_BRACE,
@@ -63,6 +64,8 @@ typedef struct {
 
     size_t index;
 } AsmLexer;
+
+OpCode asm_token_to_opcode(AsmTokenType token);
 
 void asm_lexer_init(AsmLexer* lexer);
 void asm_lexer_source(AsmLexer* lexer, const char* src);

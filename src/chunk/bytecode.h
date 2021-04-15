@@ -2,12 +2,23 @@
 #define RISA_BYTECODE_H_GUARD
 
 #include <stdbool.h>
+#include "../def/macro.h"
 
 #define RISA_TODLR_INSTRUCTION_SIZE 4
-#define RISA_TODLR_INSTRUCTION_MASK 0x3F
-#define RISA_TODLR_TYPE_MASK        0xC0
-#define RISA_TODLR_TYPE_LEFT_MASK   0x80
-#define RISA_TODLR_TYPE_RIGHT_MASK  0x40
+#define RISA_TODLR_INSTRUCTION_MASK  0x3F
+
+#define RISA_TODLR_TYPE_MASK         0xC0
+#define RISA_TODLR_TYPE_LEFT_MASK    0x80
+#define RISA_TODLR_TYPE_RIGHT_MASK   0x40
+
+// About REGISTER_NULL:
+// Some instructions expect either a register or this value. Examples:
+//
+// RET 20r means 'return the value stored in the 20th register'.         RET 251 means 'return null'.
+// DIS 20r means 'disassemble the function stored in the 20th register'. DIS 251 means 'disassemble the current function'.
+#define RISA_TODLR_REGISTER_COUNT    250
+#define RISA_TODLR_REGISTER_NULL     251
+#define RISA_TODLR_REGISTER_NULL_STR RISA_STRINGIFY(RISA_TODLR_REGISTER_NULL)
 
 typedef enum {
     OP_CNST,
