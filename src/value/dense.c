@@ -57,7 +57,8 @@ void dense_print(RisaIO* io, DenseValue* dense) {
     }
 }
 
-Value  dense_clone(DenseValue* dense) {
+// TODO: for arrays and objects: register the stuff in the VM.
+Value dense_clone(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
             return DENSE_VALUE(dense);
@@ -66,7 +67,7 @@ Value  dense_clone(DenseValue* dense) {
             DenseArray* clone = dense_array_create();
 
             for(size_t i = 0; i < array->data.size; ++i)
-                value_array_write(&clone->data, array->data.values[i]);
+                value_array_write(&clone->data, value_clone(array->data.values[i]));
 
             return DENSE_VALUE(((DenseValue*) clone));
         }

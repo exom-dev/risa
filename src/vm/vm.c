@@ -89,9 +89,6 @@ VMStatus vm_run(VM* vm) {
     #define LEFT_REG  (frame->regs[LEFT])
     #define RIGHT_REG (frame->regs[RIGHT])
 
-    #define RISA_TODLR_LEFT_TYPE_MASK 0x80
-    #define RISA_TODLR_RIGHT_TYPE_MASK 0x40
-
     #define LEFT_BY_TYPE  (types & RISA_TODLR_TYPE_LEFT_MASK ? LEFT_CONST : LEFT_REG)
     #define RIGHT_BY_TYPE (types & RISA_TODLR_TYPE_RIGHT_MASK ? RIGHT_CONST : RIGHT_REG)
 
@@ -137,6 +134,7 @@ VMStatus vm_run(VM* vm) {
             case OP_CLONE: {
                 DEST_REG = value_clone(LEFT_REG);
 
+                // TODO: move the register call from here to the clone function.
                 if(DEST_REG.type == VAL_DENSE) {
                     switch(AS_DENSE(DEST_REG)->type) {
                         case DVAL_ARRAY:
@@ -187,7 +185,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_UPVAL: {
-                VM_RUNTIME_ERROR(vm, "Illegal instruction 'UPVAL'");
+                VM_RUNTIME_ERROR(vm, "Illegal instruction 'UPVAL'; must be after 'CLSR'");
                 return VM_ERROR;
             }
             case OP_GUPVAL: {
