@@ -1122,7 +1122,7 @@ static void assemble_get(Assembler* assembler) {
             return;
         }
 
-        emit_byte(assembler, OP_GET | RISA_TODLR_TYPE_LEFT_MASK);
+        emit_byte(assembler, OP_GET | RISA_TODLR_TYPE_RIGHT_MASK);
     }
 
     asm_parser_advance(assembler->parser);
