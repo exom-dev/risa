@@ -40,6 +40,21 @@ Value value_clone(Value value) {
     }
 }
 
+Value value_clone_register(void* vm, Value value) {
+    switch(value.type) {
+        case VAL_NULL:
+        case VAL_BOOL:
+        case VAL_BYTE:
+        case VAL_INT:
+        case VAL_FLOAT:
+            return value;
+        case VAL_DENSE:
+            return dense_clone_register(vm, AS_DENSE(value));
+        default:
+            return NULL_VALUE;  // Never reached; written to suppress warnings.
+    }
+}
+
 bool value_is_falsy(Value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }

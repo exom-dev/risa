@@ -70,6 +70,7 @@ typedef struct {
 
 void  value_print(RisaIO* io, Value value);
 Value value_clone(Value value);
+Value value_clone_register(void* vm, Value value); // void* in order to work around the circular dependency.
 bool  value_is_falsy(Value value);
 bool  value_equals(Value left, Value right);
 bool  value_strict_equals(Value left, Value right);

@@ -117,6 +117,10 @@ void run_file(RisaIO io, const char* path) {
 
     vm_delete(&vm);
 
+    #ifdef DEBUG_SHOW_HEAP_SIZE
+        RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);
+    #endif
+
     if(status == RISA_INTERPRET_OK)
         exit(0);
     if(status == RISA_INTERPRET_COMPILE_ERROR)

@@ -81,19 +81,11 @@ RisaInterpretStatus risa_interpret_string(VM* vm, const char* str) {
         //compiler_delete(&compiler);
         //vm_delete(vm);
 
-        #ifdef DEBUG_SHOW_HEAP_SIZE
-            PRINT("\n\nHeap size: %zu\n", vm.heapSize);
-        #endif
-
         return RISA_INTERPRET_EXECUTE_ERROR;
     }
 
     //compiler_delete(&compiler);
     //vm_delete(&vm);
-
-    #ifdef DEBUG_SHOW_HEAP_SIZE
-        PRINT("\n\nHeap size: %zu\n", vm.heapSize);
-    #endif
 
     return RISA_INTERPRET_OK;
 }

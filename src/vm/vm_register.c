@@ -10,40 +10,47 @@ void vm_register_dense(VM* vm, DenseValue* dense) {
         return;
 
     DenseValue* it = vm->values;
-    bool exists = false;
 
     while(it != NULL) {
-        if(it == dense) {
-            exists = true;
-            break;
-        }
+        if(it == dense)
+            return;
 
         it = it->link;
     }
 
-    if(exists)
-        return;
+    vm_register_dense_unchecked(vm, dense);
+}
 
+void vm_register_dense_unchecked(VM* vm, DenseValue* dense) {
     dense->link = vm->values;
     vm->values = dense;
 
     vm->heapSize += dense_size(dense);
 
-    if(dense->type == DVAL_FUNCTION) {
-        vm_register_dense(vm, (DenseValue*) ((DenseFunction*) dense)->name);
+    switch(dense->type) {
+        case DVAL_FUNCTION: {
+            vm_register_dense(vm, (DenseValue *) ((DenseFunction *) dense)->name);
 
-        ValueArray* constants = &((DenseFunction*) dense)->chunk.constants;
+            ValueArray *constants = &((DenseFunction *) dense)->chunk.constants;
 
-        for(size_t i = 0; i < constants->size; ++i)
-            if (IS_DENSE(constants->values[i]))
-                vm_register_dense(vm, AS_DENSE(constants->values[i]));
-    } else if(dense->type == DVAL_CLOSURE) {
-        vm_register_dense(vm, (DenseValue*) ((DenseClosure*) dense)->function->name);
+            for(size_t i = 0; i < constants->size; ++i)
+                if(IS_DENSE(constants->values[i]))
+                    vm_register_dense(vm, AS_DENSE(constants->values[i]));
 
-        ValueArray* constants = &((DenseClosure*) dense)->function->chunk.constants;
+            break;
+        }
+        case DVAL_CLOSURE: {
+            vm_register_dense(vm, (DenseValue *) ((DenseClosure *) dense)->function->name);
 
-        for(size_t i = 0; i < constants->size; ++i)
-            if (IS_DENSE(constants->values[i]))
-                vm_register_dense(vm, AS_DENSE(constants->values[i]));
+            ValueArray *constants = &((DenseClosure *) dense)->function->chunk.constants;
+
+            for(size_t i = 0; i < constants->size; ++i)
+                if(IS_DENSE(constants->values[i]))
+                    vm_register_dense(vm, AS_DENSE(constants->values[i]));
+
+            break;
+        }
+        default:
+            return;
     }
 }

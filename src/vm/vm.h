@@ -65,6 +65,7 @@ VMStatus vm_run(VM* vm);
 
 void vm_register_string(VM* vm, DenseString* string);
 void vm_register_dense(VM* vm, DenseValue* dense);
+void vm_register_dense_unchecked(VM* vm, DenseValue* dense);
 
 DenseString* vm_string_internalize(VM* vm, const char* str, uint32_t length);
 

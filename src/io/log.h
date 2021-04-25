@@ -2,6 +2,7 @@
 #define RISA_LOG_H_GUARD
 
 #include "io.h"
+#include "../def/def.h"
 
 #include <stdio.h>
 #include <stdlib.h>

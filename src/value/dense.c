@@ -1,5 +1,6 @@
 #include "dense.h"
 #include "../io/log.h"
+#include "../vm/vm.h"
 
 void dense_print(RisaIO* io, DenseValue* dense) {
     switch(dense->type) {
@@ -57,7 +58,7 @@ void dense_print(RisaIO* io, DenseValue* dense) {
     }
 }
 
-// TODO: for arrays and objects: register the stuff in the VM.
+
 Value dense_clone(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
@@ -92,6 +93,64 @@ Value dense_clone(DenseValue* dense) {
                 clone->closed = value_clone(upvalue->closed);
 
             return DENSE_VALUE(((DenseValue*) clone));
+        }
+        case DVAL_FUNCTION:
+        case DVAL_CLOSURE:
+        case DVAL_NATIVE:
+            return DENSE_VALUE(dense);
+        default:
+            return NULL_VALUE; // Never reached; written to suppress warnings.
+    }
+}
+
+Value dense_clone_register(void* vm, DenseValue* dense) {
+    VM* vmPtr = (VM*) vm;
+
+    switch(dense->type) {
+        case DVAL_STRING:
+            return DENSE_VALUE(dense);
+        case DVAL_ARRAY: {
+            DenseArray* array = (DenseArray*) dense;
+            DenseArray* clone = dense_array_create();
+
+            for(size_t i = 0; i < array->data.size; ++i) {
+                value_array_write(&clone->data, value_clone_register(vm, array->data.values[i]));
+            }
+
+            DenseValue* result = ((DenseValue*) clone);
+            vm_register_dense_unchecked(vmPtr, result);
+
+            return DENSE_VALUE(result);
+        }
+        case DVAL_OBJECT: {
+            DenseObject* object = (DenseObject*) dense;
+            DenseObject* clone = dense_object_create();
+
+            for(size_t i = 0; i < object->data.capacity; ++i) {
+                Entry entry = object->data.entries[i];
+
+                if(entry.key != NULL) {
+                    dense_object_set(clone, entry.key, value_clone_register(vm, entry.value));
+                }
+            }
+
+            DenseValue* result = ((DenseValue*) clone);
+            vm_register_dense_unchecked(vmPtr, result);
+
+            return DENSE_VALUE(result);
+        }
+        case DVAL_UPVALUE: {
+            DenseUpvalue* upvalue = (DenseUpvalue*) dense;
+            DenseUpvalue* clone = dense_upvalue_create(upvalue->ref);
+
+            if(upvalue->closed.type != VAL_NULL) {
+                clone->closed = value_clone(upvalue->closed);
+            }
+
+            DenseValue* result = ((DenseValue*) clone);
+            vm_register_dense_unchecked(vmPtr, result);
+
+            return DENSE_VALUE(result);
         }
         case DVAL_FUNCTION:
         case DVAL_CLOSURE:
