@@ -31,16 +31,13 @@ int main(int argc, char** argv) {
     else TERMINATE(io, 64, "Invalid arguments");
 }
 
-Value print(void* vm, uint8_t argc, Value* args) {
-    value_print(&((VM*) vm)->io, args[0]);
-    return NULL_VALUE;
-}
-
 VM create_vm() {
     VM vm;
     vm_init(&vm);
+    std_register_core(&vm);
+    std_register_io(&vm);
 
-    vm_global_set_native(&vm, "print", 5, print);
+    //vm_global_set_native(&vm, "print", 5, print);
 
     return vm;
 }

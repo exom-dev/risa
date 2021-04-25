@@ -212,7 +212,9 @@ VMStatus vm_run(VM* vm) {
 
                 DEST_REG = DENSE_VALUE(closure);
 
-                for(uint8_t i = 0; i < RIGHT; ++i) {
+                uint8_t upvalCount = RIGHT;
+
+                for(uint8_t i = 0; i < upvalCount; ++i) {
                     SKIP(4);
 
                     uint8_t index = DEST;
@@ -226,7 +228,7 @@ VMStatus vm_run(VM* vm) {
                             return VM_ERROR;
                         }
 
-                        closure->upvalues[i] = frame->callee.closure->upvalues[i];
+                        closure->upvalues[i] = frame->callee.closure->upvalues[index];
                     }
                 }
 

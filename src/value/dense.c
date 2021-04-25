@@ -104,8 +104,6 @@ Value dense_clone(DenseValue* dense) {
 }
 
 Value dense_clone_register(void* vm, DenseValue* dense) {
-    VM* vmPtr = (VM*) vm;
-
     switch(dense->type) {
         case DVAL_STRING:
             return DENSE_VALUE(dense);
@@ -118,7 +116,7 @@ Value dense_clone_register(void* vm, DenseValue* dense) {
             }
 
             DenseValue* result = ((DenseValue*) clone);
-            vm_register_dense_unchecked(vmPtr, result);
+            vm_register_dense_unchecked((VM*) vm, result);
 
             return DENSE_VALUE(result);
         }
@@ -135,7 +133,7 @@ Value dense_clone_register(void* vm, DenseValue* dense) {
             }
 
             DenseValue* result = ((DenseValue*) clone);
-            vm_register_dense_unchecked(vmPtr, result);
+            vm_register_dense_unchecked((VM*) vm, result);
 
             return DENSE_VALUE(result);
         }
@@ -148,7 +146,7 @@ Value dense_clone_register(void* vm, DenseValue* dense) {
             }
 
             DenseValue* result = ((DenseValue*) clone);
-            vm_register_dense_unchecked(vmPtr, result);
+            vm_register_dense_unchecked((VM*) vm, result);
 
             return DENSE_VALUE(result);
         }

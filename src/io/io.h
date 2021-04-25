@@ -23,6 +23,7 @@ RISA_API void risa_io_redirect_err(RisaIO* io, RisaOutHandler handler);
 
 RISA_API void risa_io_clone(RisaIO* dest, RisaIO* src);
 
+// Uppercase because they are the default functions for IO.
 RISA_API uint16_t RISA_IO_STDIN();
 RISA_API void     RISA_IO_STDOUT(const char* data);
 RISA_API void     RISA_IO_STDERR(const char* data);

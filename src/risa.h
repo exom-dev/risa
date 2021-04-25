@@ -2,6 +2,7 @@
 #define RISA_RISA_H_GUARD
 
 #include "vm/vm.h"
+#include "std/std.h"
 #include "compiler/compiler.h"
 
 #define RISA_VERSION "0.0.A"
