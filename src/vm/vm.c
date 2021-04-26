@@ -149,8 +149,6 @@ VMStatus vm_run(VM* vm) {
             case OP_GGLOB: {
                 Value value;
 
-                map_get(&vm->globals, AS_STRING(LEFT_CONST), &value);
-
                 if(!map_get(&vm->globals, AS_STRING(LEFT_CONST), &value)) {
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONST));
                     return VM_ERROR;
@@ -238,14 +236,25 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_LEN: {
-                if(value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
-                    DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
-                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
-                    DEST_REG = INT_VALUE(AS_STRING(LEFT_REG)->length);
-                } else {
-                    VM_RUNTIME_ERROR(vm, "Expected string or array");
-                    return VM_ERROR;
+                switch(LEFT_REG.type) {
+                    case VAL_DENSE:
+                        switch(AS_DENSE(LEFT_REG)->type) {
+                            case DVAL_ARRAY:
+                                DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
+                                goto _op_len_success;
+                            case DVAL_STRING:
+                                DEST_REG = INT_VALUE(AS_STRING(LEFT_REG)->length);
+                                goto _op_len_success;
+                            default:
+                                break;
+                        }
+                        // Fallthrough
+                    default:
+                        VM_RUNTIME_ERROR(vm, "Expected string or array");
+                        return VM_ERROR;
                 }
+
+            _op_len_success:
 
                 SKIP(3);
                 break;
@@ -286,111 +295,188 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_GET: {
-                if(value_is_dense_of_type(LEFT_REG, DVAL_ARRAY)) {
-                    if(!IS_INT(RIGHT_BY_TYPE)) {
-                        VM_RUNTIME_ERROR(vm, "Index must be int");
+                switch(LEFT_REG.type) {
+                    case VAL_DENSE:
+                        switch(AS_DENSE(LEFT_REG)->type) {
+                            case DVAL_ARRAY: {
+                                if(!IS_INT(RIGHT_BY_TYPE)) {
+                                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                                    return VM_ERROR;
+                                }
+
+                                DenseArray* array = AS_ARRAY(LEFT_REG);
+                                int64_t index = AS_INT(RIGHT_BY_TYPE);
+
+                                if(index < 0 || index >= array->data.size) {
+                                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                                    return VM_ERROR;
+                                }
+
+                                DEST_REG = dense_array_get(array, (uint32_t) index);
+
+                                goto _op_get_success;
+                            }
+                            case DVAL_STRING: {
+                                if(!IS_INT(RIGHT_BY_TYPE)) {
+                                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                                    return VM_ERROR;
+                                }
+
+                                DenseString* str = AS_STRING(LEFT_REG);
+                                int64_t index = AS_INT(RIGHT_BY_TYPE);
+
+                                if(index < 0 || index >= str->length) {
+                                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                                    return VM_ERROR;
+                                }
+
+                                DEST_REG = DENSE_VALUE(vm_string_create(vm, str->chars + index, 1));
+
+                                gc_check(vm);
+
+                                goto _op_get_success;
+                            }
+                            case DVAL_OBJECT: {
+                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
+                                    VM_RUNTIME_ERROR(vm, "Object key must be string");
+                                    return VM_ERROR;
+                                }
+
+                                DenseObject* object = AS_OBJECT(LEFT_REG);
+                                DenseString* key = AS_STRING(RIGHT_BY_TYPE);
+
+                                Value value;
+
+                                if(!dense_object_get(object, key, &value)) {
+                                    VM_RUNTIME_ERROR(vm, "Object property does not exist");
+                                    return VM_ERROR;
+                                }
+
+                                DEST_REG = value;
+
+                                goto _op_get_success;
+                            }
+                            default:
+                                break;
+                        }
+                        // Fallthrough
+                    default:
+                        VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
                         return VM_ERROR;
-                    }
-
-                    DenseArray* array = AS_ARRAY(LEFT_REG);
-                    uint32_t index = AS_INT(RIGHT_BY_TYPE);
-
-                    if(index >= array->data.size) {
-                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                        return VM_ERROR;
-                    }
-
-                    DEST_REG = dense_array_get(array, index);
-                } else if(value_is_dense_of_type(LEFT_REG, DVAL_STRING)) {
-                    if(!IS_INT(RIGHT_BY_TYPE)) {
-                        VM_RUNTIME_ERROR(vm, "Index must be int");
-                        return VM_ERROR;
-                    }
-
-                    DenseString* str = AS_STRING(LEFT_REG);
-                    uint32_t index = AS_INT(RIGHT_BY_TYPE);
-
-                    if(index >= str->length) {
-                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                        return VM_ERROR;
-                    }
-
-                    DenseString* result = dense_string_from(str->chars + index, 1);
-                    DenseString* interned = map_find(&vm->strings, result->chars + index, 1, map_hash(str->chars + index, 1));
-
-                    if(interned != NULL) {
-                        RISA_MEM_FREE(result);
-                        result = interned;
-                        DEST_REG = DENSE_VALUE(result);
-                    } else {
-                        vm_register_string(vm, result);
-                        vm_register_dense(vm, (DenseValue*) result);
-                        DEST_REG = DENSE_VALUE(result);
-                        gc_check(vm);
-                    }
-                } else if(value_is_dense_of_type(LEFT_REG, DVAL_OBJECT)) {
-                    if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
-                        VM_RUNTIME_ERROR(vm, "Object key must be string");
-                        return VM_ERROR;
-                    }
-
-                    DenseObject* object = AS_OBJECT(LEFT_REG);
-                    DenseString* key = AS_STRING(RIGHT_BY_TYPE);
-
-                    Value value;
-
-                    if(!dense_object_get(object, key, &value)) {
-                        VM_RUNTIME_ERROR(vm, "Object property does not exist");
-                        return VM_ERROR;
-                    }
-
-                    DEST_REG = value;
-                } else {
-                    VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
-                    return VM_ERROR;
                 }
+
+            _op_get_success:
 
                 SKIP(3);
                 break;
             }
             case OP_SET: {
-                if(value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
-                    if(!IS_INT(LEFT_BY_TYPE)) {
-                        VM_RUNTIME_ERROR(vm, "Index must be int");
-                        return VM_ERROR;
-                    }
+                switch(DEST_REG.type) {
+                    case VAL_DENSE:
+                        switch(AS_DENSE(DEST_REG)->type) {
+                            case DVAL_ARRAY: {
+                                if(!IS_INT(LEFT_BY_TYPE)) {
+                                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                                    return VM_ERROR;
+                                }
 
-                    DenseArray* array = AS_ARRAY(DEST_REG);
-                    uint32_t index = AS_INT(LEFT_BY_TYPE);
+                                DenseArray* array = AS_ARRAY(DEST_REG);
+                                int64_t index = AS_INT(LEFT_BY_TYPE);
 
-                    if(index > array->data.size) {
-                        VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                        return VM_ERROR;
-                    } else if(index == array->data.size) {
-                        if(array->data.size == UINT32_MAX) {
-                            VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
-                            return VM_ERROR;
+                                if(index < 0 || index > array->data.size) {
+                                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                                    return VM_ERROR;
+                                } else if(index == array->data.size) {
+                                    if(array->data.size == UINT32_MAX) {
+                                        VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
+                                        return VM_ERROR;
+                                    }
+
+                                    value_array_write(&array->data, RIGHT_BY_TYPE);
+                                    gc_check(vm);
+                                } else dense_array_set(array, (uint32_t) index, RIGHT_BY_TYPE);
+
+                                goto _op_set_success;
+                            }
+                            /*case DVAL_STRING: {
+                                if(!IS_INT(LEFT_BY_TYPE)) {
+                                    VM_RUNTIME_ERROR(vm, "Index must be int");
+                                    return VM_ERROR;
+                                }
+
+                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
+                                    VM_RUNTIME_ERROR(vm, "Right operand must be a string of length 1");
+                                    return VM_ERROR;
+                                }
+
+                                DenseString* str = AS_STRING(DEST_REG);
+                                int64_t index = AS_INT(LEFT_BY_TYPE);
+                                DenseString* chr = AS_STRING(RIGHT_BY_TYPE);
+
+                                if(chr->length != 1) {
+                                    VM_RUNTIME_ERROR(vm, "Right operand must be a string of length 1");
+                                    return VM_ERROR;
+                                }
+
+                                if(index < 0 || index > str->length) {
+                                    VM_RUNTIME_ERROR(vm, "Index out of bounds");
+                                    return VM_ERROR;
+                                } else if(index == str->length) {
+                                    // The string will end with two nulls: one from the original str (because length + 1
+                                    // oversteps into the null character), and one added by the function. The first null
+                                    // will be replaced with the character. This practically appends a character to the string.
+                                    DenseString* newStr = dense_string_prepare(str->chars, str->length + 1);
+
+                                    newStr->chars[index] = chr->chars[0];
+                                    dense_string_hash_inplace(newStr);
+
+                                    newStr = vm_string_internalize(vm, newStr);
+
+                                    DEST_REG = DENSE_VALUE((DenseValue*) newStr);
+
+                                    gc_check(vm);
+                                } else {
+                                    if(str->chars[index] != chr->chars[0]) {
+                                        DenseString* newStr = dense_string_prepare(str->chars, str->length);
+
+                                        newStr->chars[index] = chr->chars[0];
+                                        dense_string_hash_inplace(newStr);
+
+                                        newStr = vm_string_internalize(vm, newStr);
+
+                                        DEST_REG = DENSE_VALUE((DenseValue*) newStr);
+
+                                        gc_check(vm);
+                                    }
+                                }
+
+                                goto _op_set_success;
+                            }*/
+                            case DVAL_OBJECT: {
+                                if(!value_is_dense_of_type(LEFT_BY_TYPE, DVAL_STRING)) {
+                                    VM_RUNTIME_ERROR(vm, "Object key must be string");
+                                    return VM_ERROR;
+                                }
+
+                                DenseObject* object = AS_OBJECT(DEST_REG);
+                                DenseString* key = AS_STRING(LEFT_BY_TYPE);
+
+                                dense_object_set(object, key, RIGHT_BY_TYPE);
+
+                                gc_check(vm);
+
+                                goto _op_set_success;
+                            }
+                            default:
+                                break;
                         }
-
-                        value_array_write(&array->data, RIGHT_BY_TYPE);
-                        gc_check(vm);
-                    } else dense_array_set(array, index, RIGHT_BY_TYPE);
-                } else if(value_is_dense_of_type(DEST_REG, DVAL_OBJECT)) {
-                    if(!value_is_dense_of_type(LEFT_BY_TYPE, DVAL_STRING)) {
-                        VM_RUNTIME_ERROR(vm, "Object key must be string");
+                        // Fallthrough
+                    default:
+                        VM_RUNTIME_ERROR(vm, "Left operand must be an array, string, or object");
                         return VM_ERROR;
-                    }
-
-                    DenseObject* object = AS_OBJECT(DEST_REG);
-                    DenseString* key = AS_STRING(LEFT_BY_TYPE);
-
-                    dense_object_set(object, key, RIGHT_BY_TYPE);
-
-                    gc_check(vm);
-                } else {
-                    VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
-                    return VM_ERROR;
                 }
+
+            _op_set_success:
 
                 SKIP(3);
                 break;

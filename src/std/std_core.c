@@ -16,7 +16,7 @@ void std_register_core(VM* vm) {
 }
 
 static Value std_core_typeof_internal(VM* vm, Value val) {
-    #define TYPEOF_RESULT(type) DENSE_VALUE(vm_string_internalize(vm, type, sizeof(type) - 1))
+    #define TYPEOF_RESULT(type) DENSE_VALUE(vm_string_create(vm, type, sizeof(type) - 1))
 
     switch(val.type) {
         case VAL_NULL:  return TYPEOF_RESULT("null");

@@ -24,7 +24,7 @@ void std_register_debug(VM* vm) {
 }
 
 static Value std_debug_type_internal(VM* vm, Value val) {
-    #define TYPE_RESULT(type) DENSE_VALUE(vm_string_internalize(vm, type, sizeof(type) - 1))
+    #define TYPE_RESULT(type) DENSE_VALUE(vm_string_create(vm, type, sizeof(type) - 1))
 
     switch(val.type) {
         case VAL_NULL:  return TYPE_RESULT("null");

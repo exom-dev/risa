@@ -77,7 +77,9 @@ Value  dense_clone_register(void* vm, DenseValue* dense); // void* in order to w
 size_t dense_size(DenseValue* dense);
 void   dense_delete(DenseValue* dense);
 
+DenseString* dense_string_prepare(const char* chars, uint32_t length);
 uint32_t     dense_string_hash(DenseString* string);
+void         dense_string_hash_inplace(DenseString* string);
 DenseString* dense_string_from(const char* chars, uint32_t length);
 DenseString* dense_string_concat(DenseString* left, DenseString* right);
 void         dense_string_delete(DenseString* string);

@@ -20,7 +20,7 @@ DenseObject* dense_object_create_register(void* vm, uint32_t entryCount, ...) {
         uint32_t keySize = va_arg(args, uint32_t);
         Value val        = va_arg(args, Value);
 
-        dense_object_set(obj, vm_string_internalize((VM*) vm, key, keySize), val);
+        dense_object_set(obj, vm_string_create((VM *) vm, key, keySize), val);
 
         if(val.type == VAL_DENSE)
             vm_register_dense((VM*) vm, AS_DENSE(val));

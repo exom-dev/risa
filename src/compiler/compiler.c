@@ -1649,7 +1649,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
     }
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
-        if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+        if(prop.size == 6 && memcmp(prop.start, "length", sizeof("length") - 1) == 0) {
             parser_error_at_previous(compiler->parser, "Cannot assign to length");
             return;
         }
@@ -1660,14 +1660,22 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         parser_advance(compiler->parser);
         compile_expression(compiler);
 
-        #define L_TYPE (identifierConst * RISA_TODLR_TYPE_LEFT_MASK)
+        // TODO: Test this for all cases.
+        if(compiler->last.isConst) {
+            register_free(compiler);
+            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+            compiler->function->chunk.size -= 4;
+            compiler->last.isNew = false;
+        }
 
-        emit_byte(compiler, OP_SET | L_TYPE);
+        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+
+        emit_byte(compiler, OP_SET | LR_TYPES);
         emit_byte(compiler, leftReg);
         emit_byte(compiler, rightReg);
         emit_byte(compiler, compiler->last.reg);
 
-        #undef L_TYPE
+        #undef LR_TYPES
 
         if(leftNew)
             register_free(compiler);
@@ -1693,7 +1701,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
             destReg = compiler->regIndex - 1;
         }
 
-        if(prop.size == 6 && memcmp(prop.start, "length", 6) == 0) {
+        if(prop.size == 6 && memcmp(prop.start, "length", sizeof("length") - 1) == 0) {
             emit_byte(compiler, OP_LEN);
             emit_byte(compiler, destReg);
             emit_byte(compiler, leftReg);
@@ -1898,7 +1906,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
 
     compile_expression(compiler);
 
-    bool isLength = (compiler->parser->previous.type == TOKEN_STRING && compiler->parser->previous.size == 8 && memcmp(compiler->parser->previous.start, "\"length\"", 8) == 0);
+    bool isLength = (compiler->parser->previous.type == TOKEN_STRING && compiler->parser->previous.size == 8 && memcmp(compiler->parser->previous.start, "\"length\"", sizeof("\"length\"") - 1) == 0);
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACKET, "Expected ']' after expression");
 
@@ -1922,14 +1930,22 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         parser_advance(compiler->parser);
         compile_expression(compiler);
 
-        #define L_TYPE (isRightConst * RISA_TODLR_TYPE_LEFT_MASK)
+        // TODO: Test this for all cases.
+        if(compiler->last.isConst) {
+            register_free(compiler);
+            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+            compiler->function->chunk.size -= 4;
+            compiler->last.isNew = false;
+        }
 
-        emit_byte(compiler, OP_SET | L_TYPE);
+        #define LR_TYPES (isRightConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+
+        emit_byte(compiler, OP_SET | LR_TYPES);
         emit_byte(compiler, leftReg);
         emit_byte(compiler, rightReg);
         emit_byte(compiler, compiler->last.reg);
 
-        #undef L_TYPE
+        #undef LR_TYPES
 
         if(isLeftNew)
             register_free(compiler);

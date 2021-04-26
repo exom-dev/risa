@@ -67,7 +67,8 @@ void vm_register_string(VM* vm, DenseString* string);
 void vm_register_dense(VM* vm, DenseValue* dense);
 void vm_register_dense_unchecked(VM* vm, DenseValue* dense);
 
-DenseString* vm_string_internalize(VM* vm, const char* str, uint32_t length);
+DenseString* vm_string_create(VM* vm, const char* str, uint32_t length);
+DenseString* vm_string_internalize(VM* vm, DenseString* str);
 
 void vm_global_set(VM* vm, const char* str, uint32_t length, Value value);
 void vm_global_set_native(VM* vm, const char* str, uint32_t length, NativeFunction fn);
