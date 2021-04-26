@@ -34,8 +34,10 @@ int main(int argc, char** argv) {
 VM create_vm() {
     VM vm;
     vm_init(&vm);
+
     std_register_core(&vm);
     std_register_io(&vm);
+    std_register_debug(&vm);
 
     //vm_global_set_native(&vm, "print", 5, print);
 

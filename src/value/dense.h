@@ -89,6 +89,7 @@ Value       dense_array_get(DenseArray* array, uint32_t index);
 void        dense_array_set(DenseArray* array, uint32_t index, Value value);
 
 DenseObject* dense_object_create();
+DenseObject* dense_object_create_register(void* vm, uint32_t entryCount, ...);
 void         dense_object_init(DenseObject* object);
 void         dense_object_delete(DenseObject* object);
 bool         dense_object_get(DenseObject* object, DenseString* key, Value* value);
@@ -103,5 +104,6 @@ void           dense_function_delete(DenseFunction* function);
 DenseClosure* dense_closure_create(DenseFunction* function, uint8_t upvalueCount);
 
 DenseNative* dense_native_create(NativeFunction function);
+Value dense_native_value(NativeFunction function);
 
 #endif

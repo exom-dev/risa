@@ -10,3 +10,7 @@ DenseNative* dense_native_create(NativeFunction function) {
 
     return native;
 }
+
+Value dense_native_value(NativeFunction function) {
+    return DENSE_VALUE(dense_native_create(function));
+}
