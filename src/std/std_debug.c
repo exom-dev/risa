@@ -12,15 +12,37 @@ static Value std_debug_type(void* vm, uint8_t argc, Value* args) {
     return NULL_VALUE;
 }
 
-void std_register_debug(VM* vm) {
-    #define REGISTER_DEBUG_ENTRY(name) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, dense_native_value(std_debug_##name)
+static Value std_debug_vm_acc(void* vm, uint8_t argc, Value* args) {
+    if(argc == 0) {
+        return ((VM*) vm)->acc;
+    }
 
-    DenseObject* obj = dense_object_create_register(vm, 1
-                                                    REGISTER_DEBUG_ENTRY(type));
+    return (((VM*) vm)->acc = args[0]);
+}
+
+static Value std_debug_vm_heap_size(void* vm, uint8_t argc, Value* args) {
+    return (INT_VALUE((uint64_t) ((VM*) vm)->heapSize));
+}
+
+static Value std_debug_vm_stack_size(void* vm, uint8_t argc, Value* args) {
+    return (INT_VALUE((uint64_t) (VM_STACK_SIZE * sizeof(Value))));
+}
+
+void std_register_debug(VM* vm) {
+    #define STD_DEBUG_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, dense_native_value(std_debug_##fn)
+
+    DenseObject* objVm = dense_object_create_register(vm, 3
+                                                      STD_DEBUG_ENTRY(acc, vm_acc)
+                                                      STD_DEBUG_ENTRY(heapSize, vm_heap_size)
+                                                      STD_DEBUG_ENTRY(stackSize, vm_stack_size));
+
+    DenseObject* obj = dense_object_create_register(vm, 2,
+                                                    "vm", sizeof("vm") - 1, DENSE_VALUE((DenseValue*) objVm)
+                                                    STD_DEBUG_ENTRY(type, type));
 
     vm_global_set(vm, "debug", sizeof("debug") - 1, DENSE_VALUE((DenseValue*) obj));
 
-    #undef REGISTER_DEBUG_ENTRY
+    #undef STD_DEBUG_ENTRY
 }
 
 static Value std_debug_type_internal(VM* vm, Value val) {

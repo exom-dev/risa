@@ -31,7 +31,7 @@ typedef struct {
 
 typedef struct {
     RisaIO io;
-    CallFrame frames[CALLFRAME_STACK_SIZE];
+    CallFrame frames[VM_CALLFRAME_COUNT];
     uint32_t frameCount;
 
     Value  stack[VM_STACK_SIZE];

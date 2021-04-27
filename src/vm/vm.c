@@ -1143,6 +1143,8 @@ VMStatus vm_run(VM* vm) {
                 if(vm->frameCount == 0)
                     return VM_OK;
 
+                // The reg that contained the function will now contain the returned value.
+                // This has to be done manually for native functions (see call_native).
                 if(DEST > 249)
                     *frame->base = NULL_VALUE;
                 else *frame->base = DEST_REG;
@@ -1242,7 +1244,7 @@ static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
         return false;
     }
 
-    if(vm->frameCount == CALLFRAME_STACK_SIZE) {
+    if(vm->frameCount == VM_CALLFRAME_COUNT) {
         VM_RUNTIME_ERROR(vm, "Stack overflow");
         return false;
     }
@@ -1269,7 +1271,7 @@ static bool call_closure(VM* vm, uint8_t reg, uint8_t argc) {
         return false;
     }
 
-    if(vm->frameCount == CALLFRAME_STACK_SIZE) {
+    if(vm->frameCount == VM_CALLFRAME_COUNT) {
         VM_RUNTIME_ERROR(vm, "Stack overflow");
         return false;
     }
@@ -1292,7 +1294,7 @@ static bool call_native(VM* vm, uint8_t reg, uint8_t argc) {
 
     DenseNative* native = AS_NATIVE(FRAME.regs[reg]);
 
-    vm->frames[vm->frameCount - 1].regs[reg] = native->function(vm, argc, &FRAME.regs[reg + 1]);
+    FRAME.regs[reg] = native->function(vm, argc, &FRAME.regs[reg + 1]);
     return true;
 
     #undef FRAME
