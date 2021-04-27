@@ -78,6 +78,8 @@ static uint16_t create_identifier_constant(Compiler*);
 static uint16_t create_string_constant(Compiler*, const char*, uint32_t);
 static uint16_t declare_variable(Compiler*);
 
+static void optimize_last_cnst(Compiler*);
+
 static bool    register_reserve(Compiler*);
 static uint8_t register_find(Compiler*, RegType, Token);
 static void    register_free(Compiler*);
@@ -563,11 +565,14 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
             if(set == OP_SGLOB) {
                 Chunk* chunk = &compiler->function->chunk;
 
-                if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
+                optimize_last_cnst(compiler);
+
+                // TODO: check if this works for all cases
+                /*if(chunk->bytecode[chunk->size - 4] == OP_CNST) {
                     compiler->last.reg = chunk->bytecode[chunk->size - 2];
                     compiler->last.isConst = true;
                     chunk->size -= 4;
-                }
+                }*/
 
                 #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
                 set |= L_TYPE;
@@ -663,10 +668,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
             if (compiler->last.isNew)
                 register_free(compiler);
 
-            if (compiler->last.isConst) {
-                compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-                compiler->function->chunk.size -= 4;
-            }
+            optimize_last_cnst(compiler);
 
             #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
@@ -777,10 +779,7 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
             if(compiler->last.isNew)
                 register_free(compiler);
 
-            if(compiler->last.isConst) {
-                compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
-                compiler->function->chunk.size -= 4;
-            }
+            optimize_last_cnst(compiler);
 
             #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
 
@@ -1661,12 +1660,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         compile_expression(compiler);
 
         // TODO: Test this for all cases.
-        if(compiler->last.isConst) {
-            register_free(compiler);
-            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-            compiler->function->chunk.size -= 4;
-            compiler->last.isNew = false;
-        }
+        optimize_last_cnst(compiler);
 
         #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
@@ -1910,12 +1904,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
 
     parser_consume(compiler->parser, TOKEN_RIGHT_BRACKET, "Expected ']' after expression");
 
-    if(compiler->last.isConst) {
-        register_free(compiler);
-        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-        compiler->function->chunk.size -= 4;
-        compiler->last.isNew = false;
-    }
+    optimize_last_cnst(compiler);
 
     if(allowAssignment && (compiler->parser->current.type == TOKEN_EQUAL)) {
         if(isLength) {
@@ -1931,12 +1920,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         compile_expression(compiler);
 
         // TODO: Test this for all cases.
-        if(compiler->last.isConst) {
-            register_free(compiler);
-            compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-            compiler->function->chunk.size -= 4;
-            compiler->last.isNew = false;
-        }
+        optimize_last_cnst(compiler);
 
         #define LR_TYPES (isRightConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
@@ -2081,12 +2065,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     Rule* rule = &EXPRESSION_RULES[operatorType];
     compile_expression_precedence(compiler, (Precedence) (rule->precedence + 1));
 
-    if(compiler->last.isConst) {
-        register_free(compiler);
-        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
-        compiler->function->chunk.size -= 4;
-        compiler->last.isNew = false;
-    }
+    optimize_last_cnst(compiler);
 
     // The GT and GTE instructions are simulated with reversed LT and LTE. Therefore, switch the operands and use the REV def.
     #define LR_TYPES ((isLeftConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
@@ -2218,10 +2197,7 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
 
     compile_expression(compiler);
 
-    if(compiler->last.isConst) {
-        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 4 + 2];
-        compiler->function->chunk.size -= 4;
-    }
+    optimize_last_cnst(compiler);
 
     #define R_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
 
@@ -2752,6 +2728,15 @@ static uint16_t declare_variable(Compiler* compiler) {
     }
 
     return create_identifier_constant(compiler);
+}
+
+static void optimize_last_cnst(Compiler* compiler) {
+    if(compiler->last.isConst) {
+        register_free(compiler);
+        compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
+        compiler->function->chunk.size -= 4;
+        compiler->last.isNew = false;
+    }
 }
 
 static bool register_reserve(Compiler* compiler) {
