@@ -2416,6 +2416,7 @@ static void compile_postfix(Compiler* compiler, bool allowAssignment) {
         case LVAL_UPVAL:
             emit_bytes(compiler, OP_SUPVAL, compiler->last.lvalMeta.upval, destReg);
             emit_byte(compiler, 0);
+            break;
         case LVAL_UPVAL_PROP:
             emit_bytes(compiler, OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
                                                                                                                                 : compiler->last.lvalMeta.propIndex.as.reg);
