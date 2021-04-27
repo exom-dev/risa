@@ -1858,7 +1858,8 @@ static void compile_lambda(Compiler* compiler) {
             declare_variable(&subcompiler);
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
-            //++subcompiler.regIndex;
+            // Reserve a register for the parameter.
+            ++subcompiler.regIndex;
 
             if(subcompiler.parser->current.type != TOKEN_COMMA)
                 break;

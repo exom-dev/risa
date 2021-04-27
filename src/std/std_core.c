@@ -1,5 +1,6 @@
 #include "std.h"
 #include "../value/value.h"
+#include "../def/macro.h"
 
 static Value std_core_typeof_internal(VM* vm, Value val);
 
@@ -11,8 +12,44 @@ static Value std_core_typeof(void* vm, uint8_t argc, Value* args) {
     return NULL_VALUE;
 }
 
+static Value std_core_foreach(void* vm, uint8_t argc, Value* args) {
+    if(argc < 2)
+        return NULL_VALUE;
+
+    if(!value_is_dense_of_type(args[0], DVAL_ARRAY))
+        return NULL_VALUE;
+
+    switch(args[1].type) {
+        case VAL_DENSE:
+            switch(AS_DENSE(args[1])->type) {
+                case DVAL_FUNCTION:
+                case DVAL_CLOSURE:
+                case DVAL_NATIVE:
+                    goto _std_core_foreach_work;
+            } // Fallthrough
+        default:
+            return NULL_VALUE;
+    }
+
+_std_core_foreach_work: ;
+
+    DenseArray* array = AS_ARRAY(args[0]);
+
+    for(size_t i = 0; i < array->data.size; ++i) {
+        vm_invoke(vm, args + argc, args[1], 1, array->data.values[i]);
+    }
+
+    return NULL_VALUE;
+}
+
 void std_register_core(VM* vm) {
+    #define STD_CORE_ENTRY(name) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_core_##name
+
+    // typeof is a C keyword, so the entry macro can't be used.
     vm_global_set_native(vm, "typeof", sizeof("typeof") - 1, std_core_typeof);
+    vm_global_set_native(vm, STD_CORE_ENTRY(foreach));
+
+    #undef STD_CORE_ENTRY
 }
 
 static Value std_core_typeof_internal(VM* vm, Value val) {

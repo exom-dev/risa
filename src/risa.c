@@ -34,15 +34,7 @@ RisaExecuteStatus risa_execute_chunk(VM* vm, Chunk chunk) {
 RisaExecuteStatus risa_execute_function(VM* vm, DenseFunction* function) {
     vm_clean(vm);
 
-    CallFrame frame;
-
-    frame.type = FRAME_FUNCTION;
-    frame.callee.function = function;
-    frame.ip = frame.callee.function->chunk.bytecode;
-    frame.base = vm->stackTop++;
-    frame.regs = frame.base + 1;
-
-    vm->frames[0] = frame;
+    vm->frames[0] = vm_frame_from_function(vm, NULL, function, true);
     vm->frameCount = 1;
     vm->stackTop += 250;
 

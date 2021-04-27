@@ -21,7 +21,7 @@ void gc_run(VM* vm) {
             gc_mark_dense(AS_DENSE(*i));
 
     for(uint32_t i = 0; i < vm->frameCount; ++i)
-        gc_mark_dense((DenseValue*) FRAME_FUNCTION(vm->frames[i]));
+        gc_mark_dense((DenseValue*) VM_FRAME_FUNCTION(vm->frames[i]));
 
     for(DenseUpvalue* i = vm->upvalues; i != NULL; i = i->next)
         gc_mark_dense((DenseValue*) i);

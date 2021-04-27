@@ -8,12 +8,13 @@
 #include "../asm/disassembler.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
-    fprintf(stderr, "[error] at index %u: " fmt "\n", FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.indices[vm->frames[vm->frameCount - 1].ip - FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.bytecode], ##__VA_ARGS__ )
+    fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.bytecode], ##__VA_ARGS__ )
 
-static bool call_value(VM* vm, uint8_t reg, uint8_t argc);
-static bool call_function(VM* vm, uint8_t reg, uint8_t argc);
-static bool call_closure(VM* vm, uint8_t reg, uint8_t argc);
-static bool call_native(VM* vm, uint8_t reg, uint8_t argc);
+static bool call_register(VM* vm, uint8_t reg, uint8_t argc);
+static bool call_value(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
+static bool call_function(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
+static bool call_closure(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
+static bool call_native(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
 
 static DenseUpvalue* upvalue_capture(VM* vm, Value* local);
 static void          upvalue_close_from(VM* vm, Value* slot);
@@ -73,17 +74,17 @@ VMStatus vm_run(VM* vm) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
 
     #define NEXT_BYTE() (*frame->ip++)
-    #define NEXT_CONSTANT() (FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
+    #define NEXT_CONSTANT() (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
 
     #define DEST     (*frame->ip)
     #define LEFT     (frame->ip[1])
     #define RIGHT    (frame->ip[2])
     #define COMBINED ((((uint16_t) frame->ip[1]) << 8) | (frame->ip[2]))
 
-    #define DEST_CONST     (FRAME_FUNCTION(*frame)->chunk.constants.values[DEST])
-    #define LEFT_CONST     (FRAME_FUNCTION(*frame)->chunk.constants.values[LEFT])
-    #define RIGHT_CONST    (FRAME_FUNCTION(*frame)->chunk.constants.values[RIGHT])
-    #define COMBINED_CONST (FRAME_FUNCTION(*frame)->chunk.constants.values[COMBINED])
+    #define DEST_CONST     (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[DEST])
+    #define LEFT_CONST     (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[LEFT])
+    #define RIGHT_CONST    (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[RIGHT])
+    #define COMBINED_CONST (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[COMBINED])
 
     #define DEST_REG  (frame->regs[DEST])
     #define LEFT_REG  (frame->regs[LEFT])
@@ -1125,7 +1126,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_CALL: {
-                if(!call_value(vm, DEST, LEFT))
+                if(!call_register(vm, DEST, LEFT))
                     return VM_ERROR;
 
                 // Native function.
@@ -1140,6 +1141,7 @@ VMStatus vm_run(VM* vm) {
 
                 --vm->frameCount;
 
+                // When returning from the first frame, halt the VM.
                 if(vm->frameCount == 0)
                     return VM_OK;
 
@@ -1149,8 +1151,14 @@ VMStatus vm_run(VM* vm) {
                     *frame->base = NULL_VALUE;
                 else *frame->base = DEST_REG;
 
-                vm->stackTop = frame->base + 1;
+                vm->stackTop -= 251; // = frame->base + 1;
+
                 frame = &vm->frames[vm->frameCount - 1];
+
+                // If the frame is isolated, halt the VM.
+                if(vm->frames[vm->frameCount].isolated) {
+                    return VM_OK;
+                }
 
                 SKIP(3); // Skip the CALL args.
                 break;
@@ -1170,7 +1178,7 @@ VMStatus vm_run(VM* vm) {
                 DenseFunction* func;
 
                 if(DEST > 249)
-                    func = FRAME_FUNCTION(*frame);
+                    func = VM_FRAME_FUNCTION(*frame);
                 else {
                     if(value_is_dense_of_type(DEST_REG, DVAL_FUNCTION))
                         func = AS_FUNCTION(DEST_REG);
@@ -1217,17 +1225,69 @@ VMStatus vm_run(VM* vm) {
     #undef NEXT_BYTE
 }
 
-static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
-    Value value = vm->frames[vm->frameCount - 1].regs[reg];
+Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...) {
+    Value* ptr = base + 1;
+    Value* end = ptr + argc;
 
-    if(IS_DENSE(value)) {
-        switch(AS_DENSE(value)->type) {
+    va_list args;
+
+    va_start(args, argc);
+
+    // Push the args on the stack.
+    while(ptr < end) {
+        *ptr++ = va_arg(args, Value);
+    }
+
+    va_end(args);
+
+    if(IS_DENSE(callee)) {
+        switch(AS_DENSE(callee)->type) {
+            case DVAL_FUNCTION: {
+                if(!call_function(vm, base, callee, argc, true))
+                    return NULL_VALUE;
+
+                goto _vm_invoke_run;
+            }
+            case DVAL_CLOSURE: {
+                if(!call_closure(vm, base, callee, argc, true))
+                    return NULL_VALUE;
+
+            _vm_invoke_run:
+
+                if(vm_run(vm) == VM_ERROR)
+                    return NULL_VALUE;
+
+                return *base;
+            }
+            case DVAL_NATIVE: {
+                if(!call_native(vm, base, callee, argc, true))
+                    return NULL_VALUE;
+
+                return *base;
+            }
+            default: ;
+        }
+    }
+
+    VM_RUNTIME_ERROR(vm, "Cannot call non-function type");
+    return NULL_VALUE;
+}
+
+static bool call_register(VM* vm, uint8_t reg, uint8_t argc) {
+    Value* callee = &vm->frames[vm->frameCount - 1].regs[reg];
+
+    return call_value(vm, callee, *callee, argc, false);
+}
+
+static bool call_value(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
+    if(IS_DENSE(callee)) {
+        switch(AS_DENSE(callee)->type) {
             case DVAL_FUNCTION:
-                return call_function(vm, reg, argc);
+                return call_function(vm, base, callee, argc, isolated);
             case DVAL_CLOSURE:
-                return call_closure(vm, reg, argc);
+                return call_closure(vm, base, callee, argc, isolated);
             case DVAL_NATIVE:
-                return call_native(vm, reg, argc);
+                return call_native(vm, base, callee, argc, isolated);
             default: ;
         }
     }
@@ -1236,8 +1296,8 @@ static bool call_value(VM* vm, uint8_t reg, uint8_t argc) {
     return false;
 }
 
-static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
-    DenseFunction* function = AS_FUNCTION(vm->frames[vm->frameCount - 1].regs[reg]);
+static bool call_function(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
+    DenseFunction* function = AS_FUNCTION(callee);
 
     if(argc != function->arity) {
         VM_RUNTIME_ERROR(vm, "Expected %x args, got %x", function->arity, argc);
@@ -1249,21 +1309,16 @@ static bool call_function(VM* vm, uint8_t reg, uint8_t argc) {
         return false;
     }
 
-    CallFrame* frame = &vm->frames[vm->frameCount++];
-    frame->type = FRAME_FUNCTION;
-    frame->callee.function = function;
-    frame->ip = function->chunk.bytecode;
+    ++vm->frameCount;
 
-    frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
-    frame->regs = frame->base + 1;
-
+    vm->frames[vm->frameCount - 1] = vm_frame_from_function(vm, base, function, isolated);
     vm->stackTop += 251;
 
     return true;
 }
 
-static bool call_closure(VM* vm, uint8_t reg, uint8_t argc) {
-    DenseClosure* closure = AS_CLOSURE(vm->frames[vm->frameCount - 1].regs[reg]);
+static bool call_closure(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
+    DenseClosure* closure = AS_CLOSURE(callee);
     DenseFunction* function = closure->function;
 
     if(argc != function->arity) {
@@ -1276,28 +1331,20 @@ static bool call_closure(VM* vm, uint8_t reg, uint8_t argc) {
         return false;
     }
 
-    CallFrame* frame = &vm->frames[vm->frameCount++];
-    frame->type = FRAME_CLOSURE;
-    frame->callee.closure = closure;
-    frame->ip = function->chunk.bytecode;
+    ++vm->frameCount;
 
-    frame->base = &vm->frames[vm->frameCount - 2].regs[reg];
-    frame->regs = frame->base + 1;
-
+    vm->frames[vm->frameCount - 1] = vm_frame_from_closure(vm, base, closure, isolated);
     vm->stackTop += 251;
 
     return true;
 }
 
-static bool call_native(VM* vm, uint8_t reg, uint8_t argc) {
-    #define FRAME vm->frames[vm->frameCount - 1]
+static bool call_native(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
+    DenseNative* native = AS_NATIVE(callee);
 
-    DenseNative* native = AS_NATIVE(FRAME.regs[reg]);
+    *base = native->function(vm, argc, base + 1);
 
-    FRAME.regs[reg] = native->function(vm, argc, &FRAME.regs[reg + 1]);
     return true;
-
-    #undef FRAME
 }
 
 static DenseUpvalue* upvalue_capture(VM* vm, Value* local) {

@@ -8,6 +8,9 @@
 #include "../value/dense.h"
 #include "../options/options.h"
 
+// This is also used in 'memory/gc.c'
+#define VM_FRAME_FUNCTION(frame) ((frame).type == FRAME_FUNCTION ? (frame).callee.function : (frame).callee.closure->function)
+
 typedef enum {
     FRAME_FUNCTION,
     FRAME_CLOSURE
@@ -25,9 +28,9 @@ typedef struct {
 
     Value* base;
     Value* regs;
-} CallFrame;
 
-#define FRAME_FUNCTION(frame) ((frame).type == FRAME_FUNCTION ? (frame).callee.function : (frame).callee.closure->function)
+    bool isolated;
+} CallFrame;
 
 typedef struct {
     RisaIO io;
@@ -62,10 +65,16 @@ void vm_delete(VM* vm);
 
 VMStatus vm_execute(VM* vm);
 VMStatus vm_run(VM* vm);
+Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...);
 
 void vm_register_string(VM* vm, DenseString* string);
 void vm_register_dense(VM* vm, DenseValue* dense);
 void vm_register_dense_unchecked(VM* vm, DenseValue* dense);
+
+// isolated = upon returning from this frame, halt the VM. Useful for the first frame,
+// and for calling other functions from native functions.
+CallFrame vm_frame_from_function(VM* vm, Value* base, DenseFunction* function, bool isolated);
+CallFrame vm_frame_from_closure(VM* vm, Value* base, DenseClosure* closure, bool isolated);
 
 DenseString* vm_string_create(VM* vm, const char* str, uint32_t length);
 DenseString* vm_string_internalize(VM* vm, DenseString* str);

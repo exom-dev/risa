@@ -1,5 +1,6 @@
 #include "std.h"
 #include "../value/value.h"
+#include "../def/macro.h"
 
 static Value std_io_print(void* vm, uint8_t argc, Value* args) {
     for(uint16_t i = 0; i < argc; ++i)
@@ -22,6 +23,10 @@ static Value std_io_println(void* vm, uint8_t argc, Value* args) {
 }
 
 void std_register_io(VM* vm) {
-    vm_global_set_native(vm, "print", sizeof("print") - 1, std_io_print);
-    vm_global_set_native(vm, "println", sizeof("println") - 1, std_io_println);
+    #define STD_IO_ENTRY(name) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_io_##name
+
+    vm_global_set_native(vm, STD_IO_ENTRY(print));
+    vm_global_set_native(vm, STD_IO_ENTRY(println));
+
+    #undef STD_IO_ENTRY
 }
