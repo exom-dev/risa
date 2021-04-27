@@ -1050,7 +1050,12 @@ static void compile_function(Compiler* compiler) {
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
             ++subcompiler.regIndex;
-        } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
+
+            if(subcompiler.parser->current.type != TOKEN_COMMA)
+                break;
+
+            parser_advance(subcompiler.parser);
+        } while(true);
     }
 
     parser_consume(subcompiler.parser, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
@@ -1772,7 +1777,12 @@ static uint8_t compile_arguments(Compiler* compiler) {
             }
 
             ++argc;
-        } while(compiler->parser->current.type == TOKEN_COMMA && (parser_advance(compiler->parser), true));
+
+            if(compiler->parser->current.type != TOKEN_COMMA)
+                break;
+
+            parser_advance(compiler->parser);
+        } while(true);
     }
 
     parser_consume(compiler->parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments");
@@ -1849,7 +1859,12 @@ static void compile_lambda(Compiler* compiler) {
             subcompiler.locals[subcompiler.localCount - 1].depth = subcompiler.scopeDepth;
 
             //++subcompiler.regIndex;
-        } while(subcompiler.parser->current.type == TOKEN_COMMA && (parser_advance(subcompiler.parser), true));
+
+            if(subcompiler.parser->current.type != TOKEN_COMMA)
+                break;
+
+            parser_advance(subcompiler.parser);
+        } while(true);
     }
 
     parser_consume(subcompiler.parser, TOKEN_RIGHT_PAREN, "Expected ')' after lambda parameters");
@@ -2771,5 +2786,3 @@ static void register_free(Compiler* compiler) {
 static void finalize_compilation(Compiler* compiler) {
     emit_return(compiler);
 }
-
-#undef RISA_TODLR_INSTRUCTION_MASK
