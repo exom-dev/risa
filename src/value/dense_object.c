@@ -8,7 +8,7 @@ DenseObject* dense_object_create() {
     return object;
 }
 
-DenseObject* dense_object_create_register(void* vm, uint32_t entryCount, ...) {
+DenseObject* dense_object_create_with(void* vm, uint32_t entryCount, ...) {
     DenseObject* obj = dense_object_create();
 
     va_list args;

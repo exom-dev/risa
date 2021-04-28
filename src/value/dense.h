@@ -91,7 +91,7 @@ Value       dense_array_get(DenseArray* array, uint32_t index);
 void        dense_array_set(DenseArray* array, uint32_t index, Value value);
 
 DenseObject* dense_object_create();
-DenseObject* dense_object_create_register(void* vm, uint32_t entryCount, ...);
+DenseObject* dense_object_create_with(void* vm, uint32_t entryCount, ...);
 void         dense_object_init(DenseObject* object);
 void         dense_object_delete(DenseObject* object);
 bool         dense_object_get(DenseObject* object, DenseString* key, Value* value);
