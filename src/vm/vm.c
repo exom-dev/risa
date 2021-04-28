@@ -1226,6 +1226,12 @@ VMStatus vm_run(VM* vm) {
 }
 
 Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...) {
+    // Check the frame count before pushing anything on the stack.
+    if(vm->frameCount == VM_CALLFRAME_COUNT) {
+        VM_RUNTIME_ERROR(vm, "Stack overflow");
+        return NULL_VALUE;
+    }
+
     Value* ptr = base + 1;
     Value* end = ptr + argc;
 

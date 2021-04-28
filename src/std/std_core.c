@@ -45,8 +45,7 @@ _std_core_foreach_work: ;
 void std_register_core(VM* vm) {
     #define STD_CORE_ENTRY(name) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_core_##name
 
-    // typeof is a C keyword, so the entry macro can't be used.
-    vm_global_set_native(vm, "typeof", sizeof("typeof") - 1, std_core_typeof);
+    vm_global_set_native(vm, STD_CORE_ENTRY(typeof));
     vm_global_set_native(vm, STD_CORE_ENTRY(foreach));
 
     #undef STD_CORE_ENTRY
