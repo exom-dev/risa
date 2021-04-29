@@ -69,6 +69,7 @@ typedef struct {
 #define IS_DENSE(value) ((value).type == VAL_DENSE)
 
 void  value_print(RisaIO* io, Value value);
+char* value_to_string(Value value);
 Value value_clone(Value value);
 Value value_clone_register(void* vm, Value value); // void* in order to work around the circular dependency.
 bool  value_is_falsy(Value value);

@@ -2,14 +2,28 @@
 #include "../value/value.h"
 #include "../def/macro.h"
 
+#include <string.h>
+
 static Value std_core_typeof_internal(VM* vm, Value val);
 
 static Value std_core_typeof(void* vm, uint8_t argc, Value* args) {
-    if(argc > 0) {
-        return std_core_typeof_internal((VM*) vm, args[0]);
-    }
+    if(argc == 0)
+        return NULL_VALUE;
 
-    return NULL_VALUE;
+    return std_core_typeof_internal((VM*) vm, args[0]);
+}
+
+static Value std_core_to_string(void* vm, uint8_t argc, Value* args) {
+    if(argc == 0)
+        return NULL_VALUE;
+
+    char* str = value_to_string(args[0]);
+
+    DenseString* result = vm_string_create(vm, str, strlen(str));
+
+    RISA_MEM_FREE(str);
+
+    return DENSE_VALUE((DenseValue*) result);
 }
 
 static Value std_core_foreach(void* vm, uint8_t argc, Value* args) {
@@ -43,10 +57,11 @@ _std_core_foreach_work: ;
 }
 
 void std_register_core(VM* vm) {
-    #define STD_CORE_ENTRY(name) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_core_##name
+    #define STD_CORE_ENTRY(name, fn) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_core_##fn
 
-    vm_global_set_native(vm, STD_CORE_ENTRY(typeof));
-    vm_global_set_native(vm, STD_CORE_ENTRY(foreach));
+    vm_global_set_native(vm, STD_CORE_ENTRY(typeof, typeof));
+    vm_global_set_native(vm, STD_CORE_ENTRY(toString, to_string));
+    vm_global_set_native(vm, STD_CORE_ENTRY(foreach, foreach));
 
     #undef STD_CORE_ENTRY
 }

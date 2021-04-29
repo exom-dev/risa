@@ -2,6 +2,8 @@
 #include "dense.h"
 #include "../io/log.h"
 
+#include <string.h>
+
 void value_print(RisaIO* io, Value value) {
     switch(value.type) {
         case VAL_NULL:
@@ -23,6 +25,61 @@ void value_print(RisaIO* io, Value value) {
             dense_print(io, AS_DENSE(value));
             break;
     }
+}
+
+char* value_to_string(Value value) {
+    char* data;
+
+    switch(value.type) {
+        case VAL_NULL: {
+            data = RISA_MEM_ALLOC(sizeof("null"));
+            memcpy(data, "null\0", sizeof("null"));
+            break;
+        }
+        case VAL_BOOL: {
+            char* str;
+            size_t size;
+
+            if(AS_BOOL(value)) {
+                str = "true";
+                size = sizeof("true");
+            } else {
+                str = "false";
+                size = sizeof("false");
+            }
+
+            data = RISA_MEM_ALLOC(sizeof(char) * size);
+            memcpy(data, str, size);
+            break;
+        }
+        case VAL_BYTE: {
+            size_t size = 1 + snprintf(NULL, 0, "%hhu", AS_BYTE(value));
+            data = RISA_MEM_ALLOC(sizeof(char) * size);
+
+            snprintf(data, size, "%hhu", AS_BYTE(value));
+            break;
+        }
+        case VAL_INT: {
+            size_t size = 1 + snprintf(NULL, 0, "%lld", AS_INT(value));
+            data = RISA_MEM_ALLOC(sizeof(char) * size);
+
+            snprintf(data, size, "%lld", AS_INT(value));
+            break;
+        }
+        case VAL_FLOAT: {
+            size_t size = 1 + snprintf(NULL, 0, "%f", AS_FLOAT(value));
+            data = RISA_MEM_ALLOC(sizeof(char) * size);
+
+            snprintf(data, size, "%f", AS_FLOAT(value));
+            break;
+        }
+        case VAL_DENSE: {
+            data = dense_to_string(AS_DENSE(value));
+            break;
+        }
+    }
+
+    return data;
 }
 
 Value value_clone(Value value) {

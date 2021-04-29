@@ -123,9 +123,11 @@ char* risa_io_format(const char* fmt, va_list args) {
     va_list argscpy;
     va_copy(argscpy, args);
 
-    data = RISA_MEM_ALLOC(1 + vsnprintf(NULL, 0, fmt, argscpy));
+    size_t size = 1 + vsnprintf(NULL, 0, fmt, argscpy);
 
-    vsprintf(data, fmt, args);
+    data = RISA_MEM_ALLOC(size);
+
+    vsnprintf(data, size, fmt, args);
     va_end(argscpy);
 
     return data;

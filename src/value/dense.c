@@ -1,6 +1,9 @@
 #include "dense.h"
 #include "../io/log.h"
 #include "../vm/vm.h"
+#include "../lib/charlib.h"
+
+#include <string.h>
 
 void dense_print(RisaIO* io, DenseValue* dense) {
     switch(dense->type) {
@@ -58,6 +61,123 @@ void dense_print(RisaIO* io, DenseValue* dense) {
     }
 }
 
+char*  dense_to_string(DenseValue* dense) {
+    char* data;
+
+    switch(dense->type) {
+        case DVAL_STRING: {
+            data = RISA_MEM_ALLOC(sizeof(char) * (1 + ((DenseString*) dense)->length));
+            memcpy(data, ((DenseString*) dense)->chars, ((DenseString*) dense)->length + 1);
+            break;
+        }
+        case DVAL_ARRAY: {
+            RisaLibCharlibString str;
+
+            risa_lib_charlib_string_init(&str);
+            risa_lib_charlib_string_append_c(&str,  "[");
+
+            for(uint32_t i = 0; i < ((DenseArray*) dense)->data.size; ++i) {
+                char* valStr = value_to_string(((DenseArray*) dense)->data.values[i]);
+
+                risa_lib_charlib_string_append_c(&str, valStr);
+                RISA_MEM_FREE(valStr);
+
+                if(i < ((DenseArray*) dense)->data.size - 1)
+                    risa_lib_charlib_string_append_c(&str,  ", ");
+            }
+
+            risa_lib_charlib_string_append_c(&str,  "]");
+
+            data = str.data;
+            break;
+        }
+        case DVAL_OBJECT: {
+            bool first = true;
+
+            RisaLibCharlibString str;
+
+            risa_lib_charlib_string_init(&str);
+            risa_lib_charlib_string_append_c(&str,  "{ ");
+
+            for (uint32_t i = 0; i < ((DenseObject *) dense)->data.capacity; ++i) {
+                if(((DenseObject *) dense)->data.entries[i].key != NULL) {
+                    if(first)
+                        first = false;
+                    else risa_lib_charlib_string_append_c(&str,  ", ");
+
+                    risa_lib_charlib_string_append_c(&str,  "\"");
+
+                    char* valStr = dense_to_string((DenseValue*) (((DenseObject *) dense)->data.entries[i].key));
+                    risa_lib_charlib_string_append_c(&str,  valStr);
+                    RISA_MEM_FREE(valStr);
+
+
+                    risa_lib_charlib_string_append_c(&str,  "\": ");
+
+                    valStr = value_to_string(((DenseObject *) dense)->data.entries[i].value);
+                    risa_lib_charlib_string_append_c(&str,  valStr);
+                    RISA_MEM_FREE(valStr);
+                }
+            }
+
+            risa_lib_charlib_string_append_c(&str,  " }");
+
+            data = str.data;
+            break;
+        }
+        case DVAL_UPVALUE: {
+            data = RISA_MEM_ALLOC(sizeof("<upval>"));
+            memcpy(data, "<upval>\0", sizeof("<upval>"));
+            break;
+        }
+        case DVAL_FUNCTION: {
+            if(((DenseFunction*) dense)->name == NULL) {
+                data = RISA_MEM_ALLOC(sizeof("<script>"));
+                memcpy(data, "<script>\0", sizeof("<script>"));
+                break;
+            } else {
+                RisaLibCharlibString str;
+
+                risa_lib_charlib_string_init(&str);
+                risa_lib_charlib_string_append_c(&str, "<fn ");
+                risa_lib_charlib_string_append_c(&str, ((DenseFunction*) dense)->name->chars);
+                risa_lib_charlib_string_append_c(&str, ">");
+
+                data = str.data;
+                break;
+            }
+        }
+        case DVAL_CLOSURE: {
+            if(((DenseFunction*) dense)->name == NULL) {
+                data = RISA_MEM_ALLOC(sizeof("<script>"));
+                memcpy(data, "<script>\0", sizeof("<script>"));
+                break;
+            } else {
+                RisaLibCharlibString str;
+
+                risa_lib_charlib_string_init(&str);
+                risa_lib_charlib_string_append_c(&str, "<fn ");
+                risa_lib_charlib_string_append_c(&str, ((DenseClosure*) dense)->function->name->chars);
+                risa_lib_charlib_string_append_c(&str, ">");
+
+                data = str.data;
+                break;
+            }
+        }
+        case DVAL_NATIVE: {
+            data = RISA_MEM_ALLOC(sizeof("<native fn>"));
+            memcpy(data, "<native fn>\0", sizeof("<native fn>"));
+            break;
+        }
+        default: {
+            data = RISA_MEM_ALLOC(sizeof("UNK"));
+            memcpy(data, "UNK\0", sizeof("UNK"));
+            break;
+        }
+    }
+
+    return data;
+}
 
 Value dense_clone(DenseValue* dense) {
     switch(dense->type) {
