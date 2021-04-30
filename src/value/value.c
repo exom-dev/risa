@@ -1,6 +1,8 @@
 #include "value.h"
 #include "dense.h"
 #include "../io/log.h"
+#include "../def/def.h"
+#include "../def/macro.h"
 
 #include <string.h>
 
@@ -19,7 +21,7 @@ void value_print(RisaIO* io, Value value) {
             RISA_OUT((*io), "%lld", AS_INT(value));
             break;
         case VAL_FLOAT:
-            RISA_OUT((*io), "%f", AS_FLOAT(value));
+            RISA_OUT((*io), "%." RISA_STRINGIFY(RISA_VALUE_FLOAT_PRECISION) "g", AS_FLOAT(value));
             break;
         case VAL_DENSE:
             dense_print(io, AS_DENSE(value));
@@ -67,10 +69,10 @@ char* value_to_string(Value value) {
             break;
         }
         case VAL_FLOAT: {
-            size_t size = 1 + snprintf(NULL, 0, "%f", AS_FLOAT(value));
+            size_t size = 1 + snprintf(NULL, 0, "%." RISA_STRINGIFY(RISA_VALUE_FLOAT_PRECISION) "g", AS_FLOAT(value));
             data = RISA_MEM_ALLOC(sizeof(char) * size);
 
-            snprintf(data, size, "%f", AS_FLOAT(value));
+            snprintf(data, size, "%." RISA_STRINGIFY(RISA_VALUE_FLOAT_PRECISION) "g", AS_FLOAT(value));
             break;
         }
         case VAL_DENSE: {

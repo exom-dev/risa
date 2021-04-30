@@ -1,6 +1,7 @@
 #include "assembler.h"
 
 #include "../io/log.h"
+#include "../lib/charlib.h"
 
 #include <stdlib.h>
 #include <errno.h>
@@ -412,9 +413,7 @@ static void assemble_function_data(Assembler* assembler) {
     int64_t argc = 0;
 
     if(assembler->parser->current.type == ASM_TOKEN_INT) {
-        argc = strtol(assembler->parser->current.start, NULL, 10);
-
-        if(errno == ERANGE || (argc < 0 || argc > 250)) {
+        if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &argc) || argc < 0 || argc > RISA_TODLR_REGISTER_COUNT) {
             asm_parser_error_at_current(assembler->parser, "Argument count out of range (0-250)");
             return;
         }
@@ -1221,9 +1220,9 @@ static void emit_word(Assembler* assembler, uint16_t word) {
 }
 
 static uint8_t read_reg(Assembler* assembler) {
-    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+    int64_t num;
 
-    if (errno == ERANGE || num > 249) {
+    if (!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > (RISA_TODLR_REGISTER_COUNT - 1)) {
         asm_parser_error_at_current(assembler->parser, "Number is not a valid register (0-249)");
         return RISA_TODLR_REGISTER_NULL;
     }
@@ -1232,9 +1231,9 @@ static uint8_t read_reg(Assembler* assembler) {
 }
 
 static uint16_t read_const(Assembler* assembler) {
-    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+    int64_t num;
 
-    if(errno == ERANGE || num > UINT16_MAX) {
+    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT16_MAX) {
         asm_parser_error_at_current(assembler->parser, "Number is not a valid constant (0-65535)");
         return UINT16_MAX;
     }
@@ -1261,10 +1260,10 @@ static uint16_t read_byte(Assembler* assembler) {
         }
     }
 
-    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+    int64_t num;
 
-    if(errno == ERANGE || num > UINT8_MAX) {
-        asm_parser_error_at_current(assembler->parser, "Number is too large for type 'byte'");
+    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
+        asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'byte'");
         return UINT16_MAX;
     }
 
@@ -1290,10 +1289,10 @@ static uint16_t read_int(Assembler* assembler) {
         }
     }
 
-    int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+    int64_t num;
 
-    if(errno == ERANGE) {
-        asm_parser_error_at_current(assembler->parser, "Number is too large for type 'int'");
+    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
+        asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'int'");
         return UINT16_MAX;
     }
 
@@ -1319,10 +1318,10 @@ static uint16_t read_float(Assembler* assembler) {
         }
     }
 
-    double num = strtod(assembler->parser->current.start, NULL);
+    double num;
 
-    if(errno == ERANGE) {
-        asm_parser_error_at_current(assembler->parser, "Number is too small or too large for type 'float'");
+    if(!risa_lib_charlib_strntod(assembler->parser->current.start, assembler->parser->current.size, &num)) {
+        asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'float'");
         return UINT16_MAX;
     }
 
@@ -1482,10 +1481,10 @@ static int64_t read_number(Assembler* assembler) {
     }
 
     if(assembler->parser->current.type == ASM_TOKEN_INT) {
-        int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+        int64_t num;
 
-        if (errno == ERANGE) {
-            asm_parser_error_at_current(assembler->parser, "Number is too large for type 'int'");
+        if (!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
+            asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'int'");
             return INT64_MAX;
         }
 
@@ -1493,10 +1492,10 @@ static int64_t read_number(Assembler* assembler) {
     }
 
     if(assembler->parser->current.type == ASM_TOKEN_BYTE){
-        int64_t num = strtol(assembler->parser->current.start, NULL, 10);
+        int64_t num;
 
-        if(errno == ERANGE || num > UINT8_MAX) {
-            asm_parser_error_at_current(assembler->parser, "Number is too large for type 'byte'");
+        if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
+            asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'byte'");
             return INT64_MAX;
         }
 

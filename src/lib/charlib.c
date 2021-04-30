@@ -1,7 +1,9 @@
 #include "charlib.h"
 #include "../memory/mem.h"
 
+#include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define CHARLIB_STRING_CAP_START 8
 
@@ -50,9 +52,9 @@ void risa_lib_charlib_string_append_chr(RisaLibCharlibString* str, char right) {
     str->len += 1;
 }
 
-RisaLibCharlibString risa_lib_charlib_string_from_sub(const char* src, int start, int end) {
+RisaLibCharlibString risa_lib_charlib_string_from_sub(const char* src, size_t start, size_t end) {
     RisaLibCharlibString str;
-    int size = end - start;
+    size_t size = end - start;
 
     risa_lib_charlib_string_init(&str);
     str.cap = 8;
@@ -85,7 +87,7 @@ bool risa_lib_charlib_is_alphascore(char c) {
 }
 
 bool risa_lib_charlib_strnicmp(const char* left, const char* right, size_t size) {
-    #define LWR(c) (c >= 'A' && c <= 'Z' ? c + 32 : c)
+    #define LWR(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
 
     const char* leftLimit = left + size;
 
@@ -123,6 +125,46 @@ char* risa_lib_charlib_strndup(const char* src, size_t size) {
     dest[size] = '\0';
 
     return dest;
+}
+
+bool risa_lib_charlib_strtod(const char* src, double* dest) {
+    char* end;
+    *dest = strtod(src, &end);
+
+    return (errno != ERANGE && *end == '\0');
+}
+
+RISA_API_HIDDEN bool risa_lib_charlib_strntod(const char* src, uint32_t size, double* dest) {
+    char* temp = RISA_MEM_ALLOC(sizeof(char) * (size + 1));
+    memcpy(temp, src, size);
+
+    temp[size] = '\0';
+
+    bool success = risa_lib_charlib_strtod(temp, dest);
+
+    RISA_MEM_FREE(temp);
+
+    return success;
+}
+
+RISA_API_HIDDEN bool risa_lib_charlib_strtol(const char* src, int base, int64_t* dest) {
+    char* end;
+    *dest = strtol(src, &end, base);
+
+    return (errno != ERANGE && *end == '\0');
+}
+
+RISA_API_HIDDEN bool risa_lib_charlib_strntol(const char* src, uint32_t size, int base, int64_t* dest) {
+    char* temp = RISA_MEM_ALLOC(sizeof(char) * (size + 1));
+    memcpy(temp, src, size);
+
+    temp[size] = '\0';
+
+    bool success = risa_lib_charlib_strtol(temp, base, dest);
+
+    RISA_MEM_FREE(temp);
+
+    return success;
 }
 
 #undef CHARLIB_STRING_CAP_START

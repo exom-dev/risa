@@ -62,6 +62,13 @@ static Value std_io_read_line(void* vm, uint8_t argc, Value* args) {
     if(line == NULL)
         return NULL_VALUE;
 
+    // If there is a line ending left from a previous read operation, ignore and read again.
+    if(*line == '\0')
+        line = risa_io_in(&((VM*) vm)->io, RISA_INPUT_LINE);
+
+    if(line == NULL)
+        return NULL_VALUE;
+
     uint32_t size = (uint32_t) strlen(line);
 
     Value result = DENSE_VALUE((DenseString*) vm_string_create(vm, line, size));
@@ -78,50 +85,57 @@ static Value std_io_read_int(void* vm, uint8_t argc, Value* args) {
     if(str == NULL)
         return NULL_VALUE;
 
-    uint32_t size = (uint32_t) strlen(str);
+    uint32_t length = (uint32_t) strlen(str);
 
-    // 0xF -> skip the first 2 chars, parse in base 16.
-    // 523 -> don't skip any chars, parse in base 10.
-    size_t offset = 0;
-    uint32_t base = 10;
-
-    if(size > 2 && str[0] == '0') {
-        offset = 2;
-
-        switch(str[1]) {
-            case 'x':
-                base = 16;
-                break;
-            case 'b':
-                base = 2;
-                break;
-            default:
-                offset = 0;
-                break;
-        }
-    }
-
-    int64_t num = strtol(str + offset, NULL, base);
+    Value result = value_int_from_string(str, length);
 
     if(((VM*) vm)->io.freeInput)
         RISA_MEM_FREE(str);
 
-    if (errno == ERANGE) {
-        return NULL_VALUE;
-    }
+    return result;
+}
 
-    return INT_VALUE(num);
+static Value std_io_read_byte(void* vm, uint8_t argc, Value* args) {
+    char* str = risa_io_in(&((VM*) vm)->io, RISA_INPUT_WORD);
+
+    if(str == NULL)
+        return NULL_VALUE;
+
+    uint32_t length = (uint32_t) strlen(str);
+
+    Value result = value_byte_from_string(str, length);
+
+    if(((VM*) vm)->io.freeInput)
+        RISA_MEM_FREE(str);
+
+    return result;
+}
+
+static Value std_io_read_float(void* vm, uint8_t argc, Value* args) {
+    char* str = risa_io_in(&((VM*) vm)->io, RISA_INPUT_WORD);
+
+    if(str == NULL)
+        return NULL_VALUE;
+
+    Value result = value_float_from_string(str);
+
+    if(((VM*) vm)->io.freeInput)
+        RISA_MEM_FREE(str);
+
+    return result;
 }
 
 void std_register_io(VM* vm) {
     #define STD_IO_ENTRY(name)           RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, std_io_##name
     #define STD_IO_OBJ_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, dense_native_value(std_io_##fn)
 
-    DenseObject* objRead = dense_object_create_with(vm, 4
+    DenseObject* objRead = dense_object_create_with(vm, 6
                                                     STD_IO_OBJ_ENTRY(char, read_char)
                                                     STD_IO_OBJ_ENTRY(string, read_string)
                                                     STD_IO_OBJ_ENTRY(line, read_line)
-                                                    STD_IO_OBJ_ENTRY(int, read_int));
+                                                    STD_IO_OBJ_ENTRY(int, read_int)
+                                                    STD_IO_OBJ_ENTRY(byte, read_byte)
+                                                    STD_IO_OBJ_ENTRY(float, read_float));
 
     vm_global_set_native(vm, STD_IO_ENTRY(print));
     vm_global_set_native(vm, STD_IO_ENTRY(println));

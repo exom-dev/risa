@@ -78,6 +78,10 @@ bool  value_strict_equals(Value left, Value right);
 
 bool value_is_dense_of_type(Value value, DenseValueType type);
 
+Value value_int_from_string(char* str, uint32_t length);
+Value value_byte_from_string(char* str, uint32_t length);
+Value value_float_from_string(char* str);
+
 void value_array_init(ValueArray* array);
 void value_array_write(ValueArray* array, Value value);
 void value_array_delete(ValueArray* array);

@@ -4,6 +4,7 @@
 #include "../io/log.h"
 
 #include "../asm/assembler.h"
+#include "../lib/charlib.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -225,10 +226,10 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         if (!register_reserve(compiler))
             return;
 
-        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+        int64_t num;
 
-        if (errno == ERANGE || num > 255) {
-            parser_error_at_previous(compiler->parser, "Number is too large for type 'byte'");
+        if (!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num) || num > UINT8_MAX) {
+            parser_error_at_previous(compiler->parser, "Number is invalid for type 'byte'");
             return;
         }
 
@@ -258,10 +259,10 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
         if(!register_reserve(compiler))
             return;
 
-        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+        int64_t num;
 
-        if(errno == ERANGE) {
-            parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
+        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
+            parser_error_at_previous(compiler->parser, "Number is invalid for type 'int'");
             return;
         }
 
@@ -291,10 +292,10 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
         if(!register_reserve(compiler))
             return;
 
-        double num = strtod(compiler->parser->previous.start, NULL);
+        double num;
 
-        if(errno == ERANGE) {
-            parser_error_at_previous(compiler->parser, "Number is too small or too large for type 'float'");
+        if(!risa_lib_charlib_strntod(compiler->parser->previous.start, compiler->parser->previous.size, &num)) {
+            parser_error_at_previous(compiler->parser, "Number is invalid for type 'float'");
             return;
         }
 
@@ -1366,10 +1367,10 @@ static void compile_continue_statement(Compiler* compiler) {
     } else if(compiler->parser->current.type == TOKEN_INT) {
         parser_advance(compiler->parser);
 
-        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+        int64_t num;
 
-        if(errno == ERANGE) {
-            parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
+        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
+            parser_error_at_previous(compiler->parser, "Number is invalid for type 'int'");
             return;
         }
         if(num < 0) {
@@ -1415,9 +1416,9 @@ static void compile_break_statement(Compiler* compiler) {
     } else if(compiler->parser->current.type == TOKEN_INT) {
         parser_advance(compiler->parser);
 
-        int64_t num = strtol(compiler->parser->previous.start, NULL, 10);
+        int64_t num;
 
-        if(errno == ERANGE) {
+        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
             parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
             return;
         }
