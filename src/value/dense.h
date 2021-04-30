@@ -73,6 +73,7 @@ typedef struct {
 
 void   dense_print(RisaIO* io, DenseValue* dense);
 char*  dense_to_string(DenseValue* dense);
+bool   dense_is_truthy(DenseValue* dense);
 Value  dense_clone(DenseValue* dense);
 Value  dense_clone_register(void* vm, DenseValue* dense); // void* in order to work around the circular dependency.
 size_t dense_size(DenseValue* dense);

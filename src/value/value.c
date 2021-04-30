@@ -114,8 +114,27 @@ Value value_clone_register(void* vm, Value value) {
     }
 }
 
+bool value_is_truthy(Value value) {
+    switch(value.type) {
+        case VAL_NULL:
+            return false;
+        case VAL_BOOL:
+            return AS_BOOL(value);
+        case VAL_BYTE:
+            return AS_BYTE(value) != 0;
+        case VAL_INT:
+            return AS_INT(value) != 0;
+        case VAL_FLOAT:
+            return AS_FLOAT(value) != 0;
+        case VAL_DENSE:
+            return dense_is_truthy(AS_DENSE(value));
+        default:
+            return false;  // Never reached; written to suppress warnings.
+    }
+}
+
 bool value_is_falsy(Value value) {
-    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+    return !value_is_truthy(value);
 }
 
 bool value_equals(Value left, Value right) {

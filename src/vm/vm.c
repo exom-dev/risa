@@ -1090,7 +1090,7 @@ VMStatus vm_run(VM* vm) {
                 break;
             }
             case OP_TEST: {
-                if(!value_is_falsy(DEST_REG))
+                if(value_is_truthy(DEST_REG))
                     SKIP(4);
                 SKIP(3);
                 break;

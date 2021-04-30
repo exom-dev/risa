@@ -72,15 +72,18 @@ void  value_print(RisaIO* io, Value value);
 char* value_to_string(Value value);
 Value value_clone(Value value);
 Value value_clone_register(void* vm, Value value); // void* in order to work around the circular dependency.
+bool  value_is_truthy(Value value);
 bool  value_is_falsy(Value value);
 bool  value_equals(Value left, Value right);
 bool  value_strict_equals(Value left, Value right);
 
 bool value_is_dense_of_type(Value value, DenseValueType type);
 
+// Length is required for the first 2 in order to determine the base (prefixes 0x, 0b, ..., may or may not exist)
 Value value_int_from_string(char* str, uint32_t length);
 Value value_byte_from_string(char* str, uint32_t length);
 Value value_float_from_string(char* str);
+Value value_bool_from_string(char* str);
 
 void value_array_init(ValueArray* array);
 void value_array_write(ValueArray* array, Value value);

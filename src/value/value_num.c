@@ -58,3 +58,12 @@ Value value_float_from_string(char* str) {
 
     return FLOAT_VALUE(num);
 }
+
+Value value_bool_from_string(char* str) {
+    if(risa_lib_charlib_stricmp(str, "true") || risa_lib_charlib_stricmp(str, "1"))
+        return BOOL_VALUE(true);
+    if(risa_lib_charlib_stricmp(str, "false") || risa_lib_charlib_stricmp(str, "0"))
+        return BOOL_VALUE(false);
+
+    return NULL_VALUE;
+}

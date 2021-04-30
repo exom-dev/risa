@@ -137,6 +137,13 @@ static Value std_core_to_float(void* vm, uint8_t argc, Value* args) {
     }
 }
 
+static Value std_core_to_bool(void* vm, uint8_t argc, Value* args) {
+    if(argc == 0)
+        return NULL_VALUE;
+
+    return BOOL_VALUE(!value_is_falsy(args[0]));
+}
+
 static Value std_core_foreach(void* vm, uint8_t argc, Value* args) {
     if(argc < 2)
         return NULL_VALUE;
@@ -175,6 +182,7 @@ void std_register_core(VM* vm) {
     vm_global_set_native(vm, STD_CORE_ENTRY(toInt, to_int));
     vm_global_set_native(vm, STD_CORE_ENTRY(toByte, to_byte));
     vm_global_set_native(vm, STD_CORE_ENTRY(toFloat, to_float));
+    vm_global_set_native(vm, STD_CORE_ENTRY(toBool, to_bool));
     vm_global_set_native(vm, STD_CORE_ENTRY(foreach, foreach));
 
     #undef STD_CORE_ENTRY

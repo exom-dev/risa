@@ -21,6 +21,7 @@ RISA_API_HIDDEN void                 risa_lib_charlib_string_delete(RisaLibCharl
 
 RISA_API_HIDDEN bool risa_lib_charlib_is_digit(char c);
 RISA_API_HIDDEN bool risa_lib_charlib_is_alphascore(char c);
+RISA_API_HIDDEN bool risa_lib_charlib_stricmp(const char* left, const char* right);
 RISA_API_HIDDEN bool risa_lib_charlib_strnicmp(const char* left, const char* right, size_t size);
 RISA_API_HIDDEN bool risa_lib_charlib_strmcmp(const char* left, const char* right, size_t size); // Like strcmp, but right is not null-terminated, while left is. Size = right size.
 

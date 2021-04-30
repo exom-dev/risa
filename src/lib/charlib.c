@@ -86,6 +86,19 @@ bool risa_lib_charlib_is_alphascore(char c) {
            || (c == '_');
 }
 
+RISA_API_HIDDEN bool risa_lib_charlib_stricmp(const char* left, const char* right) {
+    #define LWR(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
+
+    while(LWR(*left) == LWR(*right) && *left != '\0' && *right != '\0') {
+        ++left;
+        ++right;
+    }
+
+    return *left == '\0' ||  *right == '\0';
+
+    #undef LWR
+}
+
 bool risa_lib_charlib_strnicmp(const char* left, const char* right, size_t size) {
     #define LWR(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
 

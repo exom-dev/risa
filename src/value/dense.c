@@ -179,6 +179,22 @@ char*  dense_to_string(DenseValue* dense) {
     return data;
 }
 
+bool dense_is_truthy(DenseValue* dense) {
+    switch(dense->type) {
+        case DVAL_STRING:
+            return ((DenseString*) dense)->length > 0;
+        case DVAL_ARRAY:
+            return ((DenseArray*) dense)->data.size > 0;
+        case DVAL_OBJECT:
+            return ((DenseObject*) dense)->data.count > 0;
+        case DVAL_UPVALUE:
+        case DVAL_FUNCTION:
+        case DVAL_CLOSURE:
+        case DVAL_NATIVE:
+            return true;
+    }
+}
+
 Value dense_clone(DenseValue* dense) {
     switch(dense->type) {
         case DVAL_STRING:
