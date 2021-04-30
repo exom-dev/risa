@@ -66,6 +66,7 @@ typedef struct Compiler {
         bool isPostIncrement; // Whether or not the last value is the result of a post increment operation.
         bool isEqualOp;       // Whether or not the last value is the result of an equality operation.
         bool canOverwrite;    // Whether or not the last value can overwrite a previously-used register (TODO: explain this better).
+        bool fromBranched;    // Whether or not the last value comes from one of multiple branches (e.g. ternary). Required to disable bad CNST optimizations.
 
         struct {
             enum LValType {

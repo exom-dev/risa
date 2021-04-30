@@ -5,7 +5,8 @@
 #include <string.h>
 
 #define PEEK(i) lexer->current[i]
-#define ADVANCE(i) (++lexer->index, lexer->current += i)
+#define ADVANCE(i) (lexer->index += i, lexer->current += i)
+#define IGNORE(i) (lexer->index += i)
 #define NEXT() (++lexer->index, *(lexer->current++))
 
 #define AT_END(i) (lexer->current[i] == '\0')
@@ -34,6 +35,9 @@ void lexer_delete(Lexer* lexer) {
 }
 
 Token lexer_next(Lexer* lexer) {
+    lexer->start = lexer->source + lexer->index;
+    lexer->current = lexer->start;
+
     bool whitespace = true;
 
     while(!AT_END(0) && whitespace) {
@@ -71,7 +75,8 @@ Token lexer_next(Lexer* lexer) {
         }
     }
 
-    lexer->start = lexer->current;
+    lexer->start = lexer->source + lexer->index;
+    lexer->current = lexer->start;
 
     if(AT_END(0))
         return lexer_emit(lexer, TOKEN_EOF);
@@ -127,7 +132,7 @@ Token lexer_emit(Lexer* lexer, TokenType type) {
     token.type = type;
     token.start = lexer->start;
     token.size = (size_t) (lexer->current - lexer->start);
-    token.index = lexer->index - token.size;
+    token.index = (uint32_t) ((lexer->current - token.size) - lexer->source);
 
     return token;
 }
@@ -206,16 +211,16 @@ Token next_number(Lexer* lexer) {
                     ADVANCE(1);
 
                 if(!AT_END(0) && PEEK(0) == 'f')
-                    ADVANCE(1);
+                    IGNORE(1);
             } else return lexer_error(lexer, "Expected digit after dot");
             break;
         case 'b':
             type = TOKEN_BYTE;
-            ADVANCE(1);
+            IGNORE(1);
             break;
         case 'f':
             type = TOKEN_FLOAT;
-            ADVANCE(1);
+            IGNORE(1);
             break;
     }
 
@@ -241,6 +246,7 @@ Token next_string(Lexer* lexer) {
 }
 
 #undef PEEK
+#undef IGNORE
 #undef ADVANCE
 #undef NEXT
 

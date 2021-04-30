@@ -5,7 +5,8 @@
 #include <string.h>
 
 #define PEEK(i) lexer->current[i]
-#define ADVANCE(i) (++lexer->index, lexer->current += i)
+#define ADVANCE(i) (lexer->index += i, lexer->current += i)
+#define IGNORE(i) (lexer->index += i)
 #define NEXT() (++lexer->index, *(lexer->current++))
 
 #define AT_END(i) (lexer->current[i] == '\0' || (lexer->stoppers != NULL && (!lexer->ignoreStoppers && strchr(lexer->stoppers, lexer->current[i]) != NULL)))
@@ -92,6 +93,9 @@ void asm_lexer_delete(AsmLexer* lexer) {
 }
 
 AsmToken asm_lexer_next(AsmLexer* lexer) {
+    lexer->start = lexer->source + lexer->index;
+    lexer->current = lexer->start;
+
     bool whitespace = true;
 
     while(!AT_END(0) && whitespace) {
@@ -130,7 +134,8 @@ AsmToken asm_lexer_next(AsmLexer* lexer) {
         }
     }
 
-    lexer->start = lexer->current;
+    lexer->start = lexer->source + lexer->index;
+    lexer->current = lexer->start;
 
     if(AT_END(0))
         return asm_lexer_emit(lexer, ASM_TOKEN_EOF);
@@ -332,24 +337,24 @@ AsmToken asm_next_number(AsmLexer* lexer) {
                     ADVANCE(1);
 
                 if((!AT_END(0) && PEEK(0) == 'f') || (!AT_END(0) && PEEK(0) == 'F'))
-                    ADVANCE(1);
+                    IGNORE(1);
             } else return asm_lexer_error(lexer, "Expected digit after dot");
             break;
         case 'b': case 'B':
             type = ASM_TOKEN_BYTE;
-            ADVANCE(1);
+            IGNORE(1);
             break;
         case 'c': case 'C':
             type = ASM_TOKEN_CONSTANT;
-            ADVANCE(1);
+            IGNORE(1);
             break;
         case 'f': case 'F':
             type = ASM_TOKEN_FLOAT;
-            ADVANCE(1);
+            IGNORE(1);
             break;
         case 'r': case 'R':
             type = ASM_TOKEN_REGISTER;
-            ADVANCE(1);
+            IGNORE(1);
             break;
     }
 

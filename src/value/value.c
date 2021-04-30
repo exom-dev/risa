@@ -26,6 +26,9 @@ void value_print(RisaIO* io, Value value) {
         case VAL_DENSE:
             dense_print(io, AS_DENSE(value));
             break;
+        default:
+            RISA_OUT((*io), "UNK");
+            break;
     }
 }
 
@@ -77,6 +80,11 @@ char* value_to_string(Value value) {
         }
         case VAL_DENSE: {
             data = dense_to_string(AS_DENSE(value));
+            break;
+        }
+        default: {
+            data = RISA_MEM_ALLOC(sizeof("UNK"));
+            memcpy(data, "UNK\0", sizeof("UNK"));
             break;
         }
     }

@@ -8,7 +8,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <errno.h>
 
 static void compile_byte(Compiler*, bool);
 static void compile_int(Compiler*, bool);
@@ -80,6 +79,7 @@ static uint16_t create_string_constant(Compiler*, const char*, uint32_t);
 static uint16_t declare_variable(Compiler*);
 
 static void optimize_last_cnst(Compiler*);
+static bool can_optimize_last_cnst(Compiler* compiler);
 
 static bool    register_reserve(Compiler*);
 static uint8_t register_find(Compiler*, RegType, Token);
@@ -172,6 +172,7 @@ void compiler_init(Compiler* compiler) {
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
     compiler->last.canOverwrite = false; // true
+    compiler->last.fromBranched = false;
     compiler->last.lvalMeta.type = LVAL_LOCAL;
     compiler->last.lvalMeta.global = 0;
     compiler->last.lvalMeta.globalReg = 0;
@@ -242,6 +243,7 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
@@ -249,6 +251,7 @@ static void compile_byte(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     }
 }
 
@@ -275,6 +278,7 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
@@ -282,6 +286,7 @@ static void compile_int(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     }
 }
 
@@ -307,12 +312,14 @@ static void compile_float(Compiler* compiler, bool allowAssignment) {
         compiler->last.isConst = true;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     }
 }
 
@@ -410,6 +417,7 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
@@ -417,6 +425,7 @@ static void compile_string(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     }
 }
 
@@ -452,6 +461,7 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
         compiler->last.isNew = false;
@@ -459,6 +469,7 @@ static void compile_literal(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
     }
 }
 
@@ -575,7 +586,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
                     chunk->size -= 4;
                 }*/
 
-                #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
+                #define L_TYPE ((can_optimize_last_cnst(compiler)) * RISA_TODLR_TYPE_LEFT_MASK)
                 set |= L_TYPE;
                 #undef L_TYPE
             }
@@ -587,6 +598,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
         }
 
         compiler->last.isConst = false;
+        compiler->last.fromBranched = false;
 
         //register_free(compiler);
     } else {
@@ -649,6 +661,7 @@ static void compile_identifier(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = true;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 }
 
 static void compile_array(Compiler* compiler, bool allowAssignment) {
@@ -671,7 +684,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
 
             optimize_last_cnst(compiler);
 
-            #define L_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK)
+            #define L_TYPE (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK)
 
             emit_byte(compiler, OP_PARR | L_TYPE);
             emit_byte(compiler, reg);
@@ -695,6 +708,7 @@ static void compile_array(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
@@ -782,9 +796,9 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
 
             optimize_last_cnst(compiler);
 
-            #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
+            #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK))
 
-            emit_byte(compiler, OP_SET | LR_TYPES);
+            emit_byte(compiler, OP_SET | LR_TYPES);//HERE2
             emit_byte(compiler, reg);
             emit_byte(compiler, dest);
             emit_byte(compiler, compiler->last.reg);
@@ -806,6 +820,7 @@ static void compile_object(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 
     compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
@@ -853,6 +868,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         compiler->last.isNew = true;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.fromBranched = false;
     }
 
     parser_consume(compiler->parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
@@ -939,6 +955,7 @@ static void compile_variable_declaration(Compiler* compiler) {
         compiler->last.isLvalue = false;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
 
         if(compiler->regIndex == 249) {
             parser_error_at_current(compiler->parser, "Register limit exceeded (250)");
@@ -971,6 +988,7 @@ static void compile_variable_declaration(Compiler* compiler) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 }
 
 static void compile_function_declaration(Compiler* compiler) {
@@ -1008,6 +1026,7 @@ static void compile_function_declaration(Compiler* compiler) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 }
 
 static void compile_function(Compiler* compiler) {
@@ -1097,6 +1116,7 @@ static void compile_function(Compiler* compiler) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 
     compiler_delete(&subcompiler);
 }
@@ -1586,6 +1606,7 @@ static void compile_call(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 }
 
 static void compile_clone(Compiler* compiler, bool allowAssignment) {
@@ -1617,6 +1638,7 @@ static void compile_clone(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 }
 
 static void compile_dot(Compiler* compiler, bool allowAssignment) {
@@ -1668,7 +1690,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         // TODO: Test this for all cases.
         optimize_last_cnst(compiler);
 
-        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
 
         emit_byte(compiler, OP_SET | LR_TYPES);
         emit_byte(compiler, leftReg);
@@ -1686,6 +1708,7 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
 
         compiler->last.isLvalue = false;
         compiler->last.isConst = false; // CNST was already handled here.
+        compiler->last.fromBranched = false;
     } else {
         uint8_t destReg;
 
@@ -1746,6 +1769,8 @@ static void compile_dot(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = true;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
+
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     }
 }
@@ -1906,6 +1931,7 @@ static void compile_lambda(Compiler* compiler) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 
     compiler_delete(&subcompiler);
 }
@@ -1914,6 +1940,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
     uint8_t leftReg = compiler->last.reg;
     bool isLeftNew = compiler->last.isNew;
     bool isLeftConst = compiler->last.isConst;
+    bool isLeftOptimized = can_optimize_last_cnst(compiler);
 
     compile_expression(compiler);
 
@@ -1932,6 +1959,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         uint8_t rightReg = compiler->last.reg;
         bool isRightConst = compiler->last.isConst;
         bool isRightNew = compiler->last.isNew;
+        bool isRightOptimized = can_optimize_last_cnst(compiler);
 
         parser_advance(compiler->parser);
         compile_expression(compiler);
@@ -1939,7 +1967,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         // TODO: Test this for all cases.
         optimize_last_cnst(compiler);
 
-        #define LR_TYPES (isRightConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
 
         emit_byte(compiler, OP_SET | LR_TYPES);
         emit_byte(compiler, leftReg);
@@ -1959,6 +1987,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         compiler->last.isNew = true;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
+        compiler->last.fromBranched = false;
     } else {
         uint8_t destReg;
 
@@ -1974,7 +2003,7 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
             destReg = compiler->regIndex - 1;
         }
 
-        #define R_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define R_TYPE (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
 
         emit_byte(compiler, isLength ? OP_LEN : OP_GET | R_TYPE);
         emit_byte(compiler, destReg);
@@ -2010,6 +2039,8 @@ static void compile_accessor(Compiler* compiler, bool allowAssignment) {
         compiler->last.isLvalue = true;
         compiler->last.isPostIncrement = false;
         compiler->last.isEqualOp = false;
+        compiler->last.fromBranched = false;
+
         compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     }
 }
@@ -2021,6 +2052,7 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
 
     uint8_t destReg;
 
+    // TODO: use optimize_last_cnst here
     if(compiler->last.isConst) {
         //register_free(compiler);
         destReg = compiler->last.reg;
@@ -2054,28 +2086,35 @@ static void compile_unary(Compiler* compiler, bool allowAssignment) {
     }
 
     compiler->last.isNew = true;
-    compiler->regs[destReg] = (RegInfo) { REG_TEMP };
     compiler->last.reg = destReg;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
+
+    compiler->regs[destReg] = (RegInfo) { REG_TEMP };
 
     #undef L_TYPE
 }
 
 static void compile_binary(Compiler* compiler, bool allowAssignment) {
+    bool isLeftOptimized = can_optimize_last_cnst(compiler);
+
+    optimize_last_cnst(compiler);
+
     uint8_t leftReg = compiler->last.reg;
     bool isLeftNew = compiler->last.isNew;
     bool isLeftConst = compiler->last.isConst;
 
-    if(isLeftConst) {
+    // TODO: check if this works exactly the same
+    /*if(isLeftConst) {
         register_free(compiler);
         leftReg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
         compiler->function->chunk.size -= 4;
         isLeftNew = false;
-    }
+    }*/
 
     TokenType operatorType = compiler->parser->previous.type;
 
@@ -2085,8 +2124,8 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     optimize_last_cnst(compiler);
 
     // The GT and GTE instructions are simulated with reversed LT and LTE. Therefore, switch the operands and use the REV def.
-    #define LR_TYPES ((isLeftConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK))
-    #define LR_TYPES_REV ((compiler->last.isConst * RISA_TODLR_TYPE_LEFT_MASK) | (isLeftConst * RISA_TODLR_TYPE_RIGHT_MASK))
+    #define LR_TYPES ((isLeftOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK))
+    #define LR_TYPES_REV ((can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK) | (isLeftOptimized * RISA_TODLR_TYPE_RIGHT_MASK))
 
     switch(operatorType) {
         case TOKEN_PLUS:
@@ -2169,6 +2208,7 @@ static void compile_binary(Compiler* compiler, bool allowAssignment) {
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
 
     #undef LR_TYPES
 }
@@ -2192,6 +2232,9 @@ static void compile_ternary(Compiler* compiler, bool allowAssignment) {
     emit_jump(compiler, first);
     compile_expression(compiler);
     emit_jump(compiler, second);
+
+    // Disable CNST optimizations that can be bad (e.g. if the next instruction is OP_SET, it will only take the last branch value)
+    compiler->last.fromBranched = true;
 }
 
 static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
@@ -2216,7 +2259,7 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
 
     optimize_last_cnst(compiler);
 
-    #define R_TYPE (compiler->last.isConst * RISA_TODLR_TYPE_RIGHT_MASK)
+    #define R_TYPE (can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
 
     switch(operator) {
         case TOKEN_PLUS_EQUAL:
@@ -2294,12 +2337,14 @@ static void compile_equal_op(Compiler* compiler, bool allowAssignment) {
     #undef L_TYPE
 
     compiler->last.reg = destReg;
-    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = isNew;
     compiler->last.isConst = isConst;
     compiler->last.isLvalue = isLvalue;
     compiler->last.isPostIncrement = false;
     compiler->last.isEqualOp = true;
+    compiler->last.fromBranched = false;
+
+    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
 
 static void compile_prefix(Compiler* compiler, bool allowAssignment) {
@@ -2368,6 +2413,8 @@ static void compile_prefix(Compiler* compiler, bool allowAssignment) {
     }
 
     #undef L_TYPE
+
+    compiler->last.fromBranched = false;
 
     /* Currently, this will give you 13:
      *
@@ -2449,12 +2496,14 @@ static void compile_postfix(Compiler* compiler, bool allowAssignment) {
     #undef L_TYPE
 
     compiler->last.reg = compiler->regIndex - 1;
-    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
     compiler->last.isPostIncrement = true;
     compiler->last.isEqualOp = false;
+    compiler->last.fromBranched = false;
+
+    compiler->regs[compiler->last.reg] = (RegInfo) { REG_TEMP };
 }
 
 static void compile_and(Compiler* compiler, bool allowAssignment) {
@@ -2749,8 +2798,13 @@ static uint16_t declare_variable(Compiler* compiler) {
     return create_identifier_constant(compiler);
 }
 
+static bool can_optimize_last_cnst(Compiler* compiler) {
+    return compiler->last.isConst && !compiler->last.fromBranched;
+}
+
 static void optimize_last_cnst(Compiler* compiler) {
-    if(compiler->last.isConst) {
+    // Do not optimize if the last CNST is part of a branch (e.g. ternary).
+    if(can_optimize_last_cnst(compiler)) {
         register_free(compiler);
         compiler->last.reg = compiler->function->chunk.bytecode[compiler->function->chunk.size - 2];
         compiler->function->chunk.size -= 4;
