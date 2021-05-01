@@ -1,12 +1,12 @@
 #include "dense.h"
 
-DenseClosure* dense_closure_create(DenseFunction* function, uint8_t upvalueCount) {
-    DenseUpvalue** upvalues = RISA_MEM_ALLOC(upvalueCount * sizeof(DenseUpvalue));
+RisaDenseClosure* risa_dense_closure_create(RisaDenseFunction* function, uint8_t upvalueCount) {
+    RisaDenseUpvalue** upvalues = RISA_MEM_ALLOC(upvalueCount * sizeof(RisaDenseUpvalue));
     for(uint8_t i = 0; i < upvalueCount; ++i)
         upvalues[i] = NULL;
 
-    DenseClosure* closure = RISA_MEM_ALLOC(sizeof(DenseClosure));
-    closure->dense.type = DVAL_CLOSURE;
+    RisaDenseClosure* closure = RISA_MEM_ALLOC(sizeof(RisaDenseClosure));
+    closure->dense.type = RISA_DVAL_CLOSURE;
     closure->dense.link = NULL;
     closure->dense.marked = false;
 

@@ -5,39 +5,39 @@
 #include "lexer.h"
 
 #include "../io/io.h"
-#include "../chunk/chunk.h"
+#include "../cluster/cluster.h"
 #include "../data/map.h"
 #include "../def/def.h"
 #include "../value/dense.h"
 
 typedef enum {
-    ASM_DATA,
-    ASM_CODE
-} AsmMode;
+    RISA_ASM_MODE_DATA,
+    RISA_ASM_MODE_CODE
+} RisaAsmMode;
 
-typedef struct Assembler {
+typedef struct RisaAssembler {
     RisaIO io;
-    struct Assembler* super;
+    struct RisaAssembler* super;
 
-    Chunk chunk;
+    RisaCluster cluster;
 
-    AsmParser* parser;
-    Map* strings;
+    RisaAsmParser* parser;
+    RisaMap* strings;
 
-    Map identifiers;
+    RisaMap identifiers;
 
     bool canSwitchToData;
-    AsmMode mode;
-} Assembler;
+    RisaAsmMode mode;
+} RisaAssembler;
 
 typedef enum {
-    ASSEMBLER_OK,
-    ASSEMBLER_ERROR
+    RISA_ASM_STATUS_OK,
+    RISA_ASM_STATUS_ERROR
 } AssemblerStatus;
 
-void assembler_init(Assembler* assembler);
-void assembler_delete(Assembler* assembler);
+void risa_assembler_init   (RisaAssembler* assembler);
+void risa_assembler_delete (RisaAssembler* assembler);
 
-AssemblerStatus assembler_assemble(Assembler* assembler, const char* str, const char* stoppers);
+AssemblerStatus risa_assembler_assemble (RisaAssembler* assembler, const char* str, const char* stoppers);
 
 #endif

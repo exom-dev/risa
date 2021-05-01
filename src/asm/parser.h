@@ -7,22 +7,22 @@
 
 typedef struct {
     RisaIO io;
-    AsmLexer lexer;
+    RisaAsmLexer lexer;
 
-    AsmToken current;
-    AsmToken previous;
+    RisaAsmToken current;
+    RisaAsmToken previous;
 
     bool error;
     bool panic;
-} AsmParser;
+} RisaAsmParser;
 
-void asm_parser_init(AsmParser* parser);
-void asm_parser_advance(AsmParser* parser);
-void asm_parser_consume(AsmParser* parser, AsmTokenType type, const char* err);
+void risa_asm_parser_init              (RisaAsmParser* parser);
+void risa_asm_parser_advance           (RisaAsmParser* parser);
+void risa_asm_parser_consume           (RisaAsmParser* parser, RisaAsmTokenType type, const char* err);
 
-void asm_parser_sync(AsmParser* parser);
-void asm_parser_error_at(AsmParser* parser, AsmToken token, const char* msg);
-void asm_parser_error_at_previous(AsmParser* parser, const char* msg);
-void asm_parser_error_at_current(AsmParser* parser, const char* msg);
+void risa_asm_parser_sync              (RisaAsmParser* parser);
+void risa_asm_parser_error_at          (RisaAsmParser* parser, RisaAsmToken token, const char* msg);
+void risa_asm_parser_error_at_previous (RisaAsmParser* parser, const char* msg);
+void risa_asm_parser_error_at_current  (RisaAsmParser* parser, const char* msg);
 
 #endif

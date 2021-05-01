@@ -4,7 +4,7 @@
 #include "../def/types.h"
 
 typedef struct {
-    bool replMode; // COMPILER: Whether or not to store the lastRed value into the ACC reg.
-} Options;
+    bool replMode; // COMPILER: Whether or not to store the lastReg value into the ACC reg.
+} RisaOptions;
 
 #endif

@@ -2,157 +2,145 @@
 
 #include "../memory/gc.h"
 #include "../memory/mem.h"
-#include "../chunk/bytecode.h"
+#include "../cluster/bytecode.h"
 #include "../io/log.h"
 #include "../value/dense.h"
 #include "../asm/disassembler.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
-    fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->chunk.bytecode], ##__VA_ARGS__ )
+    fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.bytecode], ##__VA_ARGS__ )
 
-static bool call_register(VM* vm, uint8_t reg, uint8_t argc);
-static bool call_value(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
-static bool call_function(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
-static bool call_closure(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
-static bool call_native(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated);
+static bool risa_vm_call_register (RisaVM*, uint8_t, uint8_t);
+static bool risa_vm_call_value    (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
+static bool risa_vm_call_function (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
+static bool risa_vm_call_closure  (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
+static bool risa_vm_call_native   (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
 
-static DenseUpvalue* upvalue_capture(VM* vm, Value* local);
-static void          upvalue_close_from(VM* vm, Value* slot);
+static RisaDenseUpvalue* risa_vm_upvalue_capture    (RisaVM* vm, RisaValue* local);
+static void              risa_vm_upvalue_close_from (RisaVM* vm, RisaValue* slot);
 
-void vm_init(VM* vm) {
+void risa_vm_init(RisaVM* vm) {
     risa_io_init(&vm->io);
 
-    vm_stack_reset(vm);
+    risa_vm_stack_reset(vm);
 
-    map_init(&vm->strings);
-    map_init(&vm->globals);
+    risa_map_init(&vm->strings);
+    risa_map_init(&vm->globals);
 
     vm->values = NULL;
     vm->options.replMode = false; // TODO: Split compiler and vm options into separate structs.
     vm->heapSize = 0;
-    vm->heapThreshold = VM_HEAP_INITIAL_THRESHOLD;
+    vm->heapThreshold = RISA_VM_HEAP_INITIAL_THRESHOLD;
 }
 
-void vm_delete(VM* vm) {
-    map_delete(&vm->strings);
-    map_delete(&vm->globals);
+void risa_vm_delete(RisaVM* vm) {
+    risa_map_delete(&vm->strings);
+    risa_map_delete(&vm->globals);
 
-    DenseValue* dense = vm->values;
+    RisaDenseValue* dense = vm->values;
 
     while(dense != NULL) {
-        DenseValue* next = dense->link;
-        vm->heapSize -= dense_size(dense);
-        dense_delete(dense);
+        RisaDenseValue* next = dense->link;
+        vm->heapSize -= risa_dense_size(dense);
+        risa_dense_delete(dense);
         dense = next;
     }
 }
 
-void vm_clean(VM* vm) {
+void risa_vm_clean(RisaVM* vm) {
     while(vm->frameCount > 1) {
-        CallFrame* frame = &vm->frames[vm->frameCount - 1];
+        RisaCallFrame* frame = &vm->frames[vm->frameCount - 1];
 
         switch(frame->type) {
-            case FRAME_FUNCTION:
-                dense_delete((DenseValue*) frame->callee.function);
+            case RISA_FRAME_FUNCTION:
+                risa_dense_delete((RisaDenseValue *) frame->callee.function);
                 break;
-            case FRAME_CLOSURE:
-                dense_delete((DenseValue*) frame->callee.closure);
+            case RISA_FRAME_CLOSURE:
+                risa_dense_delete((RisaDenseValue *) frame->callee.closure);
                 break;
         }
     }
 
-    vm_stack_reset(vm);
+    risa_vm_stack_reset(vm);
 
-    gc_check(vm);
+    risa_gc_check(vm);
 }
 
-VMStatus vm_execute(VM* vm) {
-    return vm_run(vm);
+RisaVMStatus risa_vm_execute(RisaVM* vm) {
+    return risa_vm_run(vm);
 }
 
-VMStatus vm_run(VM* vm) {
-    CallFrame* frame = &vm->frames[vm->frameCount - 1];
+RisaVMStatus risa_vm_run(RisaVM* vm) {
+    RisaCallFrame* frame = &vm->frames[vm->frameCount - 1];
 
-    #define NEXT_BYTE() (*frame->ip++)
-    #define NEXT_CONSTANT() (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[NEXT_BYTE()])
+    #define NEXT_BYTE()     (*frame->ip++)
+    #define NEXT_CONSTANT() (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[NEXT_BYTE()])
 
-    #define DEST     (*frame->ip)
-    #define LEFT     (frame->ip[1])
-    #define RIGHT    (frame->ip[2])
-    #define COMBINED ((((uint16_t) frame->ip[1]) << 8) | (frame->ip[2]))
+    #define DEST            (*frame->ip)
+    #define LEFT            (frame->ip[1])
+    #define RIGHT           (frame->ip[2])
+    #define COMBINED        ((((uint16_t) frame->ip[1]) << 8) | (frame->ip[2]))
 
-    #define DEST_CONST     (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[DEST])
-    #define LEFT_CONST     (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[LEFT])
-    #define RIGHT_CONST    (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[RIGHT])
-    #define COMBINED_CONST (VM_FRAME_FUNCTION(*frame)->chunk.constants.values[COMBINED])
+    #define DEST_CONST      (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[DEST])
+    #define LEFT_CONST      (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[LEFT])
+    #define RIGHT_CONST     (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[RIGHT])
+    #define COMBINED_CONST  (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[COMBINED])
 
-    #define DEST_REG  (frame->regs[DEST])
-    #define LEFT_REG  (frame->regs[LEFT])
-    #define RIGHT_REG (frame->regs[RIGHT])
+    #define DEST_REG        (frame->regs[DEST])
+    #define LEFT_REG        (frame->regs[LEFT])
+    #define RIGHT_REG       (frame->regs[RIGHT])
 
-    #define LEFT_BY_TYPE  (types & RISA_TODLR_TYPE_LEFT_MASK ? LEFT_CONST : LEFT_REG)
-    #define RIGHT_BY_TYPE (types & RISA_TODLR_TYPE_RIGHT_MASK ? RIGHT_CONST : RIGHT_REG)
+    #define LEFT_BY_TYPE    (types & RISA_TODLR_TYPE_LEFT_MASK ? LEFT_CONST : LEFT_REG)
+    #define RIGHT_BY_TYPE   (types & RISA_TODLR_TYPE_RIGHT_MASK ? RIGHT_CONST : RIGHT_REG)
 
-    #define SKIP(count) (frame->ip += count)
-    #define BSKIP(count) (frame->ip -= count)
+    #define SKIP(count)     (frame->ip += count)
+    #define BSKIP(count)    (frame->ip -= count)
 
     while(1) {
-        #ifdef DEBUG_TRACE_EXECUTION
-            debug_disassemble_instruction(&FRAME_FUNCTION(*frame)->chunk, (uint32_t) (frame->ip - FRAME_FUNCTION(*frame)->chunk.bytecode));
-
-            RISA_OUT(vm->io, "          ");
-            for(Value* entry = vm->stack; entry < vm->stackTop + 7; ++entry) {
-                RISA_OUT(vm->io, "[ ");
-                value_print(*entry);
-                RISA_OUT(vm->io, " ]");
-            }
-            RISA_OUT(vm->io, "\n");
-        #endif
-
         uint8_t instruction = NEXT_BYTE();
         uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
         instruction &= RISA_TODLR_INSTRUCTION_MASK;
 
         switch(instruction) {
-            case OP_CNST: {
+            case RISA_OP_CNST: {
                 DEST_REG = LEFT_CONST;
 
                 SKIP(3);
                 break;
             }
-            case OP_CNSTW: {
+            case RISA_OP_CNSTW: {
                 DEST_REG = COMBINED_CONST;
 
                 SKIP(3);
                 break;
             }
-            case OP_MOV: {
+            case RISA_OP_MOV: {
                 DEST_REG = LEFT_REG;
 
                 SKIP(3);
                 break;
             }
-            case OP_CLONE: {
+            case RISA_OP_CLONE: {
                 DEST_REG = value_clone_register(vm, LEFT_REG);
 
-                gc_check(vm);
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_DGLOB: {
-                map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE);
-                gc_check(vm);
+            case RISA_OP_DGLOB: {
+                risa_map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE);
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_GGLOB: {
-                Value value;
+            case RISA_OP_GGLOB: {
+                RisaValue value;
 
-                if(!map_get(&vm->globals, AS_STRING(LEFT_CONST), &value)) {
+                if(!risa_map_get(&vm->globals, AS_STRING(LEFT_CONST), &value)) {
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(LEFT_CONST));
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 DEST_REG = value;
@@ -160,25 +148,25 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_SGLOB: {
-                if(map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE)) {
-                    map_erase(&vm->globals, AS_STRING(DEST_CONST));
+            case RISA_OP_SGLOB: {
+                if(risa_map_set(&vm->globals, AS_STRING(DEST_CONST), LEFT_BY_TYPE)) {
+                    risa_map_erase(&vm->globals, AS_STRING(DEST_CONST));
 
                     VM_RUNTIME_ERROR(vm, "Undefined variable '%s'", AS_CSTRING(DEST_CONST));
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_UPVAL: {
+            case RISA_OP_UPVAL: {
                 VM_RUNTIME_ERROR(vm, "Illegal instruction 'UPVAL'; must be after 'CLSR'");
-                return VM_ERROR;
+                return RISA_VM_STATUS_ERROR;
             }
-            case OP_GUPVAL: {
-                if(frame->type != FRAME_CLOSURE) {
+            case RISA_OP_GUPVAL: {
+                if(frame->type != RISA_FRAME_CLOSURE) {
                     VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 DEST_REG = *(frame->callee.closure->upvalues[LEFT]->ref);
@@ -186,10 +174,10 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_SUPVAL: {
-                if(frame->type != FRAME_CLOSURE) {
+            case RISA_OP_SUPVAL: {
+                if(frame->type != RISA_FRAME_CLOSURE) {
                     VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 *frame->callee.closure->upvalues[DEST]->ref = LEFT_REG;
@@ -197,17 +185,17 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_CUPVAL: {
-                upvalue_close_from(vm, &DEST_REG);
+            case RISA_OP_CUPVAL: {
+                risa_vm_upvalue_close_from(vm, &DEST_REG);
 
                 SKIP(3);
                 break;
             }
-            case OP_CLSR: {
-                DenseFunction* function = (DenseFunction*) AS_DENSE(LEFT_REG);
-                DenseClosure* closure = dense_closure_create(function, RIGHT);
+            case RISA_OP_CLSR: {
+                RisaDenseFunction* function = (RisaDenseFunction*) AS_DENSE(LEFT_REG);
+                RisaDenseClosure* closure = risa_dense_closure_create(function, RIGHT);
 
-                vm_register_dense(vm, (DenseValue*) closure);
+                risa_vm_register_dense(vm, (RisaDenseValue *) closure);
 
                 DEST_REG = DENSE_VALUE(closure);
 
@@ -220,30 +208,30 @@ VMStatus vm_run(VM* vm) {
                     bool local = LEFT;
 
                     if(local)
-                        closure->upvalues[i] = upvalue_capture(vm, frame->regs + index);
+                        closure->upvalues[i] = risa_vm_upvalue_capture(vm, frame->regs + index);
                     else {
-                        if(frame->type != FRAME_CLOSURE) {
+                        if(frame->type != RISA_FRAME_CLOSURE) {
                             VM_RUNTIME_ERROR(vm, "Frame not of type 'closure'");
-                            return VM_ERROR;
+                            return RISA_VM_STATUS_ERROR;
                         }
 
                         closure->upvalues[i] = frame->callee.closure->upvalues[index];
                     }
                 }
 
-                gc_check(vm);
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_LEN: {
+            case RISA_OP_LEN: {
                 switch(LEFT_REG.type) {
-                    case VAL_DENSE:
+                    case RISA_VAL_DENSE:
                         switch(AS_DENSE(LEFT_REG)->type) {
-                            case DVAL_ARRAY:
+                            case RISA_DVAL_ARRAY:
                                 DEST_REG = INT_VALUE(AS_ARRAY(LEFT_REG)->data.size);
                                 goto _op_len_success;
-                            case DVAL_STRING:
+                            case RISA_DVAL_STRING:
                                 DEST_REG = INT_VALUE(AS_STRING(LEFT_REG)->length);
                                 goto _op_len_success;
                             default:
@@ -252,7 +240,7 @@ VMStatus vm_run(VM* vm) {
                         // Fallthrough
                     default:
                         VM_RUNTIME_ERROR(vm, "Expected string or array");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                 }
 
             _op_len_success:
@@ -260,97 +248,97 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_ARR: {
-                DEST_REG = DENSE_VALUE(dense_array_create());
-                vm_register_dense(vm, AS_DENSE(DEST_REG));
-                gc_check(vm);
+            case RISA_OP_ARR: {
+                DEST_REG = DENSE_VALUE(risa_dense_array_create());
+                risa_vm_register_dense(vm, AS_DENSE(DEST_REG));
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_PARR: {
-                if(!value_is_dense_of_type(DEST_REG, DVAL_ARRAY)) {
+            case RISA_OP_PARR: {
+                if(!value_is_dense_of_type(DEST_REG, RISA_DVAL_ARRAY)) {
                     VM_RUNTIME_ERROR(vm, "Destination must be an array");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
-                DenseArray* array = AS_ARRAY(DEST_REG);
+                RisaDenseArray* array = AS_ARRAY(DEST_REG);
 
                 if(array->data.size == UINT32_MAX) {
                     VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 value_array_write(&array->data, LEFT_BY_TYPE);
-                gc_check(vm);
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_OBJ: {
-                DEST_REG = DENSE_VALUE(dense_object_create());
-                vm_register_dense(vm, AS_DENSE(DEST_REG));
-                gc_check(vm);
+            case RISA_OP_OBJ: {
+                DEST_REG = DENSE_VALUE(risa_dense_object_create());
+                risa_vm_register_dense(vm, AS_DENSE(DEST_REG));
+                risa_gc_check(vm);
 
                 SKIP(3);
                 break;
             }
-            case OP_GET: {
+            case RISA_OP_GET: {
                 switch(LEFT_REG.type) {
-                    case VAL_DENSE:
+                    case RISA_VAL_DENSE:
                         switch(AS_DENSE(LEFT_REG)->type) {
-                            case DVAL_ARRAY: {
+                            case RISA_DVAL_ARRAY: {
                                 if(!IS_INT(RIGHT_BY_TYPE)) {
                                     VM_RUNTIME_ERROR(vm, "Index must be int");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseArray* array = AS_ARRAY(LEFT_REG);
+                                RisaDenseArray* array = AS_ARRAY(LEFT_REG);
                                 int64_t index = AS_INT(RIGHT_BY_TYPE);
 
                                 if(index < 0 || index >= array->data.size) {
                                     VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DEST_REG = dense_array_get(array, (uint32_t) index);
+                                DEST_REG = risa_dense_array_get(array, (uint32_t) index);
 
                                 goto _op_get_success;
                             }
-                            case DVAL_STRING: {
+                            case RISA_DVAL_STRING: {
                                 if(!IS_INT(RIGHT_BY_TYPE)) {
                                     VM_RUNTIME_ERROR(vm, "Index must be int");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseString* str = AS_STRING(LEFT_REG);
+                                RisaDenseString* str = AS_STRING(LEFT_REG);
                                 int64_t index = AS_INT(RIGHT_BY_TYPE);
 
                                 if(index < 0 || index >= str->length) {
                                     VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DEST_REG = DENSE_VALUE(vm_string_create(vm, str->chars + index, 1));
+                                DEST_REG = DENSE_VALUE(risa_vm_string_create(vm, str->chars + index, 1));
 
-                                gc_check(vm);
+                                risa_gc_check(vm);
 
                                 goto _op_get_success;
                             }
-                            case DVAL_OBJECT: {
-                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
+                            case RISA_DVAL_OBJECT: {
+                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, RISA_DVAL_STRING)) {
                                     VM_RUNTIME_ERROR(vm, "Object key must be string");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseObject* object = AS_OBJECT(LEFT_REG);
-                                DenseString* key = AS_STRING(RIGHT_BY_TYPE);
+                                RisaDenseObject* object = AS_OBJECT(LEFT_REG);
+                                RisaDenseString* key = AS_STRING(RIGHT_BY_TYPE);
 
-                                Value value;
+                                RisaValue value;
 
-                                if(!dense_object_get(object, key, &value)) {
+                                if(!risa_dense_object_get(object, key, &value)) {
                                     VM_RUNTIME_ERROR(vm, "Object property does not exist");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
                                 DEST_REG = value;
@@ -363,7 +351,7 @@ VMStatus vm_run(VM* vm) {
                         // Fallthrough
                     default:
                         VM_RUNTIME_ERROR(vm, "Left operand must be an array or object");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                 }
 
             _op_get_success:
@@ -371,100 +359,100 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_SET: {
+            case RISA_OP_SET: {
                 switch(DEST_REG.type) {
-                    case VAL_DENSE:
+                    case RISA_VAL_DENSE:
                         switch(AS_DENSE(DEST_REG)->type) {
-                            case DVAL_ARRAY: {
+                            case RISA_DVAL_ARRAY: {
                                 if(!IS_INT(LEFT_BY_TYPE)) {
                                     VM_RUNTIME_ERROR(vm, "Index must be int");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseArray* array = AS_ARRAY(DEST_REG);
+                                RisaDenseArray* array = AS_ARRAY(DEST_REG);
                                 int64_t index = AS_INT(LEFT_BY_TYPE);
 
                                 if(index < 0 || index > array->data.size) {
                                     VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 } else if(index == array->data.size) {
                                     if(array->data.size == UINT32_MAX) {
                                         VM_RUNTIME_ERROR(vm, "Array size limit exceeded (4294967295)");
-                                        return VM_ERROR;
+                                        return RISA_VM_STATUS_ERROR;
                                     }
 
                                     value_array_write(&array->data, RIGHT_BY_TYPE);
-                                    gc_check(vm);
-                                } else dense_array_set(array, (uint32_t) index, RIGHT_BY_TYPE);
+                                    risa_gc_check(vm);
+                                } else risa_dense_array_set(array, (uint32_t) index, RIGHT_BY_TYPE);
 
                                 goto _op_set_success;
                             }
-                            /*case DVAL_STRING: {
+                            /*case RISA_DVAL_STRING: {
                                 if(!IS_INT(LEFT_BY_TYPE)) {
                                     VM_RUNTIME_ERROR(vm, "Index must be int");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, DVAL_STRING)) {
+                                if(!value_is_dense_of_type(RIGHT_BY_TYPE, RISA_DVAL_STRING)) {
                                     VM_RUNTIME_ERROR(vm, "Right operand must be a string of length 1");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseString* str = AS_STRING(DEST_REG);
+                                RisaDenseString* str = AS_STRING(DEST_REG);
                                 int64_t index = AS_INT(LEFT_BY_TYPE);
-                                DenseString* chr = AS_STRING(RIGHT_BY_TYPE);
+                                RisaDenseString* chr = AS_STRING(RIGHT_BY_TYPE);
 
                                 if(chr->length != 1) {
                                     VM_RUNTIME_ERROR(vm, "Right operand must be a string of length 1");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
                                 if(index < 0 || index > str->length) {
                                     VM_RUNTIME_ERROR(vm, "Index out of bounds");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 } else if(index == str->length) {
                                     // The string will end with two nulls: one from the original str (because length + 1
                                     // oversteps into the null character), and one added by the function. The first null
                                     // will be replaced with the character. This practically appends a character to the string.
-                                    DenseString* newStr = dense_string_prepare(str->chars, str->length + 1);
+                                    RisaDenseString* newStr = dense_string_prepare(str->chars, str->length + 1);
 
                                     newStr->chars[index] = chr->chars[0];
                                     dense_string_hash_inplace(newStr);
 
                                     newStr = vm_string_internalize(vm, newStr);
 
-                                    DEST_REG = DENSE_VALUE((DenseValue*) newStr);
+                                    DEST_REG = DENSE_VALUE((RisaDenseValue*) newStr);
 
                                     gc_check(vm);
                                 } else {
                                     if(str->chars[index] != chr->chars[0]) {
-                                        DenseString* newStr = dense_string_prepare(str->chars, str->length);
+                                        RisaDenseString* newStr = risa_dense_string_prepare(str->chars, str->length);
 
                                         newStr->chars[index] = chr->chars[0];
-                                        dense_string_hash_inplace(newStr);
+                                        risa_dense_string_hash_inplace(newStr);
 
-                                        newStr = vm_string_internalize(vm, newStr);
+                                        newStr = risa_vm_string_internalize(vm, newStr);
 
-                                        DEST_REG = DENSE_VALUE((DenseValue*) newStr);
+                                        DEST_REG = DENSE_VALUE((RisaDenseValue*) newStr);
 
-                                        gc_check(vm);
+                                        risa_gc_check(vm);
                                     }
                                 }
 
                                 goto _op_set_success;
                             }*/
-                            case DVAL_OBJECT: {
-                                if(!value_is_dense_of_type(LEFT_BY_TYPE, DVAL_STRING)) {
+                            case RISA_DVAL_OBJECT: {
+                                if(!value_is_dense_of_type(LEFT_BY_TYPE, RISA_DVAL_STRING)) {
                                     VM_RUNTIME_ERROR(vm, "Object key must be string");
-                                    return VM_ERROR;
+                                    return RISA_VM_STATUS_ERROR;
                                 }
 
-                                DenseObject* object = AS_OBJECT(DEST_REG);
-                                DenseString* key = AS_STRING(LEFT_BY_TYPE);
+                                RisaDenseObject* object = AS_OBJECT(DEST_REG);
+                                RisaDenseString* key = AS_STRING(LEFT_BY_TYPE);
 
-                                dense_object_set(object, key, RIGHT_BY_TYPE);
+                                risa_dense_object_set(object, key, RIGHT_BY_TYPE);
 
-                                gc_check(vm);
+                                risa_gc_check(vm);
 
                                 goto _op_set_success;
                             }
@@ -474,7 +462,7 @@ VMStatus vm_run(VM* vm) {
                         // Fallthrough
                     default:
                         VM_RUNTIME_ERROR(vm, "Left operand must be an array, string, or object");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                 }
 
             _op_set_success:
@@ -482,32 +470,32 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_NULL: {
+            case RISA_OP_NULL: {
                 DEST_REG = NULL_VALUE;
 
                 SKIP(3);
                 break;
             }
-            case OP_TRUE: {
+            case RISA_OP_TRUE: {
                 DEST_REG = BOOL_VALUE(true);
 
                 SKIP(3);
                 break;
             }
-            case OP_FALSE: {
+            case RISA_OP_FALSE: {
                 DEST_REG = BOOL_VALUE(false);
 
                 SKIP(3);
                 break;
             }
-            case OP_NOT: {
+            case RISA_OP_NOT: {
                 DEST_REG = BOOL_VALUE(value_is_falsy(LEFT_BY_TYPE));
 
                 SKIP(3);
                 break;
             }
-            case OP_BNOT: {
-                Value left = LEFT_BY_TYPE;
+            case RISA_OP_BNOT: {
+                RisaValue left = LEFT_BY_TYPE;
 
                 if(IS_BYTE(left))
                     DEST_REG = BYTE_VALUE(~AS_BYTE(left));
@@ -515,14 +503,14 @@ VMStatus vm_run(VM* vm) {
                     DEST_REG = INT_VALUE(~AS_INT(left));
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_NEG: {
-                Value left = LEFT_BY_TYPE;
+            case RISA_OP_NEG: {
+                RisaValue left = LEFT_BY_TYPE;
 
                 if(IS_BYTE(left))
                     DEST_REG = INT_VALUE(-((int64_t) AS_BYTE(left)));
@@ -532,14 +520,14 @@ VMStatus vm_run(VM* vm) {
                     DEST_REG = FLOAT_VALUE(-AS_FLOAT(left));
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_INC: {
-                Value dest = DEST_REG;
+            case RISA_OP_INC: {
+                RisaValue dest = DEST_REG;
 
                 if(IS_BYTE(dest))
                     ++AS_BYTE(DEST_REG);
@@ -549,14 +537,14 @@ VMStatus vm_run(VM* vm) {
                     ++AS_FLOAT(DEST_REG);
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_DEC: {
-                Value dest = DEST_REG;
+            case RISA_OP_DEC: {
+                RisaValue dest = DEST_REG;
 
                 if(IS_BYTE(dest))
                     --AS_BYTE(DEST_REG);
@@ -566,15 +554,15 @@ VMStatus vm_run(VM* vm) {
                     --AS_FLOAT(DEST_REG);
                 else {
                     VM_RUNTIME_ERROR(vm, "Operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_ADD: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_ADD: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -585,7 +573,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_BYTE(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -596,7 +584,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_INT(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -607,38 +595,38 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_FLOAT(left) + AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
-                } else if(value_is_dense_of_type(left, DVAL_STRING)) {
-                    if(value_is_dense_of_type(right, DVAL_STRING)) {
-                        DenseString* result = dense_string_concat(AS_STRING(left), AS_STRING(right));
-                        DenseString* interned = map_find(&vm->strings, result->chars, result->length, result->hash);
+                } else if(value_is_dense_of_type(left, RISA_DVAL_STRING)) {
+                    if(value_is_dense_of_type(right, RISA_DVAL_STRING)) {
+                        RisaDenseString* result = risa_dense_string_concat(AS_STRING(left), AS_STRING(right));
+                        RisaDenseString* interned = risa_map_find(&vm->strings, result->chars, result->length, result->hash);
 
                         if(interned != NULL) {
                             RISA_MEM_FREE(result);
                             result = interned;
                             DEST_REG = DENSE_VALUE(result);
                         } else {
-                            vm_register_string(vm, result);
-                            vm_register_dense(vm, (DenseValue*) result);
+                            risa_vm_register_string(vm, result);
+                            risa_vm_register_dense(vm, (RisaDenseValue *) result);
                             DEST_REG = DENSE_VALUE(result);
-                            gc_check(vm);
+                            risa_gc_check(vm);
                         }
                     } else {
                         VM_RUNTIME_ERROR(vm, "Left operand must be string");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte, int, float or string");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_SUB: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_SUB: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -649,7 +637,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_BYTE(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -660,7 +648,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_INT(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -671,19 +659,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_FLOAT(left) - AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_MUL: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_MUL: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -694,7 +682,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_BYTE(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -705,7 +693,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_INT(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -716,19 +704,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_FLOAT(left) * AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_DIV: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_DIV: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -739,7 +727,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_BYTE(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -750,7 +738,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_INT(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -761,19 +749,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = FLOAT_VALUE(AS_FLOAT(left) / AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte, int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte, int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_MOD: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_MOD: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -782,7 +770,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BYTE_VALUE(AS_BYTE(left) % AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -791,19 +779,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_INT(left) % AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_SHL: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_SHL: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -811,18 +799,18 @@ VMStatus vm_run(VM* vm) {
                     } else if(IS_INT(right)) {
                         if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift left with a negative amount");
-                            return VM_ERROR;
+                            return RISA_VM_STATUS_ERROR;
                         }
 
                         DEST_REG = BYTE_VALUE(AS_BYTE(left) << AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(AS_INT(left) < 0) {
                         VM_RUNTIME_ERROR(vm, "Cannot shift negative numbers");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
 
                     if(IS_BYTE(right)) {
@@ -830,25 +818,25 @@ VMStatus vm_run(VM* vm) {
                     } else if(IS_INT(right)) {
                         if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift left with a negative amount");
-                            return VM_ERROR;
+                            return RISA_VM_STATUS_ERROR;
                         }
 
                         DEST_REG = INT_VALUE(AS_INT(left) << AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_SHR: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_SHR: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -856,18 +844,18 @@ VMStatus vm_run(VM* vm) {
                     } else if(IS_INT(right)) {
                         if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift right with a negative amount");
-                            return VM_ERROR;
+                            return RISA_VM_STATUS_ERROR;
                         }
 
                         DEST_REG = BYTE_VALUE(AS_BYTE(left) >> AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(AS_INT(left) < 0) {
                         VM_RUNTIME_ERROR(vm, "Cannot shift negative numbers");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
 
                     if(IS_BYTE(right)) {
@@ -875,25 +863,25 @@ VMStatus vm_run(VM* vm) {
                     } else if(IS_INT(right)) {
                         if(AS_INT(right) < 0) {
                             VM_RUNTIME_ERROR(vm, "Cannot shift right with a negative amount");
-                            return VM_ERROR;
+                            return RISA_VM_STATUS_ERROR;
                         }
 
                         DEST_REG = INT_VALUE(AS_INT(left) >> AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_LT: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_LT: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -904,7 +892,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_BYTE(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -915,7 +903,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_INT(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -926,19 +914,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_FLOAT(left) < AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_LTE: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_LTE: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -949,7 +937,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_BYTE(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -960,7 +948,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_INT(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_FLOAT(left)) {
                     if(IS_BYTE(right)) {
@@ -971,37 +959,37 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = BOOL_VALUE(AS_FLOAT(left) <= AS_FLOAT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either int or float");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either int or float");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_EQ: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_EQ: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 DEST_REG = BOOL_VALUE(value_equals(left, right));
 
                 SKIP(3);
                 break;
             }
-            case OP_NEQ: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_NEQ: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 DEST_REG = BOOL_VALUE(!value_equals(left, right));
 
                 SKIP(3);
                 break;
             }
-            case OP_BAND: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_BAND: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -1010,7 +998,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_BYTE(left) & AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -1019,19 +1007,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_INT(left) & AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_BXOR: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_BXOR: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -1040,7 +1028,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_BYTE(left) ^ AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -1049,19 +1037,19 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_INT(left) ^ AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_BOR: {
-                Value left = LEFT_BY_TYPE;
-                Value right = RIGHT_BY_TYPE;
+            case RISA_OP_BOR: {
+                RisaValue left = LEFT_BY_TYPE;
+                RisaValue right = RIGHT_BY_TYPE;
 
                 if(IS_BYTE(left)) {
                     if(IS_BYTE(right)) {
@@ -1070,7 +1058,7 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_BYTE(left) | AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else if(IS_INT(left)) {
                     if(IS_BYTE(right)) {
@@ -1079,55 +1067,55 @@ VMStatus vm_run(VM* vm) {
                         DEST_REG = INT_VALUE(AS_INT(left) | AS_INT(right));
                     } else {
                         VM_RUNTIME_ERROR(vm, "Right operand must be either byte or int");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 } else {
                     VM_RUNTIME_ERROR(vm, "Left operand must be either byte or int");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 SKIP(3);
                 break;
             }
-            case OP_TEST: {
+            case RISA_OP_TEST: {
                 if(value_is_truthy(DEST_REG))
                     SKIP(4);
                 SKIP(3);
                 break;
             }
-            case OP_NTEST: {
+            case RISA_OP_NTEST: {
                 if(value_is_falsy(DEST_REG))
                     SKIP(4);
                 SKIP(3);
                 break;
             }
-            case OP_JMP: {
+            case RISA_OP_JMP: {
                 SKIP(DEST * 4);
                 SKIP(3);
                 break;
             }
-            case OP_JMPW: {
+            case RISA_OP_JMPW: {
                 uint16_t amount = *((uint16_t*) &frame->ip); // This takes DEST and LEFT as 16 bits.
 
                 SKIP(amount * 4);
                 SKIP(3);
                 break;
             }
-            case OP_BJMP: {
+            case RISA_OP_BJMP: {
                 BSKIP(DEST * 4);
                 BSKIP(1);
                 break;
             }
-            case OP_BJMPW: {
+            case RISA_OP_BJMPW: {
                 uint16_t amount = *((uint16_t*) &frame->ip); // This takes DEST and LEFT as 16 bits.
 
                 BSKIP(amount * 4);
                 BSKIP(1);
                 break;
             }
-            case OP_CALL: {
-                if(!call_register(vm, DEST, LEFT))
-                    return VM_ERROR;
+            case RISA_OP_CALL: {
+                if(!risa_vm_call_register(vm, DEST, LEFT))
+                    return RISA_VM_STATUS_ERROR;
 
                 // Native function.
                 if(frame == &vm->frames[vm->frameCount - 1])
@@ -1136,17 +1124,17 @@ VMStatus vm_run(VM* vm) {
 
                 break;
             }
-            case OP_RET: {
-                upvalue_close_from(vm, frame->regs);
+            case RISA_OP_RET: {
+                risa_vm_upvalue_close_from(vm, frame->regs);
 
                 --vm->frameCount;
 
-                // When returning from the first frame, halt the VM.
+                // When returning from the first frame, halt the RisaVM.
                 if(vm->frameCount == 0)
-                    return VM_OK;
+                    return RISA_VM_STATUS_OK;
 
                 // The reg that contained the function will now contain the returned value.
-                // This has to be done manually for native functions (see call_native).
+                // This has to be done manually for native functions (see risa_vm_call_native).
                 if(DEST > 249)
                     *frame->base = NULL_VALUE;
                 else *frame->base = DEST_REG;
@@ -1155,18 +1143,18 @@ VMStatus vm_run(VM* vm) {
 
                 frame = &vm->frames[vm->frameCount - 1];
 
-                // If the frame is isolated, halt the VM.
+                // If the frame is isolated, halt the RisaVM.
                 if(vm->frames[vm->frameCount].isolated) {
-                    return VM_OK;
+                    return RISA_VM_STATUS_OK;
                 }
 
                 SKIP(3); // Skip the CALL args.
                 break;
             }
-            case OP_ACC: {
+            case RISA_OP_ACC: {
                 if(DEST > 249) {
                     VM_RUNTIME_ERROR(vm, "Expected register");
-                    return VM_ERROR;
+                    return RISA_VM_STATUS_ERROR;
                 }
 
                 vm->acc = DEST_REG;
@@ -1174,31 +1162,31 @@ VMStatus vm_run(VM* vm) {
                 SKIP(3);
                 break;
             }
-            case OP_DIS: {
-                DenseFunction* func;
+            case RISA_OP_DIS: {
+                RisaDenseFunction* func;
 
                 if(DEST > 249)
                     func = VM_FRAME_FUNCTION(*frame);
                 else {
-                    if(value_is_dense_of_type(DEST_REG, DVAL_FUNCTION))
+                    if(value_is_dense_of_type(DEST_REG, RISA_DVAL_FUNCTION))
                         func = AS_FUNCTION(DEST_REG);
-                    else if(value_is_dense_of_type(DEST_REG, DVAL_CLOSURE))
+                    else if(value_is_dense_of_type(DEST_REG, RISA_DVAL_CLOSURE))
                         func = AS_CLOSURE(DEST_REG)->function;
                     else {
                         VM_RUNTIME_ERROR(vm, "Argument must be a non-native function");
-                        return VM_ERROR;
+                        return RISA_VM_STATUS_ERROR;
                     }
                 }
 
                 RISA_OUT(vm->io, "\n");
-                dense_print(&vm->io, (DenseValue*) func);
+                risa_dense_print(&vm->io, (RisaDenseValue *) func);
 
                 RisaDisassembler disasm;
-                disassembler_init(&disasm);
+                risa_disassembler_init(&disasm);
                 risa_io_clone(&disasm.io, &vm->io);
 
-                disassembler_load(&disasm, &func->chunk);
-                disassembler_run(&disasm);
+                risa_disassembler_load(&disasm, &func->cluster);
+                risa_disassembler_run(&disasm);
                 RISA_OUT(vm->io, "\n\n");
 
                 SKIP(3);
@@ -1206,17 +1194,27 @@ VMStatus vm_run(VM* vm) {
             }
             default: {
                 VM_RUNTIME_ERROR(vm, "Illegal instruction");
-                return VM_ERROR;
+                return RISA_VM_STATUS_ERROR;
             }
         }
     }
+
+    #undef BSKIP
+    #undef SKIP
+
+    #undef RIGHT_BY_TYPE
+    #undef LEFT_BY_TYPE
 
     #undef RIGHT_REG
     #undef LEFT_REG
     #undef DEST_REG
 
+    #undef COMBINED_CONST
+    #undef RIGHT_CONST
     #undef LEFT_CONST
+    #undef DEST_CONST
 
+    #undef COMBINED
     #undef RIGHT
     #undef LEFT
     #undef DEST
@@ -1225,15 +1223,15 @@ VMStatus vm_run(VM* vm) {
     #undef NEXT_BYTE
 }
 
-Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...) {
+RisaValue risa_vm_invoke(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, ...) {
     // Check the frame count before pushing anything on the stack.
-    if(vm->frameCount == VM_CALLFRAME_COUNT) {
+    if(vm->frameCount == RISA_VM_CALLFRAME_COUNT) {
         VM_RUNTIME_ERROR(vm, "Stack overflow");
         return NULL_VALUE;
     }
 
-    Value* ptr = base + 1;
-    Value* end = ptr + argc;
+    RisaValue* ptr = base + 1;
+    RisaValue* end = ptr + argc;
 
     va_list args;
 
@@ -1241,32 +1239,32 @@ Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...) {
 
     // Push the args on the stack.
     while(ptr < end) {
-        *ptr++ = va_arg(args, Value);
+        *ptr++ = va_arg(args, RisaValue);
     }
 
     va_end(args);
 
     if(IS_DENSE(callee)) {
         switch(AS_DENSE(callee)->type) {
-            case DVAL_FUNCTION: {
-                if(!call_function(vm, base, callee, argc, true))
+            case RISA_DVAL_FUNCTION: {
+                if(!risa_vm_call_function(vm, base, callee, argc, true))
                     return NULL_VALUE;
 
                 goto _vm_invoke_run;
             }
-            case DVAL_CLOSURE: {
-                if(!call_closure(vm, base, callee, argc, true))
+            case RISA_DVAL_CLOSURE: {
+                if(!risa_vm_call_closure(vm, base, callee, argc, true))
                     return NULL_VALUE;
 
             _vm_invoke_run:
 
-                if(vm_run(vm) == VM_ERROR)
+                if(risa_vm_run(vm) == RISA_VM_STATUS_ERROR)
                     return NULL_VALUE;
 
                 return *base;
             }
-            case DVAL_NATIVE: {
-                if(!call_native(vm, base, callee, argc, true))
+            case RISA_DVAL_NATIVE: {
+                if(!risa_vm_call_native(vm, base, callee, argc, true))
                     return NULL_VALUE;
 
                 return *base;
@@ -1279,21 +1277,21 @@ Value vm_invoke(VM* vm, Value* base, Value callee, uint8_t argc, ...) {
     return NULL_VALUE;
 }
 
-static bool call_register(VM* vm, uint8_t reg, uint8_t argc) {
-    Value* callee = &vm->frames[vm->frameCount - 1].regs[reg];
+static bool risa_vm_call_register(RisaVM* vm, uint8_t reg, uint8_t argc) {
+    RisaValue* callee = &vm->frames[vm->frameCount - 1].regs[reg];
 
-    return call_value(vm, callee, *callee, argc, false);
+    return risa_vm_call_value(vm, callee, *callee, argc, false);
 }
 
-static bool call_value(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
+static bool risa_vm_call_value(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, bool isolated) {
     if(IS_DENSE(callee)) {
         switch(AS_DENSE(callee)->type) {
-            case DVAL_FUNCTION:
-                return call_function(vm, base, callee, argc, isolated);
-            case DVAL_CLOSURE:
-                return call_closure(vm, base, callee, argc, isolated);
-            case DVAL_NATIVE:
-                return call_native(vm, base, callee, argc, isolated);
+            case RISA_DVAL_FUNCTION:
+                return risa_vm_call_function(vm, base, callee, argc, isolated);
+            case RISA_DVAL_CLOSURE:
+                return risa_vm_call_closure(vm, base, callee, argc, isolated);
+            case RISA_DVAL_NATIVE:
+                return risa_vm_call_native(vm, base, callee, argc, isolated);
             default: ;
         }
     }
@@ -1302,60 +1300,60 @@ static bool call_value(VM* vm, Value* base, Value callee, uint8_t argc, bool iso
     return false;
 }
 
-static bool call_function(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
-    DenseFunction* function = AS_FUNCTION(callee);
+static bool risa_vm_call_function(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, bool isolated) {
+    RisaDenseFunction* function = AS_FUNCTION(callee);
 
     if(argc != function->arity) {
         VM_RUNTIME_ERROR(vm, "Expected %x args, got %x", function->arity, argc);
         return false;
     }
 
-    if(vm->frameCount == VM_CALLFRAME_COUNT) {
+    if(vm->frameCount == RISA_VM_CALLFRAME_COUNT) {
         VM_RUNTIME_ERROR(vm, "Stack overflow");
         return false;
     }
 
     ++vm->frameCount;
 
-    vm->frames[vm->frameCount - 1] = vm_frame_from_function(vm, base, function, isolated);
+    vm->frames[vm->frameCount - 1] = risa_vm_frame_from_function(vm, base, function, isolated);
     vm->stackTop += 251;
 
     return true;
 }
 
-static bool call_closure(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
-    DenseClosure* closure = AS_CLOSURE(callee);
-    DenseFunction* function = closure->function;
+static bool risa_vm_call_closure(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, bool isolated) {
+    RisaDenseClosure* closure = AS_CLOSURE(callee);
+    RisaDenseFunction* function = closure->function;
 
     if(argc != function->arity) {
         VM_RUNTIME_ERROR(vm, "Expected %x args, got %x", function->arity, argc);
         return false;
     }
 
-    if(vm->frameCount == VM_CALLFRAME_COUNT) {
+    if(vm->frameCount == RISA_VM_CALLFRAME_COUNT) {
         VM_RUNTIME_ERROR(vm, "Stack overflow");
         return false;
     }
 
     ++vm->frameCount;
 
-    vm->frames[vm->frameCount - 1] = vm_frame_from_closure(vm, base, closure, isolated);
+    vm->frames[vm->frameCount - 1] = risa_vm_frame_from_closure(vm, base, closure, isolated);
     vm->stackTop += 251;
 
     return true;
 }
 
-static bool call_native(VM* vm, Value* base, Value callee, uint8_t argc, bool isolated) {
-    DenseNative* native = AS_NATIVE(callee);
+static bool risa_vm_call_native(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, bool isolated) {
+    RisaDenseNative* native = AS_NATIVE(callee);
 
     *base = native->function(vm, argc, base + 1);
 
     return true;
 }
 
-static DenseUpvalue* upvalue_capture(VM* vm, Value* local) {
-    DenseUpvalue* prev = NULL;
-    DenseUpvalue* upvalue = vm->upvalues;
+static RisaDenseUpvalue* risa_vm_upvalue_capture(RisaVM* vm, RisaValue* local) {
+    RisaDenseUpvalue* prev = NULL;
+    RisaDenseUpvalue* upvalue = vm->upvalues;
 
     while(upvalue != NULL && upvalue->ref > local) {
         prev = upvalue;
@@ -1365,21 +1363,21 @@ static DenseUpvalue* upvalue_capture(VM* vm, Value* local) {
     if(upvalue != NULL && upvalue->ref == local)
         return upvalue;
 
-    DenseUpvalue* created = dense_upvalue_create(local);
+    RisaDenseUpvalue* created = risa_dense_upvalue_create(local);
     created->next = upvalue;
 
     if(prev == NULL)
         vm->upvalues = created;
     else prev->next = created;
 
-    vm_register_dense(vm, (DenseValue*) created);
+    risa_vm_register_dense(vm, (RisaDenseValue*) created);
 
     return created;
 }
 
-static void upvalue_close_from(VM* vm, Value* slot) {
+static void risa_vm_upvalue_close_from(RisaVM* vm, RisaValue* slot) {
     while(vm->upvalues != NULL && vm->upvalues->ref >= slot) {
-        DenseUpvalue* head = vm->upvalues;
+        RisaDenseUpvalue* head = vm->upvalues;
         head->closed = *head->ref;
         head->ref = &head->closed;
         vm->upvalues = head->next;

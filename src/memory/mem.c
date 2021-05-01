@@ -11,11 +11,11 @@
     static size_t unfreedAllocations = 0;
 #endif
 
-void* mem_alloc(size_t size, const char* file, uint32_t line) {
+void* risa_mem_alloc(size_t size, const char* file, uint32_t line) {
     void* ptr = malloc(size);
 
     if(ptr == NULL)
-        mem_panic();
+        risa_mem_panic();
 
     #ifdef DEBUG_TRACE_MEMORY_OPS
         ++unfreedAllocations;
@@ -25,11 +25,11 @@ void* mem_alloc(size_t size, const char* file, uint32_t line) {
     return ptr;
 }
 
-void* mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uint32_t line) {
+void* risa_mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uint32_t line) {
     void* newPtr = realloc(ptr, size * unitSize);
 
     if(newPtr == NULL)
-        mem_panic();
+        risa_mem_panic();
 
     #ifdef DEBUG_TRACE_MEMORY_OPS
         if(ptr == NULL) {
@@ -43,15 +43,15 @@ void* mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uin
     return newPtr;
 }
 
-void* mem_expand(void* ptr, size_t* size, size_t unitSize, const char* file, uint32_t line) {
+void* risa_mem_expand(void* ptr, size_t* size, size_t unitSize, const char* file, uint32_t line) {
     if(*size < MEM_BLOCK_START_SIZE)
         *size = MEM_BLOCK_START_SIZE;
     else (*size) *= 2;
 
-    return mem_realloc(ptr, *size, unitSize, file, line);
+    return risa_mem_realloc(ptr, *size, unitSize, file, line);
 }
 
-void mem_free(void* ptr, const char* file, uint32_t line) {
+void risa_mem_free(void* ptr, const char* file, uint32_t line) {
     free(ptr);
 
     #ifdef DEBUG_TRACE_MEMORY_OPS
@@ -62,7 +62,7 @@ void mem_free(void* ptr, const char* file, uint32_t line) {
     #endif
 }
 
-void mem_panic() {
+void risa_mem_panic() {
     exit(RISA_EXIT_OOM);
 }
 

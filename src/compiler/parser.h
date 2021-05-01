@@ -2,28 +2,28 @@
 #define RISA_PARSER_H_GUARD
 
 #include "../io/io.h"
-#include "../lexer/lexer.h"
+#include "lexer.h"
 #include "../def/types.h"
 
 typedef struct {
     RisaIO io;
-    Lexer lexer;
+    RisaLexer lexer;
 
-    Token current;
-    Token previous;
+    RisaToken current;
+    RisaToken previous;
 
     bool error;
     bool panic;
-} Parser;
+} RisaParser;
 
-void parser_init(Parser* parser);
-void parser_advance(Parser* parser);
-void parser_consume(Parser* parser, TokenType type, const char* err);
+void risa_parser_init              (RisaParser* parser);
+void risa_parser_advance           (RisaParser* parser);
+void risa_parser_consume           (RisaParser* parser, RisaTokenType type, const char* err);
 
-void parser_sync(Parser* parser);
+void risa_parser_sync              (RisaParser* parser);
 
-void parser_error_at(Parser* parser, Token token, const char* msg);
-void parser_error_at_current(Parser* parser, const char* msg);
-void parser_error_at_previous(Parser* parser, const char* msg);
+void risa_parser_error_at          (RisaParser* parser, RisaToken token, const char* msg);
+void risa_parser_error_at_current  (RisaParser* parser, const char* msg);
+void risa_parser_error_at_previous (RisaParser* parser, const char* msg);
 
 #endif

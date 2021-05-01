@@ -16,7 +16,7 @@
 void run_repl(RisaIO io);
 void run_file(RisaIO io, const char* path);
 
-VM create_vm();
+RisaVM create_vm();
 
 void print_info(RisaIO io);
 
@@ -31,15 +31,15 @@ int main(int argc, char** argv) {
     else TERMINATE(io, 64, "Invalid arguments");
 }
 
-VM create_vm() {
-    VM vm;
-    vm_init(&vm);
+RisaVM create_vm() {
+    RisaVM vm;
+    risa_vm_init(&vm);
 
-    std_register_core(&vm);
-    std_register_io(&vm);
-    std_register_debug(&vm);
+    risa_std_register_core(&vm);
+    risa_std_register_io(&vm);
+    risa_std_register_debug(&vm);
 
-    //vm_global_set_native(&vm, "print", 5, print);
+    //risa_vm_global_set_native(&vm, "print", 5, print);
 
     return vm;
 }
@@ -47,7 +47,7 @@ VM create_vm() {
 void run_repl(RisaIO io) {
     print_info(io);
 
-    VM vm = create_vm();
+    RisaVM vm = create_vm();
 
     vm.options.replMode = true;
 
@@ -69,7 +69,7 @@ void run_repl(RisaIO io) {
         }
 
         if(strcmp(line, "exit") == 0) {
-            vm_delete(&vm);
+            risa_vm_delete(&vm);
             exit(0);
         }
 
@@ -80,14 +80,14 @@ void run_repl(RisaIO io) {
 
         RisaInterpretStatus status = risa_interpret_string(&vm, line);
 
-        if(status == RISA_INTERPRET_OK && vm.acc.type != VAL_NULL)
+        if(status == RISA_INTERPRET_OK && vm.acc.type != RISA_VAL_NULL)
             value_print(&vm.io, vm.acc);
         RISA_OUT(io, "\n");
     }
 }
 
 void run_file(RisaIO io, const char* path) {
-    VM vm = create_vm();
+    RisaVM vm = create_vm();
 
     FILE* file = fopen(path, "rb");
 
@@ -114,7 +114,7 @@ void run_file(RisaIO io, const char* path) {
 
     RISA_MEM_FREE(data);
 
-    vm_delete(&vm);
+    risa_vm_delete(&vm);
 
     #ifdef DEBUG_SHOW_HEAP_SIZE
         RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);

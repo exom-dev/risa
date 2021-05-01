@@ -8,21 +8,22 @@
 #define MAP_MAX_LOAD 0.75
 #define MAP_START_SIZE 8
 
-static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key);
-static void map_adjust_capacity(Map* map);
+static RisaMapEntry* risa_map_find_bucket     (RisaMapEntry* entries, int capacity, DenseStringPtr key);
+static void          risa_map_adjust_capacity (RisaMap* map);
 
-void map_init(Map* map) {
+void risa_map_init(RisaMap* map) {
     map->count = 0;
     map->capacity = 0;
     map->entries = NULL;
 }
 
-void map_delete(Map* map) {
+void risa_map_delete(RisaMap* map) {
     RISA_MEM_FREE(map->entries);
-    map_init(map);
+    risa_map_init(map);
 }
 
-uint32_t map_hash(const char* chars, uint32_t length) {
+//  FNV-1a hash
+uint32_t risa_map_hash(const char* chars, uint32_t length) {
     uint32_t hash = 2166136261u;
 
     for (uint32_t i = 0; i < length; i++) {
@@ -33,11 +34,11 @@ uint32_t map_hash(const char* chars, uint32_t length) {
     return hash;
 }
 
-bool map_get(Map* map, DenseStringPtr key, Value* value) {
+bool risa_map_get(RisaMap* map, DenseStringPtr key, RisaValue* value) {
     if(map->count == 0)
         return false;
 
-    Entry* entry = map_find_bucket(map->entries, map->capacity, key);
+    RisaMapEntry* entry = risa_map_find_bucket(map->entries, map->capacity, key);
 
     if(entry->key == NULL)
         return false;
@@ -46,10 +47,10 @@ bool map_get(Map* map, DenseStringPtr key, Value* value) {
     return true;
 }
 
-bool map_set(Map* map, DenseStringPtr key, Value value) {
-    map_adjust_capacity(map);
+bool risa_map_set(RisaMap* map, DenseStringPtr key, RisaValue value) {
+    risa_map_adjust_capacity(map);
 
-    Entry* entry = map_find_bucket(map->entries, map->capacity, key);
+    RisaMapEntry* entry = risa_map_find_bucket(map->entries, map->capacity, key);
 
     bool isNewKey = entry->key == NULL;
     if(isNewKey && IS_NULL(entry->value))
@@ -61,11 +62,11 @@ bool map_set(Map* map, DenseStringPtr key, Value value) {
     return isNewKey;
 }
 
-bool map_erase(Map* map, DenseStringPtr key) {
+bool risa_map_erase(RisaMap* map, DenseStringPtr key) {
     if(map->count == 0)
         return false;
 
-    Entry* entry = map_find_bucket(map->entries, map->capacity, key);
+    RisaMapEntry* entry = risa_map_find_bucket(map->entries, map->capacity, key);
     if(entry->key == NULL)
         return false;
 
@@ -75,29 +76,29 @@ bool map_erase(Map* map, DenseStringPtr key) {
     return true;
 }
 
-void map_copy(Map* map, Map* from) {
+void risa_map_copy(RisaMap* map, RisaMap* from) {
     for(uint32_t i = 0; i < from->capacity; ++i) {
-        Entry* entry = &from->entries[i];
+        RisaMapEntry* entry = &from->entries[i];
         if(entry->key != NULL)
-            map_set(map, entry->key, entry->value);
+            risa_map_set(map, entry->key, entry->value);
     }
 }
 
-DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash) {
+DenseStringPtr risa_map_find(RisaMap* map, const char* chars, int length, uint32_t hash) {
     if(map->count == 0)
         return NULL;
 
     uint32_t index = hash & (map->capacity - 1);
 
     while(1) {
-        Entry* entry = &map->entries[index];
+        RisaMapEntry* entry = &map->entries[index];
 
         if(entry->key == NULL) {
             if(IS_NULL(entry->value))
                 return NULL;
-        } else if(((DenseString*) (entry->key))->length == length
-               && ((DenseString*) (entry->key))->hash == hash
-               && memcmp(((DenseString*) (entry->key))->chars, chars, length) == 0) {
+        } else if(((RisaDenseString*) (entry->key))->length == length
+               && ((RisaDenseString*) (entry->key))->hash == hash
+               && memcmp(((RisaDenseString*) (entry->key))->chars, chars, length) == 0) {
             return entry->key;
         }
 
@@ -105,21 +106,21 @@ DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash) 
     }
 }
 
-Entry* map_find_entry(Map* map, const char* chars, int length, uint32_t hash) {
+RisaMapEntry* risa_map_find_entry(RisaMap* map, const char* chars, int length, uint32_t hash) {
     if(map->count == 0)
         return NULL;
 
     uint32_t index = hash & (map->capacity - 1);
 
     while(1) {
-        Entry* entry = &map->entries[index];
+        RisaMapEntry* entry = &map->entries[index];
 
         if(entry->key == NULL) {
             if(IS_NULL(entry->value))
                 return NULL;
-        } else if(((DenseString*) (entry->key))->length == length
-                  && ((DenseString*) (entry->key))->hash == hash
-                  && memcmp(((DenseString*) (entry->key))->chars, chars, length) == 0) {
+        } else if(((RisaDenseString*) (entry->key))->length == length
+                  && ((RisaDenseString*) (entry->key))->hash == hash
+                  && memcmp(((RisaDenseString*) (entry->key))->chars, chars, length) == 0) {
             return entry;
         }
 
@@ -127,12 +128,12 @@ Entry* map_find_entry(Map* map, const char* chars, int length, uint32_t hash) {
     }
 }
 
-static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key) {
-    uint32_t index = ((DenseString*) key)->hash & (capacity - 1);
-    Entry* tombstone = NULL;
+static RisaMapEntry* risa_map_find_bucket(RisaMapEntry* entries, int capacity, DenseStringPtr key) {
+    uint32_t index = ((RisaDenseString*) key)->hash & (capacity - 1);
+    RisaMapEntry* tombstone = NULL;
 
     while(1) {
-        Entry* entry = &entries[index];
+        RisaMapEntry* entry = &entries[index];
 
         if(entry->key == NULL) {
             if(IS_NULL(entry->value)) {
@@ -149,10 +150,10 @@ static Entry* map_find_bucket(Entry* entries, int capacity, DenseStringPtr key) 
     }
 }
 
-static void map_adjust_capacity(Map* map) {
+static void risa_map_adjust_capacity(RisaMap* map) {
     if(map->count + 1 > map->capacity * MAP_MAX_LOAD) {
         uint32_t capacity = map->capacity < MAP_START_SIZE ? MAP_START_SIZE : 2 * map->capacity;
-        Entry* entries = RISA_MEM_ALLOC(capacity * sizeof(Entry));
+        RisaMapEntry* entries = RISA_MEM_ALLOC(capacity * sizeof(RisaMapEntry));
 
         for(uint32_t i = 0; i < capacity; ++i) {
             entries[i].key = NULL;
@@ -161,11 +162,11 @@ static void map_adjust_capacity(Map* map) {
 
         map->count = 0;
         for(uint32_t i = 0; i < map->capacity; ++i) {
-            Entry *entry = &map->entries[i];
+            RisaMapEntry *entry = &map->entries[i];
             if (entry->key == NULL)
                 continue;
 
-            Entry *dest = map_find_bucket(entries, capacity, entry->key);
+            RisaMapEntry *dest = risa_map_find_bucket(entries, capacity, entry->key);
             dest->key = entry->key;
             dest->value = entry->value;
 

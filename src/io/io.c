@@ -1,14 +1,13 @@
 #include "io.h"
 #include "../memory/mem.h"
 #include "../def/def.h"
-#include "../def/macro.h"
 
 #include <stdio.h>
 #include <string.h>
 
 char* RISA_IO_STDIN(uint8_t mode) {
     switch(mode) {
-        case RISA_INPUT_CHAR: {
+        case RISA_INPUT_MODE_CHAR: {
             int data = getc(stdin);
 
             if(data == EOF)
@@ -19,20 +18,20 @@ char* RISA_IO_STDIN(uint8_t mode) {
 
             return chr;
         }
-        case RISA_INPUT_WORD: {
-            char* word = RISA_MEM_ALLOC(sizeof(char) * (RISA_IN_WORD_BUFFER_SIZE + 1));
+        case RISA_INPUT_MODE_WORD: {
+            char* word = RISA_MEM_ALLOC(sizeof(char) * (RISA_INPUT_WORD_BUFFER_SIZE + 1));
 
-            if(fscanf(stdin, "%" RISA_STRINGIFY(RISA_IN_WORD_BUFFER_SIZE) "s", word) < 1) {
+            if(fscanf(stdin, "%" RISA_STRINGIFY(RISA_INPUT_WORD_BUFFER_SIZE) "s", word) < 1) {
                 RISA_MEM_FREE(word);
                 return NULL;
             }
 
             return word;
         }
-        case RISA_INPUT_LINE: {
-            char* line = RISA_MEM_ALLOC(sizeof(char) * (RISA_IN_LINE_BUFFER_SIZE + 1));
+        case RISA_INPUT_MODE_LINE: {
+            char* line = RISA_MEM_ALLOC(sizeof(char) * (RISA_INPUT_LINE_BUFFER_SIZE + 1));
 
-            if(fgets(line, RISA_IN_LINE_BUFFER_SIZE + 1, stdin) == NULL) {
+            if(fgets(line, RISA_INPUT_LINE_BUFFER_SIZE + 1, stdin) == NULL) {
                 RISA_MEM_FREE(line);
                 return NULL;
             }

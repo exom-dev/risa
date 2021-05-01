@@ -2,18 +2,18 @@
 #define RISA_DISASSEMBLER_H_GUARD
 
 #include "../io/io.h"
-#include "../chunk/chunk.h"
+#include "../cluster/cluster.h"
 #include "../def/types.h"
 
 typedef struct {
     RisaIO io;
-    Chunk* chunk;
+    RisaCluster* cluster;
     size_t offset;
 } RisaDisassembler;
 
-void disassembler_init(RisaDisassembler* disassembler);
-void disassembler_load(RisaDisassembler* disassembler, Chunk* chunk);
-void disassembler_run(RisaDisassembler* disassembler);
-void disassembler_reset(RisaDisassembler* disassembler);
+void risa_disassembler_init  (RisaDisassembler* disassembler);
+void risa_disassembler_load  (RisaDisassembler* disassembler, RisaCluster* chunk);
+void risa_disassembler_run   (RisaDisassembler* disassembler);
+void risa_disassembler_reset (RisaDisassembler* disassembler);
 
 #endif

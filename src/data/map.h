@@ -7,26 +7,26 @@ typedef void* DenseStringPtr;
 
 typedef struct {
     DenseStringPtr key;
-    Value value;
-} Entry;
+    RisaValue value;
+} RisaMapEntry;
 
 typedef struct {
     uint32_t count;
     uint32_t capacity;
-    Entry* entries;
-} Map;
+    RisaMapEntry* entries;
+} RisaMap;
 
-void map_init(Map* map);
-void map_delete(Map* map);
+void           risa_map_init       (RisaMap* map);
+void           risa_map_delete     (RisaMap* map);
 
-uint32_t map_hash(const char* chars, uint32_t length);
+uint32_t       risa_map_hash       (const char* chars, uint32_t length);
 
-bool map_get(Map* map, DenseStringPtr key, Value* value);
-bool map_set(Map* map, DenseStringPtr key, Value value);
-bool map_erase(Map* map, DenseStringPtr key);
-void map_copy(Map* map, Map* from);
+bool           risa_map_get        (RisaMap* map, DenseStringPtr key, RisaValue* value);
+bool           risa_map_set        (RisaMap* map, DenseStringPtr key, RisaValue value);
+bool           risa_map_erase      (RisaMap* map, DenseStringPtr key);
+void           risa_map_copy       (RisaMap* map, RisaMap* from);
 
-DenseStringPtr map_find(Map* map, const char* chars, int length, uint32_t hash);
-Entry* map_find_entry(Map* map, const char* chars, int length, uint32_t hash);
+DenseStringPtr risa_map_find       (RisaMap* map, const char* chars, int length, uint32_t hash);
+RisaMapEntry*  risa_map_find_entry (RisaMap* map, const char* chars, int length, uint32_t hash);
 
 #endif

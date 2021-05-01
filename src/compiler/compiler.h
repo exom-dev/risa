@@ -1,62 +1,62 @@
 #ifndef RISA_COMPILER_H
 #define RISA_COMPILER_H
 
+#include "lexer.h"
 #include "parser.h"
 
 #include "../io/io.h"
-#include "../chunk/chunk.h"
-#include "../lexer/lexer.h"
+#include "../cluster/cluster.h"
 #include "../data/map.h"
 #include "../def/def.h"
 #include "../value/dense.h"
 #include "../options/options.h"
 
 typedef enum {
-    REG_CONSTANT,
-    REG_LOCAL,
-    REG_UPVAL,
-    REG_GLOBAL,
-    REG_TEMP,
-    REG_EMPTY
-} RegType;
+    RISA_REG_CONSTANT,
+    RISA_REG_LOCAL,
+    RISA_REG_UPVAL,
+    RISA_REG_GLOBAL,
+    RISA_REG_TEMP,
+    RISA_REG_EMPTY
+} RisaRegType;
 
 typedef struct {
-    RegType type;
-    Token token;
-} RegInfo;
+    RisaRegType type;
+    RisaToken token;
+} RisaRegInfo;
 
 typedef struct {
-    Token identifier;
+    RisaToken identifier;
     int32_t depth;
     uint8_t reg;
 
     bool captured;
-} Local;
+} RisaLocalInfo;
 
 typedef struct {
     uint8_t index;
     bool local;
-} Upvalue;
+} RisaUpvalueInfo;
 
 typedef struct {
     uint32_t index;
     uint8_t depth;
     bool isBreak;
-} Leap;
+} RisaLeapInfo;
 
-typedef struct Compiler {
+typedef struct RisaCompiler {
     RisaIO io;
 
-    struct Compiler* super;
-    DenseFunction* function;
+    struct RisaCompiler* super;
+    RisaDenseFunction* function;
 
-    Parser* parser;
-    Map strings;
+    RisaParser* parser;
+    RisaMap strings;
 
-    RegInfo regs[250];
+    RisaRegInfo regs[250];
     uint8_t regIndex;
 
-    Options options;
+    RisaOptions options;
 
     struct {
         uint8_t reg;          // In which register the last value resides.
@@ -65,7 +65,7 @@ typedef struct Compiler {
         bool isLvalue;        // Whether or not the last value is a lvalue.
         bool isPostIncrement; // Whether or not the last value is the result of a post increment operation.
         bool isEqualOp;       // Whether or not the last value is the result of an equality operation.
-        bool canOverwrite;    // Whether or not the last value can overwrite a previously-used register (TODO: explain this better).
+        bool canOverwrite;    // Whether or not the last value can be overwritten (TODO: explain this better).
         bool fromBranched;    // Whether or not the last value comes from one of multiple branches (e.g. ternary). Required to disable bad CNST optimizations.
 
         struct {
@@ -94,9 +94,9 @@ typedef struct Compiler {
         } lvalMeta;
     } last;
 
-    Local locals[250];
-    Upvalue upvalues[250];
-    Leap leaps[250];
+    RisaLocalInfo locals[250];
+    RisaUpvalueInfo upvalues[250];
+    RisaLeapInfo leaps[250];
 
     uint8_t localCount;
     uint8_t upvalueCount;
@@ -104,45 +104,45 @@ typedef struct Compiler {
     uint8_t leapCount;
 
     int32_t scopeDepth;
-} Compiler;
+} RisaCompiler;
 
 typedef enum {
-    COMPILER_OK,
-    COMPILER_ERROR
-} CompilerStatus;
+    RISA_COMPILER_STATUS_OK,
+    RISA_COMPILER_STATUS_ERROR
+} RisaCompilerStatus;
 
 typedef enum {
-    PREC_NONE,
-    PREC_COMMA,       // ,
-    PREC_ASSIGNMENT,  // =
-    PREC_TERNARY,     // ?:
-    PREC_OR,          // ||
-    PREC_AND,         // &&
-    PREC_BITWISE_OR,  // |
-    PREC_BITWISE_XOR, // ^
-    PREC_BITWISE_AND, // &
-    PREC_EQUALITY,    // == !=
-    PREC_COMPARISON,  // < > <= >=
-    PREC_SHIFT,       // << >>
-    PREC_TERM,        // + -
-    PREC_FACTOR,      // * / %
-    PREC_UNARY,       // ! - ~ ++pre
-    PREC_CALL,        // . () [] post++
-    PREC_PRIMARY
-} Precedence;
+    RISA_PREC_NONE,
+    RISA_PREC_COMMA,       // ,
+    RISA_PREC_ASSIGNMENT,  // =
+    RISA_PREC_TERNARY,     // ?:
+    RISA_PREC_OR,          // ||
+    RISA_PREC_AND,         // &&
+    RISA_PREC_BITWISE_OR,  // |
+    RISA_PREC_BITWISE_XOR, // ^
+    RISA_PREC_BITWISE_AND, // &
+    RISA_PREC_EQUALITY,    // == !=
+    RISA_PREC_COMPARISON,  // < > <= >=
+    RISA_PREC_SHIFT,       // << >>
+    RISA_PREC_TERM,        // + -
+    RISA_PREC_FACTOR,      // * / %
+    RISA_PREC_UNARY,       // ! - ~ ++pre
+    RISA_PREC_CALL,        // . () [] post++
+    RISA_PREC_PRIMARY
+} RisaOperatorPrecedence;
 
-typedef void (*RuleHandler)(Compiler*, bool);
+typedef void (*RisaOperatorRuleHandler)(RisaCompiler*, bool);
 
 typedef struct {
-    RuleHandler prefix;
-    RuleHandler inpostfix; // infix or postfix
+    RisaOperatorRuleHandler prefix;
+    RisaOperatorRuleHandler inpostfix; // infix or postfix
 
-    Precedence precedence;
-} Rule;
+    RisaOperatorPrecedence precedence;
+} RisaOperatorRule;
 
-void compiler_init(Compiler* compiler);
-void compiler_delete(Compiler* compiler);
+void               risa_compiler_init    (RisaCompiler* compiler);
+void               risa_compiler_delete  (RisaCompiler* compiler);
 
-CompilerStatus compiler_compile(Compiler* compiler, const char* str);
+RisaCompilerStatus risa_compiler_compile (RisaCompiler* compiler, const char* str);
 
 #endif

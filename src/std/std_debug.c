@@ -2,68 +2,69 @@
 #include "../value/value.h"
 #include "../def/macro.h"
 
-static Value std_debug_type_internal(VM* vm, Value val);
+static RisaValue risa_std_debug_type          (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_debug_vm_acc        (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_debug_vm_heap_size  (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_debug_vm_stack_size (void*, uint8_t, RisaValue*);
 
-static Value std_debug_type(void* vm, uint8_t argc, Value* args) {
+static RisaValue risa_std_debug_type_internal (RisaVM*, RisaValue);
+
+void risa_std_register_debug(RisaVM* vm) {
+    #define STD_DEBUG_OBJ_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, risa_dense_native_value(risa_std_debug_##fn)
+
+    RisaDenseObject* objVm = risa_dense_object_create_under(vm, 3 STD_DEBUG_OBJ_ENTRY(acc, vm_acc)STD_DEBUG_OBJ_ENTRY(heapSize, vm_heap_size)STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
+
+    RisaDenseObject* obj = risa_dense_object_create_under(vm, 2,
+                                                          "vm", sizeof("vm") - 1, DENSE_VALUE((RisaDenseValue *) objVm)STD_DEBUG_OBJ_ENTRY(type, type));
+
+    risa_vm_global_set(vm, "debug", sizeof("debug") - 1, DENSE_VALUE((RisaDenseValue *) obj));
+
+    #undef STD_DEBUG_OBJ_ENTRY
+}
+
+static RisaValue risa_std_debug_type(void* vm, uint8_t argc, RisaValue* args) {
     if(argc > 0) {
-        return std_debug_type_internal((VM*) vm, args[0]);
+        return risa_std_debug_type_internal((RisaVM *) vm, args[0]);
     }
 
     return NULL_VALUE;
 }
 
-static Value std_debug_vm_acc(void* vm, uint8_t argc, Value* args) {
+static RisaValue risa_std_debug_vm_acc(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0) {
-        return ((VM*) vm)->acc;
+        return ((RisaVM*) vm)->acc;
     }
 
-    return (((VM*) vm)->acc = args[0]);
+    return (((RisaVM*) vm)->acc = args[0]);
 }
 
-static Value std_debug_vm_heap_size(void* vm, uint8_t argc, Value* args) {
-    return (INT_VALUE((uint64_t) ((VM*) vm)->heapSize));
+static RisaValue risa_std_debug_vm_heap_size(void* vm, uint8_t argc, RisaValue* args) {
+    return (INT_VALUE((uint64_t) ((RisaVM*) vm)->heapSize));
 }
 
-static Value std_debug_vm_stack_size(void* vm, uint8_t argc, Value* args) {
-    return (INT_VALUE((uint64_t) (VM_STACK_SIZE * sizeof(Value))));
+static RisaValue risa_std_debug_vm_stack_size(void* vm, uint8_t argc, RisaValue* args) {
+    return (INT_VALUE((uint64_t) (RISA_VM_STACK_SIZE * sizeof(RisaValue))));
 }
 
-void std_register_debug(VM* vm) {
-    #define STD_DEBUG_OBJ_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, dense_native_value(std_debug_##fn)
-
-    DenseObject* objVm = dense_object_create_with(vm, 3
-                                                  STD_DEBUG_OBJ_ENTRY(acc, vm_acc)
-                                                  STD_DEBUG_OBJ_ENTRY(heapSize, vm_heap_size)
-                                                  STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
-
-    DenseObject* obj = dense_object_create_with(vm, 2,
-                                                "vm", sizeof("vm") - 1, DENSE_VALUE((DenseValue *) objVm)
-                                                STD_DEBUG_OBJ_ENTRY(type, type));
-
-    vm_global_set(vm, "debug", sizeof("debug") - 1, DENSE_VALUE((DenseValue*) obj));
-
-    #undef STD_DEBUG_OBJ_ENTRY
-}
-
-static Value std_debug_type_internal(VM* vm, Value val) {
-    #define TYPE_RESULT(type) DENSE_VALUE(vm_string_create(vm, type, sizeof(type) - 1))
+static RisaValue risa_std_debug_type_internal(RisaVM* vm, RisaValue val) {
+    #define TYPE_RESULT(type) DENSE_VALUE(risa_vm_string_create(vm, type, sizeof(type) - 1))
 
     switch(val.type) {
-        case VAL_NULL:  return TYPE_RESULT("null");
-        case VAL_BOOL:  return TYPE_RESULT("bool");
-        case VAL_BYTE:  return TYPE_RESULT("byte");
-        case VAL_INT:   return TYPE_RESULT("int");
-        case VAL_FLOAT: return TYPE_RESULT("float");
+        case RISA_VAL_NULL:  return TYPE_RESULT("null");
+        case RISA_VAL_BOOL:  return TYPE_RESULT("bool");
+        case RISA_VAL_BYTE:  return TYPE_RESULT("byte");
+        case RISA_VAL_INT:   return TYPE_RESULT("int");
+        case RISA_VAL_FLOAT: return TYPE_RESULT("float");
 
-        case VAL_DENSE: {
+        case RISA_VAL_DENSE: {
             switch(AS_DENSE(val)->type) {
-                case DVAL_STRING:   return TYPE_RESULT("string");
-                case DVAL_ARRAY:    return TYPE_RESULT("array");
-                case DVAL_OBJECT:   return TYPE_RESULT("object");
-                case DVAL_UPVALUE:  return TYPE_RESULT("upvalue");
-                case DVAL_FUNCTION: return TYPE_RESULT("function");
-                case DVAL_CLOSURE:  return TYPE_RESULT("closure");
-                case DVAL_NATIVE:   return TYPE_RESULT("native");
+                case RISA_DVAL_STRING:   return TYPE_RESULT("string");
+                case RISA_DVAL_ARRAY:    return TYPE_RESULT("array");
+                case RISA_DVAL_OBJECT:   return TYPE_RESULT("object");
+                case RISA_DVAL_UPVALUE:  return TYPE_RESULT("upvalue");
+                case RISA_DVAL_FUNCTION: return TYPE_RESULT("function");
+                case RISA_DVAL_CLOSURE:  return TYPE_RESULT("closure");
+                case RISA_DVAL_NATIVE:   return TYPE_RESULT("native");
             }
         }
 

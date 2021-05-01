@@ -1,8 +1,8 @@
 #include "dense.h"
 
-DenseNative* dense_native_create(NativeFunction function) {
-    DenseNative* native = (DenseNative*) RISA_MEM_ALLOC(sizeof(DenseNative));
-    native->dense.type = DVAL_NATIVE;
+RisaDenseNative* risa_dense_native_create(RisaNativeFunction function) {
+    RisaDenseNative* native = (RisaDenseNative*) RISA_MEM_ALLOC(sizeof(RisaDenseNative));
+    native->dense.type = RISA_DVAL_NATIVE;
     native->dense.link = NULL;
     native->dense.marked = false;
 
@@ -11,6 +11,6 @@ DenseNative* dense_native_create(NativeFunction function) {
     return native;
 }
 
-Value dense_native_value(NativeFunction function) {
-    return DENSE_VALUE(dense_native_create(function));
+RisaValue risa_dense_native_value(RisaNativeFunction function) {
+    return DENSE_VALUE(risa_dense_native_create(function));
 }

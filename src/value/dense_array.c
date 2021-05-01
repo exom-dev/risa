@@ -1,30 +1,30 @@
 #include "dense.h"
 
-DenseArray* dense_array_create() {
-    DenseArray* array = (DenseArray*) RISA_MEM_ALLOC(sizeof(DenseArray));
+RisaDenseArray* risa_dense_array_create() {
+    RisaDenseArray* array = (RisaDenseArray*) RISA_MEM_ALLOC(sizeof(RisaDenseArray));
 
-    dense_array_init(array);
+    risa_dense_array_init(array);
     return array;
 }
 
-void dense_array_init(DenseArray* array) {
-    array->dense.type = DVAL_ARRAY;
+void risa_dense_array_init(RisaDenseArray* array) {
+    array->dense.type = RISA_DVAL_ARRAY;
     array->dense.link = NULL;
     array->dense.marked = false;
 
     value_array_init(&array->data);
 }
 
-void dense_array_delete(DenseArray* array) {
+void risa_dense_array_delete(RisaDenseArray* array) {
     value_array_delete(&array->data);
-    dense_array_init(array);
+    risa_dense_array_init(array);
 }
 
-Value dense_array_get(DenseArray* array, uint32_t index) {
+RisaValue risa_dense_array_get(RisaDenseArray* array, uint32_t index) {
     return array->data.values[index];
 }
 
-void dense_array_set(DenseArray* array, uint32_t index, Value value) {
+void risa_dense_array_set(RisaDenseArray* array, uint32_t index, RisaValue value) {
     if(index == array->data.size)
         value_array_write(&array->data, value);
     else array->data.values[index] = value;

@@ -3,8 +3,8 @@
 
 #include "../vm/vm.h"
 
-void std_register_core(VM* vm);
-void std_register_io(VM* vm);
-void std_register_debug(VM* vm);
+void risa_std_register_core  (RisaVM* vm);
+void risa_std_register_io    (RisaVM* vm);
+void risa_std_register_debug (RisaVM* vm);
 
 #endif

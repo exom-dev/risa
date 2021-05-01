@@ -1,8 +1,8 @@
 #include "dense.h"
 
-DenseUpvalue* dense_upvalue_create(Value* value) {
-    DenseUpvalue* upvalue = RISA_MEM_ALLOC(sizeof(DenseUpvalue));
-    upvalue->dense.type = DVAL_UPVALUE;
+RisaDenseUpvalue* risa_dense_upvalue_create(RisaValue* value) {
+    RisaDenseUpvalue* upvalue = RISA_MEM_ALLOC(sizeof(RisaDenseUpvalue));
+    upvalue->dense.type = RISA_DVAL_UPVALUE;
     upvalue->dense.link = NULL;
     upvalue->dense.marked = false;
 

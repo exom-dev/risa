@@ -1,23 +1,23 @@
 #include "dense.h"
 
-DenseFunction* dense_function_create() {
-    DenseFunction* function = (DenseFunction*) RISA_MEM_ALLOC(sizeof(DenseFunction));
+RisaDenseFunction* risa_dense_function_create() {
+    RisaDenseFunction* function = (RisaDenseFunction*) RISA_MEM_ALLOC(sizeof(RisaDenseFunction));
 
-    dense_function_init(function);
+    risa_dense_function_init(function);
     return function;
 }
 
-void dense_function_init(DenseFunction* function) {
-    function->dense.type = DVAL_FUNCTION;
+void risa_dense_function_init(RisaDenseFunction* function) {
+    function->dense.type = RISA_DVAL_FUNCTION;
     function->dense.link = NULL;
     function->dense.marked = false;
 
     function->arity = 0;
     function->name = NULL;
-    chunk_init(&function->chunk);
+    cluster_init(&function->cluster);
 }
 
-void dense_function_delete(DenseFunction* function) {
-    chunk_delete(&function->chunk);
-    dense_function_init(function);
+void risa_dense_function_delete(RisaDenseFunction* function) {
+    cluster_delete(&function->cluster);
+    risa_dense_function_init(function);
 }

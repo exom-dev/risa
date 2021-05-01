@@ -2,10 +2,8 @@
 #include "../lib/charlib.h"
 
 #include <stdlib.h>
-#include <string.h>
-#include <errno.h>
 
-static Value value_num_from_string(char* str, uint32_t length) {
+static RisaValue value_num_from_string(char* str, uint32_t length) {
     if(str == NULL)
         return NULL_VALUE;
 
@@ -39,17 +37,17 @@ static Value value_num_from_string(char* str, uint32_t length) {
     return INT_VALUE(num);
 }
 
-Value value_int_from_string(char* str, uint32_t length) {
+RisaValue value_int_from_string(char* str, uint32_t length) {
     return value_num_from_string(str, length);
 }
 
-Value value_byte_from_string(char* str, uint32_t length) {
-    Value result = value_num_from_string(str, length);
+RisaValue value_byte_from_string(char* str, uint32_t length) {
+    RisaValue result = value_num_from_string(str, length);
 
-    return result.type == VAL_NULL ?  result : BYTE_VALUE((uint8_t) AS_INT(result));
+    return result.type == RISA_VAL_NULL ? result : BYTE_VALUE((uint8_t) AS_INT(result));
 }
 
-Value value_float_from_string(char* str) {
+RisaValue value_float_from_string(char* str) {
     double num;
 
     if(!risa_lib_charlib_strtod(str, &num)) {
@@ -59,7 +57,7 @@ Value value_float_from_string(char* str) {
     return FLOAT_VALUE(num);
 }
 
-Value value_bool_from_string(char* str) {
+RisaValue value_bool_from_string(char* str) {
     if(risa_lib_charlib_stricmp(str, "true") || risa_lib_charlib_stricmp(str, "1"))
         return BOOL_VALUE(true);
     if(risa_lib_charlib_stricmp(str, "false") || risa_lib_charlib_stricmp(str, "0"))

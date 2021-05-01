@@ -5,88 +5,88 @@
 #include "../def/types.h"
 
 typedef enum {
-    VAL_NULL,
-    VAL_BOOL,
-    VAL_BYTE,
-    VAL_INT,
-    VAL_FLOAT,
-    VAL_DENSE
-} ValueType;
+    RISA_VAL_NULL,
+    RISA_VAL_BOOL,
+    RISA_VAL_BYTE,
+    RISA_VAL_INT,
+    RISA_VAL_FLOAT,
+    RISA_VAL_DENSE
+} RisaValueType;
 
 typedef enum {
-    DVAL_STRING,
-    DVAL_ARRAY,
-    DVAL_OBJECT,
-    DVAL_UPVALUE,
-    DVAL_FUNCTION,
-    DVAL_CLOSURE,
-    DVAL_NATIVE
-} DenseValueType;
+    RISA_DVAL_STRING,
+    RISA_DVAL_ARRAY,
+    RISA_DVAL_OBJECT,
+    RISA_DVAL_UPVALUE,
+    RISA_DVAL_FUNCTION,
+    RISA_DVAL_CLOSURE,
+    RISA_DVAL_NATIVE
+} RisaDenseValueType;
 
-typedef struct DenseValue {
-    DenseValueType type;
-    struct DenseValue* link;
+typedef struct RisaDenseValue {
+    RisaDenseValueType type;
+    struct RisaDenseValue* link;
     bool marked;
-} DenseValue;
+} RisaDenseValue;
 
 typedef struct {
-    ValueType type;
+    RisaValueType type;
 
     union {
         bool boolean;
         uint8_t byte;
         int64_t integer;
         double floating;
-        DenseValue* dense;
+        RisaDenseValue* dense;
     } as;
-} Value;
+} RisaValue;
 
 typedef struct {
     size_t size;
     size_t capacity;
 
-    Value* values;
-} ValueArray;
+    RisaValue* values;
+} RisaValueArray;
 
-#define NULL_VALUE         ((Value) { VAL_NULL, { .integer = 0 } })
-#define BOOL_VALUE(value)  ((Value) { VAL_BOOL, { .boolean = value} })
-#define BYTE_VALUE(value)  ((Value) { VAL_BYTE, { .byte = value } })
-#define INT_VALUE(value)   ((Value) { VAL_INT, { .integer = value } })
-#define FLOAT_VALUE(value) ((Value) { VAL_FLOAT, { .floating = value } })
-#define DENSE_VALUE(value) ((Value) { VAL_DENSE, { .dense = (DenseValue*) value } })
+#define NULL_VALUE         ((RisaValue) { RISA_VAL_NULL, { .integer = 0 } })
+#define BOOL_VALUE(value)  ((RisaValue) { RISA_VAL_BOOL, { .boolean = value} })
+#define BYTE_VALUE(value)  ((RisaValue) { RISA_VAL_BYTE, { .byte = value } })
+#define INT_VALUE(value)   ((RisaValue) { RISA_VAL_INT, { .integer = value } })
+#define FLOAT_VALUE(value) ((RisaValue) { RISA_VAL_FLOAT, { .floating = value } })
+#define DENSE_VALUE(value) ((RisaValue) { RISA_VAL_DENSE, { .dense = (RisaDenseValue*) value } })
 
-#define AS_BOOL(value)  ((value).as.boolean)
-#define AS_BYTE(value)  ((value).as.byte)
-#define AS_INT(value)   ((value).as.integer)
-#define AS_FLOAT(value) ((value).as.floating)
-#define AS_DENSE(value) ((value).as.dense)
+#define AS_BOOL(value)     ((value).as.boolean)
+#define AS_BYTE(value)     ((value).as.byte)
+#define AS_INT(value)      ((value).as.integer)
+#define AS_FLOAT(value)    ((value).as.floating)
+#define AS_DENSE(value)    ((value).as.dense)
 
-#define IS_NULL(value)  ((value).type == VAL_NULL)
-#define IS_BOOL(value)  ((value).type == VAL_BOOL)
-#define IS_BYTE(value)  ((value).type == VAL_BYTE)
-#define IS_INT(value)   ((value).type == VAL_INT)
-#define IS_FLOAT(value) ((value).type == VAL_FLOAT)
-#define IS_DENSE(value) ((value).type == VAL_DENSE)
+#define IS_NULL(value)     ((value).type == RISA_VAL_NULL)
+#define IS_BOOL(value)     ((value).type == RISA_VAL_BOOL)
+#define IS_BYTE(value)     ((value).type == RISA_VAL_BYTE)
+#define IS_INT(value)      ((value).type == RISA_VAL_INT)
+#define IS_FLOAT(value)    ((value).type == RISA_VAL_FLOAT)
+#define IS_DENSE(value)    ((value).type == RISA_VAL_DENSE)
 
-void  value_print(RisaIO* io, Value value);
-char* value_to_string(Value value);
-Value value_clone(Value value);
-Value value_clone_register(void* vm, Value value); // void* in order to work around the circular dependency.
-bool  value_is_truthy(Value value);
-bool  value_is_falsy(Value value);
-bool  value_equals(Value left, Value right);
-bool  value_strict_equals(Value left, Value right);
+void      value_print             (RisaIO* io, RisaValue value);
+char*     value_to_string         (RisaValue value);
+RisaValue value_clone             (RisaValue value);
+RisaValue value_clone_register    (void* vm, RisaValue value); // void* in order to work around the circular dependency.
+bool      value_is_truthy         (RisaValue value);
+bool      value_is_falsy          (RisaValue value);
+bool      value_equals            (RisaValue left, RisaValue right);
+bool      value_strict_equals     (RisaValue left, RisaValue right);
 
-bool value_is_dense_of_type(Value value, DenseValueType type);
+bool      value_is_dense_of_type  (RisaValue value, RisaDenseValueType type);
 
 // Length is required for the first 2 in order to determine the base (prefixes 0x, 0b, ..., may or may not exist)
-Value value_int_from_string(char* str, uint32_t length);
-Value value_byte_from_string(char* str, uint32_t length);
-Value value_float_from_string(char* str);
-Value value_bool_from_string(char* str);
+RisaValue value_int_from_string   (char* str, uint32_t length);
+RisaValue value_byte_from_string  (char* str, uint32_t length);
+RisaValue value_float_from_string (char* str);
+RisaValue value_bool_from_string  (char* str);
 
-void value_array_init(ValueArray* array);
-void value_array_write(ValueArray* array, Value value);
-void value_array_delete(ValueArray* array);
+void      value_array_init        (RisaValueArray* array);
+void      value_array_write       (RisaValueArray* array, RisaValue value);
+void      value_array_delete      (RisaValueArray* array);
 
 #endif

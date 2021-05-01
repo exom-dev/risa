@@ -1,15 +1,15 @@
 #include "dense.h"
 #include "../vm/vm.h"
 
-DenseObject* dense_object_create() {
-    DenseObject* object = (DenseObject*) RISA_MEM_ALLOC(sizeof(DenseObject));
+RisaDenseObject* risa_dense_object_create() {
+    RisaDenseObject* object = (RisaDenseObject*) RISA_MEM_ALLOC(sizeof(RisaDenseObject));
 
-    dense_object_init(object);
+    risa_dense_object_init(object);
     return object;
 }
 
-DenseObject* dense_object_create_with(void* vm, uint32_t entryCount, ...) {
-    DenseObject* obj = dense_object_create();
+RisaDenseObject* risa_dense_object_create_under(void* vm, uint32_t entryCount, ...) {
+    RisaDenseObject* obj = risa_dense_object_create();
 
     va_list args;
 
@@ -18,38 +18,38 @@ DenseObject* dense_object_create_with(void* vm, uint32_t entryCount, ...) {
     for(uint32_t i = 0; i < entryCount; ++i) {
         char* key        = va_arg(args, char*);
         uint32_t keySize = va_arg(args, uint32_t);
-        Value val        = va_arg(args, Value);
+        RisaValue val        = va_arg(args, RisaValue);
 
-        dense_object_set(obj, vm_string_create((VM *) vm, key, keySize), val);
+        risa_dense_object_set(obj, risa_vm_string_create((RisaVM *) vm, key, keySize), val);
 
-        if(val.type == VAL_DENSE)
-            vm_register_dense((VM*) vm, AS_DENSE(val));
+        if(val.type == RISA_VAL_DENSE)
+            risa_vm_register_dense((RisaVM *) vm, AS_DENSE(val));
     }
 
     va_end(args);
 
-    vm_register_dense((VM*) vm, ((DenseValue*) obj));
+    risa_vm_register_dense((RisaVM *) vm, ((RisaDenseValue *) obj));
 
     return obj;
 }
 
-void dense_object_init(DenseObject* object) {
-    object->dense.type = DVAL_OBJECT;
+void risa_dense_object_init(RisaDenseObject* object) {
+    object->dense.type = RISA_DVAL_OBJECT;
     object->dense.link = NULL;
     object->dense.marked = false;
 
-    map_init(&object->data);
+    risa_map_init(&object->data);
 }
 
-void dense_object_delete(DenseObject* object) {
-    map_delete(&object->data);
-    dense_object_init(object);
+void risa_dense_object_delete(RisaDenseObject* object) {
+    risa_map_delete(&object->data);
+    risa_dense_object_init(object);
 }
 
-bool dense_object_get(DenseObject* object, DenseString* key, Value* value) {
-    return map_get(&object->data, key, value);
+bool risa_dense_object_get(RisaDenseObject* object, RisaDenseString* key, RisaValue* value) {
+    return risa_map_get(&object->data, key, value);
 }
 
-void dense_object_set(DenseObject* object, DenseString* key, Value value) {
-    map_set(&object->data, key, value);
+void risa_dense_object_set(RisaDenseObject* object, RisaDenseString* key, RisaValue value) {
+    risa_map_set(&object->data, key, value);
 }

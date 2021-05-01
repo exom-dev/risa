@@ -1,233 +1,233 @@
 #include "disassembler.h"
 
-#include "../chunk/bytecode.h"
+#include "../cluster/bytecode.h"
 #include "../io/log.h"
 #include "../value/dense.h"
 
-#define RISA_DISASM_CHUNK (disassembler->chunk)
+#define RISA_DISASM_CLUSTER (disassembler->cluster)
 #define RISA_DISASM_OFFSET (disassembler->offset)
 
-static void disassemble_unary_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassemble_binary_instruction(RisaDisassembler* disassembler, const char *name, uint8_t types);
-static void disassemble_byte_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_word_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_constant_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_mov_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_call_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_global_define_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassemble_global_get_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_global_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassemble_upvalue_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_upvalue_get_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_upvalue_set_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_upvalue_close_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_closure_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_array_push_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassemble_array_length_instruction(RisaDisassembler* disassembler, const char* name);
-static void disassemble_get_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassemble_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types);
-static void disassembler_process_instruction(RisaDisassembler* disassembler);
+static void risa_disassembler_disassemble_unary_instruction         (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_binary_instruction        (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_byte_instruction          (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_word_instruction          (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_constant_instruction      (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_mov_instruction           (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_call_instruction          (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_global_define_instruction (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_global_get_instruction    (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_global_set_instruction    (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_upvalue_instruction       (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_upvalue_get_instruction   (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_upvalue_set_instruction   (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_upvalue_close_instruction (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_closure_instruction       (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_array_push_instruction    (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_array_length_instruction  (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_get_instruction           (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassemble_set_instruction           (RisaDisassembler*, const char*, uint8_t);
+static void risa_disassembler_disassembler_process_instruction      (RisaDisassembler*);
 
-void disassembler_init(RisaDisassembler* disassembler) {
+void risa_disassembler_init(RisaDisassembler* disassembler) {
     risa_io_init(&disassembler->io);
-    disassembler->chunk = NULL;
+    disassembler->cluster = NULL;
     disassembler->offset = 0;
 }
 
-void disassembler_load(RisaDisassembler* disassembler, Chunk* chunk) {
-    disassembler->chunk = chunk;
+void risa_disassembler_load(RisaDisassembler* disassembler, RisaCluster* chunk) {
+    disassembler->cluster = chunk;
 }
 
-void disassembler_run(RisaDisassembler* disassembler) {
-    if(disassembler->chunk != NULL) {
+void risa_disassembler_run(RisaDisassembler* disassembler) {
+    if(disassembler->cluster != NULL) {
         RISA_OUT(disassembler->io, "\nOFFS INDX OP\n");
 
-        while(disassembler->offset < disassembler->chunk->size)
-            disassembler_process_instruction(disassembler);
+        while(disassembler->offset < disassembler->cluster->size)
+            risa_disassembler_disassembler_process_instruction(disassembler);
 
-        // Decompile all of the functions contained in the chunk.
-        for(size_t i = 0; i < disassembler->chunk->constants.size; ++i) {
-            DenseFunction* function;
+        // Decompile all of the functions contained in the cluster.
+        for(size_t i = 0; i < disassembler->cluster->constants.size; ++i) {
+            RisaDenseFunction* function;
 
-            if(value_is_dense_of_type(disassembler->chunk->constants.values[i], DVAL_FUNCTION))
-                function = AS_FUNCTION(disassembler->chunk->constants.values[i]);
-            else if(value_is_dense_of_type(disassembler->chunk->constants.values[i], DVAL_CLOSURE))
-                function = AS_CLOSURE(disassembler->chunk->constants.values[i])->function;
+            if(value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_FUNCTION))
+                function = AS_FUNCTION(disassembler->cluster->constants.values[i]);
+            else if(value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_CLOSURE))
+                function = AS_CLOSURE(disassembler->cluster->constants.values[i])->function;
             else continue;
 
             RISA_OUT(disassembler->io, "\n<%s>", function->name->chars);
 
             RisaDisassembler disasm;
-            disassembler_init(&disasm);
+            risa_disassembler_init(&disasm);
             risa_io_clone(&disasm.io, &disassembler->io);
 
-            disassembler_load(&disasm, &function->chunk);
-            disassembler_run(&disasm);
+            risa_disassembler_load(&disasm, &function->cluster);
+            risa_disassembler_run(&disasm);
         }
     }
 }
 
-void disassembler_reset(RisaDisassembler* disassembler) {
+void risa_disassembler_reset(RisaDisassembler* disassembler) {
     disassembler->offset = 0;
 }
 
-static void disassembler_process_instruction(RisaDisassembler* disassembler) {
-    RISA_OUT(disassembler->io, "%04zu %4u ", RISA_DISASM_OFFSET, RISA_DISASM_CHUNK->indices[RISA_DISASM_OFFSET]);
+static void risa_disassembler_disassembler_process_instruction(RisaDisassembler* disassembler) {
+    RISA_OUT(disassembler->io, "%04zu %4u ", RISA_DISASM_OFFSET, RISA_DISASM_CLUSTER->indices[RISA_DISASM_OFFSET]);
 
-    uint8_t instruction = RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET];
+    uint8_t instruction = RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET];
     uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
     instruction &= RISA_TODLR_INSTRUCTION_MASK;
 
     switch(instruction) {
-        case OP_CNST:
-            disassemble_constant_instruction(disassembler, "CNST");
+        case RISA_OP_CNST:
+            risa_disassembler_disassemble_constant_instruction(disassembler, "CNST");
             break;
-        case OP_CNSTW:
-            disassemble_constant_instruction(disassembler, "CNSTW");
+        case RISA_OP_CNSTW:
+            risa_disassembler_disassemble_constant_instruction(disassembler, "CNSTW");
             break;
-        case OP_MOV:
-            disassemble_mov_instruction(disassembler, "MOV");
+        case RISA_OP_MOV:
+            risa_disassembler_disassemble_mov_instruction(disassembler, "MOV");
             break;
-        case OP_CLONE:
-            disassemble_mov_instruction(disassembler, "CLONE");
+        case RISA_OP_CLONE:
+            risa_disassembler_disassemble_mov_instruction(disassembler, "CLONE");
             break;
-        case OP_DGLOB:
-            disassemble_global_define_instruction(disassembler, "DGLOB", types);
+        case RISA_OP_DGLOB:
+            risa_disassembler_disassemble_global_define_instruction(disassembler, "DGLOB", types);
             break;
-        case OP_GGLOB:
-            disassemble_global_get_instruction(disassembler, "GGLOB");
+        case RISA_OP_GGLOB:
+            risa_disassembler_disassemble_global_get_instruction(disassembler, "GGLOB");
             break;
-        case OP_SGLOB:
-            disassemble_global_set_instruction(disassembler, "SGLOB", types);
+        case RISA_OP_SGLOB:
+            risa_disassembler_disassemble_global_set_instruction(disassembler, "SGLOB", types);
             break;
-        case OP_UPVAL:
-            disassemble_upvalue_instruction(disassembler, "UPVAL");
+        case RISA_OP_UPVAL:
+            risa_disassembler_disassemble_upvalue_instruction(disassembler, "UPVAL");
             break;
-        case OP_GUPVAL:
-            disassemble_upvalue_get_instruction(disassembler, "GUPVAL");
+        case RISA_OP_GUPVAL:
+            risa_disassembler_disassemble_upvalue_get_instruction(disassembler, "GUPVAL");
             break;
-        case OP_SUPVAL:
-            disassemble_upvalue_set_instruction(disassembler, "SUPVAL");
+        case RISA_OP_SUPVAL:
+            risa_disassembler_disassemble_upvalue_set_instruction(disassembler, "SUPVAL");
             break;
-        case OP_CUPVAL:
-            disassemble_upvalue_close_instruction(disassembler, "CUPVAL");
+        case RISA_OP_CUPVAL:
+            risa_disassembler_disassemble_upvalue_close_instruction(disassembler, "CUPVAL");
             break;
-        case OP_CLSR:
-            disassemble_closure_instruction(disassembler, "CLSR");
+        case RISA_OP_CLSR:
+            risa_disassembler_disassemble_closure_instruction(disassembler, "CLSR");
             break;
-        case OP_ARR:
-            disassemble_byte_instruction(disassembler, "ARR");
+        case RISA_OP_ARR:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "ARR");
             break;
-        case OP_PARR:
-            disassemble_array_push_instruction(disassembler, "PARR", types);
+        case RISA_OP_PARR:
+            risa_disassembler_disassemble_array_push_instruction(disassembler, "PARR", types);
             break;
-        case OP_LEN:
-            disassemble_array_length_instruction(disassembler, "LEN");
+        case RISA_OP_LEN:
+            risa_disassembler_disassemble_array_length_instruction(disassembler, "LEN");
             break;
-        case OP_OBJ:
-            disassemble_byte_instruction(disassembler, "OBJ");
+        case RISA_OP_OBJ:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "OBJ");
             break;
-        case OP_GET:
-            disassemble_get_instruction(disassembler, "GET", types);
+        case RISA_OP_GET:
+            risa_disassembler_disassemble_get_instruction(disassembler, "GET", types);
             break;
-        case OP_SET:
-            disassemble_set_instruction(disassembler, "SET", types);
+        case RISA_OP_SET:
+            risa_disassembler_disassemble_set_instruction(disassembler, "SET", types);
             break;
-        case OP_NULL:
-            disassemble_byte_instruction(disassembler, "NULL");
+        case RISA_OP_NULL:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "NULL");
             break;
-        case OP_TRUE:
-            disassemble_byte_instruction(disassembler, "TRUE");
+        case RISA_OP_TRUE:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "TRUE");
             break;
-        case OP_FALSE:
-            disassemble_byte_instruction(disassembler, "FALSE");
+        case RISA_OP_FALSE:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "FALSE");
             break;
-        case OP_NOT:
-            disassemble_unary_instruction(disassembler, "NOT", types);
+        case RISA_OP_NOT:
+            risa_disassembler_disassemble_unary_instruction(disassembler, "NOT", types);
             break;
-        case OP_BNOT:
-            disassemble_unary_instruction(disassembler, "BNOT", types);
+        case RISA_OP_BNOT:
+            risa_disassembler_disassemble_unary_instruction(disassembler, "BNOT", types);
             break;
-        case OP_NEG:
-            disassemble_unary_instruction(disassembler, "NEG", types);
+        case RISA_OP_NEG:
+            risa_disassembler_disassemble_unary_instruction(disassembler, "NEG", types);
             break;
-        case OP_INC:
-            disassemble_byte_instruction(disassembler, "INC");
+        case RISA_OP_INC:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "INC");
             break;
-        case OP_DEC:
-            disassemble_byte_instruction(disassembler, "DEC");
+        case RISA_OP_DEC:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "DEC");
             break;
-        case OP_ADD:
-            disassemble_binary_instruction(disassembler, "ADD", types);
+        case RISA_OP_ADD:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "ADD", types);
             break;
-        case OP_SUB:
-            disassemble_binary_instruction(disassembler, "SUB", types);
+        case RISA_OP_SUB:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "SUB", types);
             break;
-        case OP_MUL:
-            disassemble_binary_instruction(disassembler, "MUL", types);
+        case RISA_OP_MUL:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "MUL", types);
             break;
-        case OP_DIV:
-            disassemble_binary_instruction(disassembler, "DIV", types);
+        case RISA_OP_DIV:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "DIV", types);
             break;
-        case OP_MOD:
-            disassemble_binary_instruction(disassembler, "MOD", types);
+        case RISA_OP_MOD:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "MOD", types);
             break;
-        case OP_SHL:
-            disassemble_binary_instruction(disassembler, "SHL", types);
+        case RISA_OP_SHL:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "SHL", types);
             break;
-        case OP_SHR:
-            disassemble_binary_instruction(disassembler, "SHR", types);
+        case RISA_OP_SHR:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "SHR", types);
             break;
-        case OP_LT:
-            disassemble_binary_instruction(disassembler, "LT", types);
+        case RISA_OP_LT:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "LT", types);
             break;
-        case OP_LTE:
-            disassemble_binary_instruction(disassembler, "LTE", types);
+        case RISA_OP_LTE:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "LTE", types);
             break;
-        case OP_EQ:
-            disassemble_binary_instruction(disassembler, "EQ", types);
+        case RISA_OP_EQ:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "EQ", types);
             break;
-        case OP_NEQ:
-            disassemble_binary_instruction(disassembler, "NEQ", types);
+        case RISA_OP_NEQ:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "NEQ", types);
             break;
-        case OP_BAND:
-            disassemble_binary_instruction(disassembler, "BAND", types);
+        case RISA_OP_BAND:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "BAND", types);
             break;
-        case OP_BXOR:
-            disassemble_binary_instruction(disassembler, "BXOR", types);
+        case RISA_OP_BXOR:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "BXOR", types);
             break;
-        case OP_BOR:
-            disassemble_binary_instruction(disassembler, "BOR", types);
+        case RISA_OP_BOR:
+            risa_disassembler_disassemble_binary_instruction(disassembler, "BOR", types);
             break;
-        case OP_TEST:
-            disassemble_byte_instruction(disassembler, "TEST");
+        case RISA_OP_TEST:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "TEST");
             break;
-        case OP_NTEST:
-            disassemble_byte_instruction(disassembler, "NTEST");
+        case RISA_OP_NTEST:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "NTEST");
             break;
-        case OP_JMP:
-            disassemble_byte_instruction(disassembler, "JMP");
+        case RISA_OP_JMP:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "JMP");
             break;
-        case OP_JMPW:
-            disassemble_word_instruction(disassembler, "JMPW");
+        case RISA_OP_JMPW:
+            risa_disassembler_disassemble_word_instruction(disassembler, "JMPW");
             break;
-        case OP_BJMP:
-            disassemble_byte_instruction(disassembler, "BJMP");
+        case RISA_OP_BJMP:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "BJMP");
             break;
-        case OP_BJMPW:
-            disassemble_word_instruction(disassembler, "BJMPW");
+        case RISA_OP_BJMPW:
+            risa_disassembler_disassemble_word_instruction(disassembler, "BJMPW");
             break;
-        case OP_CALL:
-            disassemble_call_instruction(disassembler, "CALL");
+        case RISA_OP_CALL:
+            risa_disassembler_disassemble_call_instruction(disassembler, "CALL");
             break;
-        case OP_RET:
-            disassemble_byte_instruction(disassembler, "RET");
+        case RISA_OP_RET:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "RET");
             break;
-        case OP_ACC:
-            disassemble_byte_instruction(disassembler, "ACC");
+        case RISA_OP_ACC:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "ACC");
             break;
-        case OP_DIS:
-            disassemble_byte_instruction(disassembler, "DIS");
+        case RISA_OP_DIS:
+            risa_disassembler_disassemble_byte_instruction(disassembler, "DIS");
             break;
         default:
             RISA_OUT(disassembler->io, "<UNK>");
@@ -236,148 +236,148 @@ static void disassembler_process_instruction(RisaDisassembler* disassembler) {
     RISA_DISASM_OFFSET += RISA_TODLR_INSTRUCTION_SIZE;
 }
 
-void disassemble_binary_instruction(RisaDisassembler* disassembler, const char *name, uint8_t types) {
+void risa_disassembler_disassemble_binary_instruction(RisaDisassembler* disassembler, const char *name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c %4d%c\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'),
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 3],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
              (types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r'));
 }
 
-void disassemble_unary_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_unary_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 }
 
-void disassemble_byte_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_byte_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]);
 }
 
-void disassemble_word_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_word_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %5hu\n", name,
-             (uint16_t) RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1]);
+             (uint16_t) RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]);
 }
 
-void disassemble_constant_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_constant_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d    '", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 
-    value_print(&disassembler->io, RISA_DISASM_CHUNK->constants.values[RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]]);
+    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
 
-void disassemble_mov_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_mov_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 }
 
-void disassemble_call_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_call_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 }
 
-void disassemble_global_define_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_global_define_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c    '", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 
-    value_print(&disassembler->io, RISA_DISASM_CHUNK->constants.values[RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1]]);
+    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
 
-void disassemble_global_get_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_global_get_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d    '", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 
-    value_print(&disassembler->io, RISA_DISASM_CHUNK->constants.values[RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]]);
+    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
 
-void disassemble_global_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_global_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c    '", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 
-    value_print(&disassembler->io, RISA_DISASM_CHUNK->constants.values[RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1]]);
+    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
 
-void disassemble_upvalue_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_upvalue_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d    %s\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2] == 0 ? "upvalue" : "local");
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2] == 0 ? "upvalue" : "local");
 }
 
-void disassemble_upvalue_get_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_upvalue_get_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 }
 
-void disassemble_upvalue_set_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_upvalue_set_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 }
 
-void disassemble_upvalue_close_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_upvalue_close_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]);
 }
 
-void disassemble_closure_instruction(RisaDisassembler* disassembler, const char* name) {
+void risa_disassembler_disassemble_closure_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d %4d   '", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 3]);
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3]);
 
-    value_print(&disassembler->io, RISA_DISASM_CHUNK->constants.values[RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]]);
+    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
 
-void disassemble_array_push_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_array_push_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 }
 
-void disassemble_array_length_instruction(RisaDisassembler* disassembler, const char* name) {
-    RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name, RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1], RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2]);
+void risa_disassembler_disassemble_array_length_instruction(RisaDisassembler* disassembler, const char* name) {
+    RISA_OUT(disassembler->io, "%-16s %4d %4d\n", name, RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1], RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 }
 
-void disassemble_get_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_get_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d %4d%c\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 3],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
              (types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r'));
 }
 
-void disassemble_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+void risa_disassembler_disassemble_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
     RISA_OUT(disassembler->io, "%-16s %4d %4d%c %4d%c\n", name,
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 2],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r',
-             RISA_DISASM_CHUNK->bytecode[RISA_DISASM_OFFSET + 3],
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
              types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r');
 }
 
 #undef RISA_DISASM_OFFSET
-#undef RISA_DISASM_CHUNK
+#undef RISA_DISASM_CLUSTER
