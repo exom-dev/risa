@@ -3,6 +3,10 @@
 
 #include "../def/types.h"
 
+
+// Note: when adding a new token, make sure to add an entry for it in the big operator rules table (./compiler.c - const RisaOperatorRule OPERATOR_RULES[]).
+// Make sure that you add it in the proper position (the first row is for the first token, the second one is for the second, etc).
+// Not doing so will result in bad things happening. The compiler assumes that the table is correct, complete, and ordered..
 typedef enum {
     RISA_TOKEN_LEFT_PAREN, RISA_TOKEN_RIGHT_PAREN,
     RISA_TOKEN_LEFT_BRACKET, RISA_TOKEN_RIGHT_BRACKET,
