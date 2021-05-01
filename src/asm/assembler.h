@@ -4,6 +4,7 @@
 #include "parser.h"
 #include "lexer.h"
 
+#include "../api.h"
 #include "../io/io.h"
 #include "../cluster/cluster.h"
 #include "../data/map.h"
@@ -35,9 +36,9 @@ typedef enum {
     RISA_ASM_STATUS_ERROR
 } AssemblerStatus;
 
-void risa_assembler_init   (RisaAssembler* assembler);
-void risa_assembler_delete (RisaAssembler* assembler);
+RISA_API void risa_assembler_init   (RisaAssembler* assembler);
+RISA_API void risa_assembler_delete (RisaAssembler* assembler);
 
-AssemblerStatus risa_assembler_assemble (RisaAssembler* assembler, const char* str, const char* stoppers);
+RISA_API AssemblerStatus risa_assembler_assemble (RisaAssembler* assembler, const char* str, const char* stoppers);
 
 #endif

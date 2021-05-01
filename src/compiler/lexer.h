@@ -1,8 +1,8 @@
 #ifndef RISA_LEXER_H_GUARD
 #define RISA_LEXER_H_GUARD
 
+#include "../api.h"
 #include "../def/types.h"
-
 
 // Note: when adding a new token, make sure to add an entry for it in the big operator rules table (./compiler.c - const RisaOperatorRule OPERATOR_RULES[]).
 // Make sure that you add it in the proper position (the first row is for the first token, the second one is for the second, etc).
@@ -53,14 +53,14 @@ typedef struct {
     size_t index;
 } RisaLexer;
 
-void      risa_lexer_init              (RisaLexer* lexer);
-void      risa_lexer_source            (RisaLexer* lexer, const char* src);
-void      risa_lexer_delete            (RisaLexer* lexer);
+RISA_API void      risa_lexer_init              (RisaLexer* lexer);
+RISA_API void      risa_lexer_source            (RisaLexer* lexer, const char* src);
+RISA_API void      risa_lexer_delete            (RisaLexer* lexer);
 
-RisaToken risa_lexer_next              (RisaLexer* lexer);
-RisaToken risa_lexer_emit              (RisaLexer* lexer, RisaTokenType type);
-RisaToken risa_lexer_error             (RisaLexer* lexer, const char* msg);
+RISA_API RisaToken risa_lexer_next              (RisaLexer* lexer);
+RISA_API RisaToken risa_lexer_emit              (RisaLexer* lexer, RisaTokenType type);
+RISA_API RisaToken risa_lexer_error             (RisaLexer* lexer, const char* msg);
 
-bool      risa_token_identifier_equals (RisaToken* left, RisaToken* right);
+RISA_API bool      risa_token_identifier_equals (RisaToken* left, RisaToken* right);
 
 #endif

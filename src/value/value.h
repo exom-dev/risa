@@ -1,6 +1,7 @@
 #ifndef RISA_VALUE_H_GUARD
 #define RISA_VALUE_H_GUARD
 
+#include "../api.h"
 #include "../io/io.h"
 #include "../def/types.h"
 
@@ -68,25 +69,25 @@ typedef struct {
 #define RISA_IS_FLOAT(value)    ((value).type == RISA_VAL_FLOAT)
 #define RISA_IS_DENSE(value)    ((value).type == RISA_VAL_DENSE)
 
-void      risa_value_print             (RisaIO* io, RisaValue value);
-char*     risa_value_to_string         (RisaValue value);
-RisaValue risa_value_clone             (RisaValue value);
-RisaValue risa_value_clone_register    (void* vm, RisaValue value); // void* in order to work around the circular dependency.
-bool      risa_value_is_truthy         (RisaValue value);
-bool      risa_value_is_falsy          (RisaValue value);
-bool      risa_value_equals            (RisaValue left, RisaValue right);
-bool      risa_value_strict_equals     (RisaValue left, RisaValue right);
+RISA_API void      risa_value_print             (RisaIO* io, RisaValue value);
+RISA_API char*     risa_value_to_string         (RisaValue value);
+RISA_API RisaValue risa_value_clone             (RisaValue value);
+RISA_API RisaValue risa_value_clone_register    (void* vm, RisaValue value); // void* in order to work around the circular dependency.
+RISA_API bool      risa_value_is_truthy         (RisaValue value);
+RISA_API bool      risa_value_is_falsy          (RisaValue value);
+RISA_API bool      risa_value_equals            (RisaValue left, RisaValue right);
+RISA_API bool      risa_value_strict_equals     (RisaValue left, RisaValue right);
 
-bool      risa_value_is_dense_of_type  (RisaValue value, RisaDenseValueType type);
+RISA_API bool      risa_value_is_dense_of_type  (RisaValue value, RisaDenseValueType type);
 
 // Length is required for the first 2 in order to determine the base (prefixes 0x, 0b, ..., may or may not exist)
-RisaValue risa_value_int_from_string   (char* str, uint32_t length);
-RisaValue risa_value_byte_from_string  (char* str, uint32_t length);
-RisaValue risa_value_float_from_string (char* str);
-RisaValue risa_value_bool_from_string  (char* str);
+RISA_API RisaValue risa_value_int_from_string   (char* str, uint32_t length);
+RISA_API RisaValue risa_value_byte_from_string  (char* str, uint32_t length);
+RISA_API RisaValue risa_value_float_from_string (char* str);
+RISA_API RisaValue risa_value_bool_from_string  (char* str);
 
-void      risa_value_array_init        (RisaValueArray* array);
-void      risa_value_array_write       (RisaValueArray* array, RisaValue value);
-void      risa_value_array_delete      (RisaValueArray* array);
+RISA_API void      risa_value_array_init        (RisaValueArray* array);
+RISA_API void      risa_value_array_write       (RisaValueArray* array, RisaValue value);
+RISA_API void      risa_value_array_delete      (RisaValueArray* array);
 
 #endif

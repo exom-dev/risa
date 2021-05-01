@@ -1,6 +1,7 @@
 #ifndef RISA_BYTECODE_H_GUARD
 #define RISA_BYTECODE_H_GUARD
 
+#include "../api.h"
 #include "../def/types.h"
 #include "../def/macro.h"
 
@@ -75,6 +76,6 @@ typedef enum {
 
 // Wether or not an operation has a direct register destination (e.g. MOV, ADD, ...)
 // Used for optimizations (e.g. to move the result directly in a local variable without an extra MOV)
-bool risa_op_has_direct_dest (RisaOpCode op);
+RISA_API bool risa_op_has_direct_dest (RisaOpCode op);
 
 #endif

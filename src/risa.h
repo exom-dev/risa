@@ -1,6 +1,7 @@
 #ifndef RISA_RISA_H_GUARD
 #define RISA_RISA_H_GUARD
 
+#include "api.h"
 #include "vm/vm.h"
 #include "std/std.h"
 #include "compiler/compiler.h"
@@ -24,9 +25,9 @@ typedef enum {
     RISA_INTERPRET_EXECUTE_ERROR
 } RisaInterpretStatus;
 
-RisaCompileStatus   risa_compile_string   (RisaCompiler* compiler, const char* str);
-RisaExecuteStatus   risa_execute_cluster  (RisaVM* vm, RisaCluster cluster);
-RisaExecuteStatus   risa_execute_function (RisaVM* vm, RisaDenseFunction* function);
-RisaInterpretStatus risa_interpret_string (RisaVM* vm, const char* str);
+RISA_API RisaCompileStatus   risa_compile_string   (RisaCompiler* compiler, const char* str);
+RISA_API RisaExecuteStatus   risa_execute_cluster  (RisaVM* vm, RisaCluster cluster);
+RISA_API RisaExecuteStatus   risa_execute_function (RisaVM* vm, RisaDenseFunction* function);
+RISA_API RisaInterpretStatus risa_interpret_string (RisaVM* vm, const char* str);
 
 #endif

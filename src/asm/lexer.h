@@ -1,6 +1,7 @@
 #ifndef RISA_ASM_LEXER_H_GUARD
 #define RISA_ASM_LEXER_H_GUARD
 
+#include "../api.h"
 #include "../def/types.h"
 #include "../cluster/bytecode.h"
 
@@ -65,14 +66,14 @@ typedef struct {
     size_t index;
 } RisaAsmLexer;
 
-RisaOpCode   risa_asm_token_to_opcode (RisaAsmTokenType token);
+RISA_API RisaOpCode   risa_asm_token_to_opcode (RisaAsmTokenType token);
 
-void         risa_asm_lexer_init      (RisaAsmLexer* lexer);
-void         risa_asm_lexer_source    (RisaAsmLexer* lexer, const char* src);
-void         risa_asm_lexer_delete    (RisaAsmLexer* lexer);
+RISA_API void         risa_asm_lexer_init      (RisaAsmLexer* lexer);
+RISA_API void         risa_asm_lexer_source    (RisaAsmLexer* lexer, const char* src);
+RISA_API void         risa_asm_lexer_delete    (RisaAsmLexer* lexer);
 
-RisaAsmToken risa_asm_lexer_next      (RisaAsmLexer* lexer);
-RisaAsmToken risa_asm_lexer_emit      (RisaAsmLexer* lexer, RisaAsmTokenType type);
-RisaAsmToken risa_asm_lexer_error     (RisaAsmLexer* lexer, const char* msg);
+RISA_API RisaAsmToken risa_asm_lexer_next      (RisaAsmLexer* lexer);
+RISA_API RisaAsmToken risa_asm_lexer_emit      (RisaAsmLexer* lexer, RisaAsmTokenType type);
+RISA_API RisaAsmToken risa_asm_lexer_error     (RisaAsmLexer* lexer, const char* msg);
 
 #endif

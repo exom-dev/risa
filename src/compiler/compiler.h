@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 
+#include "../api.h"
 #include "../io/io.h"
 #include "../cluster/cluster.h"
 #include "../data/map.h"
@@ -140,9 +141,9 @@ typedef struct {
     RisaOperatorPrecedence precedence;
 } RisaOperatorRule;
 
-void               risa_compiler_init    (RisaCompiler* compiler);
-void               risa_compiler_delete  (RisaCompiler* compiler);
+RISA_API void               risa_compiler_init    (RisaCompiler* compiler);
+RISA_API void               risa_compiler_delete  (RisaCompiler* compiler);
 
-RisaCompilerStatus risa_compiler_compile (RisaCompiler* compiler, const char* str);
+RISA_API RisaCompilerStatus risa_compiler_compile (RisaCompiler* compiler, const char* str);
 
 #endif

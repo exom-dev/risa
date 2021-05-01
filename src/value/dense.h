@@ -1,6 +1,7 @@
 #ifndef RISA_DENSE_H
 #define RISA_DENSE_H
 
+#include "../api.h"
 #include "../io/io.h"
 #include "../def/types.h"
 #include "../cluster/cluster.h"
@@ -71,43 +72,43 @@ typedef struct {
 #define RISA_AS_CLOSURE(value)  ((RisaDenseClosure*) ((value).as.dense))
 #define RISA_AS_NATIVE(value)   ((RisaDenseNative*) ((value).as.dense))
 
-void               risa_dense_print               (RisaIO* io, RisaDenseValue* dense);
-char*              risa_dense_to_string           (RisaDenseValue* dense);
-bool               risa_dense_is_truthy           (RisaDenseValue* dense);
-RisaValue          risa_dense_clone               (RisaDenseValue* dense);
-RisaValue          risa_dense_clone_under         (void* vm, RisaDenseValue* dense); // void* instead of RisaVM* in order to work around the circular dependency.
-size_t             risa_dense_size                (RisaDenseValue* dense);
-void               risa_dense_delete              (RisaDenseValue* dense);
+RISA_API void               risa_dense_print               (RisaIO* io, RisaDenseValue* dense);
+RISA_API char*              risa_dense_to_string           (RisaDenseValue* dense);
+RISA_API bool               risa_dense_is_truthy           (RisaDenseValue* dense);
+RISA_API RisaValue          risa_dense_clone               (RisaDenseValue* dense);
+RISA_API RisaValue          risa_dense_clone_under         (void* vm, RisaDenseValue* dense); // void* instead of RisaVM* in order to work around the circular dependency.
+RISA_API size_t             risa_dense_size                (RisaDenseValue* dense);
+RISA_API void               risa_dense_delete              (RisaDenseValue* dense);
 
-RisaDenseString*   risa_dense_string_prepare      (const char* chars, uint32_t length);
-uint32_t           risa_dense_string_hash         (RisaDenseString* string);
-void               risa_dense_string_hash_inplace (RisaDenseString* string);
-RisaDenseString*   risa_dense_string_from         (const char* chars, uint32_t length);
-RisaDenseString*   risa_dense_string_concat       (RisaDenseString* left, RisaDenseString* right);
-void               risa_dense_string_delete       (RisaDenseString* string);
+RISA_API RisaDenseString*   risa_dense_string_prepare      (const char* chars, uint32_t length);
+RISA_API uint32_t           risa_dense_string_hash         (RisaDenseString* string);
+RISA_API void               risa_dense_string_hash_inplace (RisaDenseString* string);
+RISA_API RisaDenseString*   risa_dense_string_from         (const char* chars, uint32_t length);
+RISA_API RisaDenseString*   risa_dense_string_concat       (RisaDenseString* left, RisaDenseString* right);
+RISA_API void               risa_dense_string_delete       (RisaDenseString* string);
 
-RisaDenseArray*    risa_dense_array_create        ();
-void               risa_dense_array_init          (RisaDenseArray* array);
-void               risa_dense_array_delete        (RisaDenseArray* array);
-RisaValue          risa_dense_array_get           (RisaDenseArray* array, uint32_t index);
-void               risa_dense_array_set           (RisaDenseArray* array, uint32_t index, RisaValue value);
+RISA_API RisaDenseArray*    risa_dense_array_create        ();
+RISA_API void               risa_dense_array_init          (RisaDenseArray* array);
+RISA_API void               risa_dense_array_delete        (RisaDenseArray* array);
+RISA_API RisaValue          risa_dense_array_get           (RisaDenseArray* array, uint32_t index);
+RISA_API void               risa_dense_array_set           (RisaDenseArray* array, uint32_t index, RisaValue value);
 
-RisaDenseObject*   risa_dense_object_create       ();
-RisaDenseObject*   risa_dense_object_create_under (void* vm, uint32_t entryCount, ...);
-void               risa_dense_object_init         (RisaDenseObject* object);
-void               risa_dense_object_delete       (RisaDenseObject* object);
-bool               risa_dense_object_get          (RisaDenseObject* object, RisaDenseString* key, RisaValue* value);
-void               risa_dense_object_set          (RisaDenseObject* object, RisaDenseString* key, RisaValue value);
+RISA_API RisaDenseObject*   risa_dense_object_create       ();
+RISA_API RisaDenseObject*   risa_dense_object_create_under (void* vm, uint32_t entryCount, ...);
+RISA_API void               risa_dense_object_init         (RisaDenseObject* object);
+RISA_API void               risa_dense_object_delete       (RisaDenseObject* object);
+RISA_API bool               risa_dense_object_get          (RisaDenseObject* object, RisaDenseString* key, RisaValue* value);
+RISA_API void               risa_dense_object_set          (RisaDenseObject* object, RisaDenseString* key, RisaValue value);
 
-RisaDenseUpvalue*  risa_dense_upvalue_create      (RisaValue* value);
+RISA_API RisaDenseUpvalue*  risa_dense_upvalue_create      (RisaValue* value);
 
-RisaDenseFunction* risa_dense_function_create     ();
-void               risa_dense_function_init       (RisaDenseFunction* function);
-void               risa_dense_function_delete     (RisaDenseFunction* function);
+RISA_API RisaDenseFunction* risa_dense_function_create     ();
+RISA_API void               risa_dense_function_init       (RisaDenseFunction* function);
+RISA_API void               risa_dense_function_delete     (RisaDenseFunction* function);
 
-RisaDenseClosure*  risa_dense_closure_create      (RisaDenseFunction* function, uint8_t upvalueCount);
+RISA_API RisaDenseClosure*  risa_dense_closure_create      (RisaDenseFunction* function, uint8_t upvalueCount);
 
-RisaDenseNative*   risa_dense_native_create       (RisaNativeFunction function);
-RisaValue          risa_dense_native_value        (RisaNativeFunction function);
+RISA_API RisaDenseNative*   risa_dense_native_create       (RisaNativeFunction function);
+RISA_API RisaValue          risa_dense_native_value        (RisaNativeFunction function);
 
 #endif
