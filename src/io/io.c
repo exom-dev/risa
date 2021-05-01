@@ -1,5 +1,5 @@
 #include "io.h"
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 #include "../def/def.h"
 
 #include <stdio.h>

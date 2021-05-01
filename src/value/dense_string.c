@@ -1,6 +1,6 @@
 #include "dense.h"
 
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 #include "../data/map.h"
 
 #include <string.h>

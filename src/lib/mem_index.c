@@ -1,6 +1,6 @@
 #include "mem_index.h"
 
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 
 #include <string.h>
 #include <stdlib.h>

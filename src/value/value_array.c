@@ -1,6 +1,6 @@
 #include "value.h"
 
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 
 void value_array_init(RisaValueArray* array) {
     array->size = 0;

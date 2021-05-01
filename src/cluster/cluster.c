@@ -1,6 +1,6 @@
 #include "cluster.h"
 
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 
 void cluster_init(RisaCluster* cluster) {
     cluster->size = 0;

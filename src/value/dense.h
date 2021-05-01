@@ -4,7 +4,7 @@
 #include "../io/io.h"
 #include "../def/types.h"
 #include "../cluster/cluster.h"
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 #include "../data/map.h"
 
 typedef RisaValue (*RisaNativeFunction)(void* vm, uint8_t argc, RisaValue* args);

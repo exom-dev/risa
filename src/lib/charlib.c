@@ -1,5 +1,5 @@
 #include "charlib.h"
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 
 #include <stdlib.h>
 #include <string.h>

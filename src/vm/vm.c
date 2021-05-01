@@ -1,7 +1,7 @@
 #include "vm.h"
 
-#include "../memory/gc.h"
-#include "../memory/mem.h"
+#include "../mem/gc.h"
+#include "../mem/mem.h"
 #include "../cluster/bytecode.h"
 #include "../io/log.h"
 #include "../value/dense.h"

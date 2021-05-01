@@ -8,7 +8,7 @@
 #include "../value/dense.h"
 #include "../options/options.h"
 
-// This is also used in 'memory/gc.c'
+// This is also used in 'mem/gc.c'
 #define VM_FRAME_FUNCTION(frame) ((frame).type == RISA_FRAME_FUNCTION ? (frame).callee.function : (frame).callee.closure->function)
 
 typedef enum {

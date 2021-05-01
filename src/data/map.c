@@ -1,5 +1,5 @@
 #include "map.h"
-#include "../memory/mem.h"
+#include "../mem/mem.h"
 #include "../value/dense.h"
 
 #include <stdlib.h>
