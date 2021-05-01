@@ -12,10 +12,14 @@ static RisaValue risa_std_debug_type_internal (RisaVM*, RisaValue);
 void risa_std_register_debug(RisaVM* vm) {
     #define STD_DEBUG_OBJ_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, risa_dense_native_value(risa_std_debug_##fn)
 
-    RisaDenseObject* objVm = risa_dense_object_create_under(vm, 3 STD_DEBUG_OBJ_ENTRY(acc, vm_acc)STD_DEBUG_OBJ_ENTRY(heapSize, vm_heap_size)STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
+    RisaDenseObject* objVm = risa_dense_object_create_under(vm, 3
+                                                            STD_DEBUG_OBJ_ENTRY(acc, vm_acc)
+                                                            STD_DEBUG_OBJ_ENTRY(heapSize, vm_heap_size)
+                                                            STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
 
     RisaDenseObject* obj = risa_dense_object_create_under(vm, 2,
-                                                          "vm", sizeof("vm") - 1, DENSE_VALUE((RisaDenseValue *) objVm)STD_DEBUG_OBJ_ENTRY(type, type));
+                                                          "vm", sizeof("vm") - 1, DENSE_VALUE((RisaDenseValue *) objVm)
+                                                          STD_DEBUG_OBJ_ENTRY(type, type));
 
     risa_vm_global_set(vm, "debug", sizeof("debug") - 1, DENSE_VALUE((RisaDenseValue *) obj));
 

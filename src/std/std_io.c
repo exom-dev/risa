@@ -21,9 +21,14 @@ void risa_std_register_io(RisaVM* vm) {
 
     #undef bool // This gets treated as a macro, which changes the 'bool' entry to something else.
 
-    RisaDenseObject* objRead = risa_dense_object_create_under(vm, 7 STD_IO_OBJ_ENTRY(char, read_char)STD_IO_OBJ_ENTRY(string, read_string)STD_IO_OBJ_ENTRY(line, read_line)STD_IO_OBJ_ENTRY(int,
-                                                                                                                                                                                            read_int)STD_IO_OBJ_ENTRY(
-            byte, read_byte)STD_IO_OBJ_ENTRY(float, read_float)STD_IO_OBJ_ENTRY(bool, read_bool));
+    RisaDenseObject* objRead = risa_dense_object_create_under(vm, 7
+                                                              STD_IO_OBJ_ENTRY(char, read_char)
+                                                              STD_IO_OBJ_ENTRY(string, read_string)
+                                                              STD_IO_OBJ_ENTRY(line, read_line)
+                                                              STD_IO_OBJ_ENTRY(int, read_int)
+                                                              STD_IO_OBJ_ENTRY(byte, read_byte)
+                                                              STD_IO_OBJ_ENTRY(float, read_float)
+                                                              STD_IO_OBJ_ENTRY(bool, read_bool));
 
     risa_vm_global_set_native(vm, STD_IO_ENTRY(print));
     risa_vm_global_set_native(vm, STD_IO_ENTRY(println));
