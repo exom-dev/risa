@@ -48,7 +48,7 @@ RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
 
     if(risa_compile_string(&compiler, str) == RISA_COMPILE_ERROR) {
         //risa_compiler_delete(&compiler);
-        cluster_delete(&compiler.function->cluster);
+        risa_cluster_delete(&compiler.function->cluster);
         RISA_MEM_FREE(compiler.function);
 
         return RISA_INTERPRET_COMPILE_ERROR;

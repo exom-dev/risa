@@ -23,7 +23,7 @@ RisaDenseObject* risa_dense_object_create_under(void* vm, uint32_t entryCount, .
         risa_dense_object_set(obj, risa_vm_string_create((RisaVM *) vm, key, keySize), val);
 
         if(val.type == RISA_VAL_DENSE)
-            risa_vm_register_dense((RisaVM *) vm, AS_DENSE(val));
+            risa_vm_register_dense((RisaVM *) vm, RISA_AS_DENSE(val));
     }
 
     va_end(args);

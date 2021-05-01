@@ -49,10 +49,10 @@ void risa_disassembler_run(RisaDisassembler* disassembler) {
         for(size_t i = 0; i < disassembler->cluster->constants.size; ++i) {
             RisaDenseFunction* function;
 
-            if(value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_FUNCTION))
-                function = AS_FUNCTION(disassembler->cluster->constants.values[i]);
-            else if(value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_CLOSURE))
-                function = AS_CLOSURE(disassembler->cluster->constants.values[i])->function;
+            if(risa_value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_FUNCTION))
+                function = RISA_AS_FUNCTION(disassembler->cluster->constants.values[i]);
+            else if(risa_value_is_dense_of_type(disassembler->cluster->constants.values[i], RISA_DVAL_CLOSURE))
+                function = RISA_AS_CLOSURE(disassembler->cluster->constants.values[i])->function;
             else continue;
 
             RISA_OUT(disassembler->io, "\n<%s>", function->name->chars);
@@ -267,7 +267,7 @@ void risa_disassembler_disassemble_constant_instruction(RisaDisassembler* disass
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 
-    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
+    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
@@ -290,7 +290,7 @@ void risa_disassembler_disassemble_global_define_instruction(RisaDisassembler* d
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 
-    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
+    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
@@ -300,7 +300,7 @@ void risa_disassembler_disassemble_global_get_instruction(RisaDisassembler* disa
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]);
 
-    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
+    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
@@ -311,7 +311,7 @@ void risa_disassembler_disassemble_global_set_instruction(RisaDisassembler* disa
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 
-    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
+    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
@@ -346,7 +346,7 @@ void risa_disassembler_disassemble_closure_instruction(RisaDisassembler* disasse
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3]);
 
-    value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
+    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }

@@ -14,10 +14,10 @@ void risa_dense_function_init(RisaDenseFunction* function) {
 
     function->arity = 0;
     function->name = NULL;
-    cluster_init(&function->cluster);
+    risa_cluster_init(&function->cluster);
 }
 
 void risa_dense_function_delete(RisaDenseFunction* function) {
-    cluster_delete(&function->cluster);
+    risa_cluster_delete(&function->cluster);
     risa_dense_function_init(function);
 }

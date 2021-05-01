@@ -165,7 +165,7 @@ void risa_compiler_init(RisaCompiler* compiler) {
     compiler->super = NULL;
     compiler->function = risa_dense_function_create();
 
-    cluster_init(&compiler->function->cluster);
+    risa_cluster_init(&compiler->function->cluster);
     risa_map_init(&compiler->strings);
 
     compiler->regIndex = 0;
@@ -239,7 +239,7 @@ static void risa_compiler_compile_byte(RisaCompiler* compiler, bool allowAssignm
             return;
         }
 
-        risa_compiler_emit_constant(compiler, BYTE_VALUE(num));
+        risa_compiler_emit_constant(compiler, RISA_BYTE_VALUE(num));
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
@@ -274,7 +274,7 @@ static void risa_compiler_compile_int(RisaCompiler* compiler, bool allowAssignme
             return;
         }
 
-        risa_compiler_emit_constant(compiler, INT_VALUE(num));
+        risa_compiler_emit_constant(compiler, RISA_INT_VALUE(num));
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
@@ -309,7 +309,7 @@ static void risa_compiler_compile_float(RisaCompiler* compiler, bool allowAssign
             return;
         }
 
-        risa_compiler_emit_constant(compiler, FLOAT_VALUE(num));
+        risa_compiler_emit_constant(compiler, RISA_FLOAT_VALUE(num));
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
@@ -408,12 +408,12 @@ static void risa_compiler_compile_string(RisaCompiler* compiler, bool allowAssig
 
         if (interned == NULL) {
             interned = risa_dense_string_from(start, length);
-            risa_map_set(&super->strings, interned, NULL_VALUE);
+            risa_map_set(&super->strings, interned, RISA_NULL_VALUE);
         }
 
         RISA_MEM_FREE(str);
 
-        risa_compiler_emit_constant(compiler, DENSE_VALUE(interned));
+        risa_compiler_emit_constant(compiler, RISA_DENSE_VALUE(interned));
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
@@ -1054,7 +1054,7 @@ static void risa_compiler_compile_function(RisaCompiler* compiler) {
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(&super->strings, interned, NULL_VALUE);
+        risa_map_set(&super->strings, interned, RISA_NULL_VALUE);
     }
 
     subcompiler.function->name = interned;
@@ -1102,9 +1102,9 @@ static void risa_compiler_compile_function(RisaCompiler* compiler) {
             return;
 
     if(subcompiler.upvalueCount == 0) {
-        risa_compiler_emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+        risa_compiler_emit_constant(compiler, RISA_DENSE_VALUE(subcompiler.function));
     } else {
-        risa_compiler_emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+        risa_compiler_emit_constant(compiler, RISA_DENSE_VALUE(subcompiler.function));
 
         risa_compiler_emit_byte(compiler, RISA_OP_CLSR);
         risa_compiler_emit_byte(compiler, compiler->regIndex - 1);
@@ -1872,7 +1872,7 @@ static void risa_compiler_compile_lambda(RisaCompiler* compiler) {
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(&super->strings, interned, NULL_VALUE);
+        risa_map_set(&super->strings, interned, RISA_NULL_VALUE);
     }
 
     subcompiler.function->name = interned;
@@ -1915,9 +1915,9 @@ static void risa_compiler_compile_lambda(RisaCompiler* compiler) {
         return;
 
     if(subcompiler.upvalueCount == 0) {
-        risa_compiler_emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+        risa_compiler_emit_constant(compiler, RISA_DENSE_VALUE(subcompiler.function));
     } else {
-        risa_compiler_emit_constant(compiler, DENSE_VALUE(subcompiler.function));
+        risa_compiler_emit_constant(compiler, RISA_DENSE_VALUE(subcompiler.function));
 
         risa_compiler_emit_byte(compiler, RISA_OP_CLSR);
         risa_compiler_emit_byte(compiler, compiler->regIndex - 1);
@@ -2641,7 +2641,7 @@ static uint8_t risa_compiler_upvalue_resolve(RisaCompiler* compiler, RisaToken* 
 }
 
 static void risa_compiler_emit_byte(RisaCompiler* compiler, uint8_t byte) {
-    cluster_write(&compiler->function->cluster, byte, compiler->parser->previous.index);
+    risa_cluster_write(&compiler->function->cluster, byte, compiler->parser->previous.index);
 }
 
 static void risa_compiler_emit_bytes(RisaCompiler* compiler, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
@@ -2747,7 +2747,7 @@ static void risa_compiler_emit_backwards_jump_from(RisaCompiler* compiler, uint3
 }
 
 static uint16_t risa_compiler_create_constant(RisaCompiler* compiler, RisaValue value) {
-    size_t index = cluster_write_constant(&compiler->function->cluster, value);
+    size_t index = risa_cluster_write_constant(&compiler->function->cluster, value);
 
     if(index > UINT16_MAX) {
         risa_parser_error_at_previous(compiler->parser, "Constant limit exceeded (65535)");
@@ -2773,10 +2773,10 @@ static uint16_t risa_compiler_create_string_constant(RisaCompiler* compiler, con
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(&super->strings, interned, NULL_VALUE);
+        risa_map_set(&super->strings, interned, RISA_NULL_VALUE);
     }
 
-    return risa_compiler_create_constant(compiler, DENSE_VALUE(interned));
+    return risa_compiler_create_constant(compiler, RISA_DENSE_VALUE(interned));
 }
 
 static uint16_t risa_compiler_declare_variable(RisaCompiler* compiler) {

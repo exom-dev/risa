@@ -14,9 +14,9 @@ typedef struct {
     RisaValueArray constants;
 } RisaCluster;
 
-void   cluster_init           (RisaCluster* cluster);
-void   cluster_write          (RisaCluster* cluster, uint8_t byte, uint32_t index);
-size_t cluster_write_constant (RisaCluster* cluster, RisaValue constant);
-void   cluster_delete         (RisaCluster* cluster);
+void   risa_cluster_init           (RisaCluster* cluster);
+void   risa_cluster_write          (RisaCluster* cluster, uint8_t byte, uint32_t index);
+size_t risa_cluster_write_constant (RisaCluster* cluster, RisaValue constant);
+void   risa_cluster_delete         (RisaCluster* cluster);
 
 #endif

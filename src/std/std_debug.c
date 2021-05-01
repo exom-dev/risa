@@ -18,10 +18,10 @@ void risa_std_register_debug(RisaVM* vm) {
                                                             STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
 
     RisaDenseObject* obj = risa_dense_object_create_under(vm, 2,
-                                                          "vm", sizeof("vm") - 1, DENSE_VALUE((RisaDenseValue *) objVm)
+                                                          "vm", sizeof("vm") - 1, RISA_DENSE_VALUE((RisaDenseValue *) objVm)
                                                           STD_DEBUG_OBJ_ENTRY(type, type));
 
-    risa_vm_global_set(vm, "debug", sizeof("debug") - 1, DENSE_VALUE((RisaDenseValue *) obj));
+    risa_vm_global_set(vm, "debug", sizeof("debug") - 1, RISA_DENSE_VALUE((RisaDenseValue *) obj));
 
     #undef STD_DEBUG_OBJ_ENTRY
 }
@@ -31,7 +31,7 @@ static RisaValue risa_std_debug_type(void* vm, uint8_t argc, RisaValue* args) {
         return risa_std_debug_type_internal((RisaVM *) vm, args[0]);
     }
 
-    return NULL_VALUE;
+    return RISA_NULL_VALUE;
 }
 
 static RisaValue risa_std_debug_vm_acc(void* vm, uint8_t argc, RisaValue* args) {
@@ -43,15 +43,15 @@ static RisaValue risa_std_debug_vm_acc(void* vm, uint8_t argc, RisaValue* args) 
 }
 
 static RisaValue risa_std_debug_vm_heap_size(void* vm, uint8_t argc, RisaValue* args) {
-    return (INT_VALUE((uint64_t) ((RisaVM*) vm)->heapSize));
+    return (RISA_INT_VALUE((uint64_t) ((RisaVM*) vm)->heapSize));
 }
 
 static RisaValue risa_std_debug_vm_stack_size(void* vm, uint8_t argc, RisaValue* args) {
-    return (INT_VALUE((uint64_t) (RISA_VM_STACK_SIZE * sizeof(RisaValue))));
+    return (RISA_INT_VALUE((uint64_t) (RISA_VM_STACK_SIZE * sizeof(RisaValue))));
 }
 
 static RisaValue risa_std_debug_type_internal(RisaVM* vm, RisaValue val) {
-    #define TYPE_RESULT(type) DENSE_VALUE(risa_vm_string_create(vm, type, sizeof(type) - 1))
+    #define TYPE_RESULT(type) RISA_DENSE_VALUE(risa_vm_string_create(vm, type, sizeof(type) - 1))
 
     switch(val.type) {
         case RISA_VAL_NULL:  return TYPE_RESULT("null");
@@ -61,7 +61,7 @@ static RisaValue risa_std_debug_type_internal(RisaVM* vm, RisaValue val) {
         case RISA_VAL_FLOAT: return TYPE_RESULT("float");
 
         case RISA_VAL_DENSE: {
-            switch(AS_DENSE(val)->type) {
+            switch(RISA_AS_DENSE(val)->type) {
                 case RISA_DVAL_STRING:   return TYPE_RESULT("string");
                 case RISA_DVAL_ARRAY:    return TYPE_RESULT("array");
                 case RISA_DVAL_OBJECT:   return TYPE_RESULT("object");
@@ -72,7 +72,7 @@ static RisaValue risa_std_debug_type_internal(RisaVM* vm, RisaValue val) {
             }
         }
 
-        default: return NULL_VALUE;
+        default: return RISA_NULL_VALUE;
     }
 
     #undef TYPE_RESULT

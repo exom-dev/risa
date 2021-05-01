@@ -17,8 +17,8 @@ void risa_gc_check(RisaVM* vm) {
 
 void risa_gc_run(RisaVM* vm) {
     for(RisaValue* i = vm->stack; i < vm->stackTop; ++i)
-        if(IS_DENSE(*i))
-            gc_mark_dense(AS_DENSE(*i));
+        if(RISA_IS_DENSE(*i))
+            gc_mark_dense(RISA_AS_DENSE(*i));
 
     for(uint32_t i = 0; i < vm->frameCount; ++i)
         gc_mark_dense((RisaDenseValue*) VM_FRAME_FUNCTION(vm->frames[i]));
@@ -51,24 +51,24 @@ static void gc_mark_dense(RisaDenseValue* dense) {
             RisaDenseArray* array = (RisaDenseArray*) dense;
 
             for(uint32_t i = 0; i < array->data.size; ++i)
-                if(IS_DENSE(array->data.values[i]))
-                    gc_mark_dense(AS_DENSE(array->data.values[i]));
+                if(RISA_IS_DENSE(array->data.values[i]))
+                    gc_mark_dense(RISA_AS_DENSE(array->data.values[i]));
             break;
         }
         case RISA_DVAL_OBJECT:
             gc_mark_map(&((RisaDenseObject*) dense)->data);
             break;
         case RISA_DVAL_UPVALUE:
-            if(IS_DENSE(((RisaDenseUpvalue*) dense)->closed))
-                gc_mark_dense(AS_DENSE(((RisaDenseUpvalue*) dense)->closed));
+            if(RISA_IS_DENSE(((RisaDenseUpvalue*) dense)->closed))
+                gc_mark_dense(RISA_AS_DENSE(((RisaDenseUpvalue*) dense)->closed));
             break;
         case RISA_DVAL_FUNCTION: {
             RisaDenseFunction* function = (RisaDenseFunction*) dense;
             gc_mark_dense((RisaDenseValue*) function->name);
 
             for(uint32_t i = 0; i < function->cluster.constants.size; ++i)
-                if(IS_DENSE(function->cluster.constants.values[i]))
-                    gc_mark_dense(AS_DENSE(function->cluster.constants.values[i]));
+                if(RISA_IS_DENSE(function->cluster.constants.values[i]))
+                    gc_mark_dense(RISA_AS_DENSE(function->cluster.constants.values[i]));
             break;
         }
         case RISA_DVAL_CLOSURE: {
@@ -87,8 +87,8 @@ static void gc_mark_map(RisaMap* map) {
         RisaMapEntry* entry = &map->entries[i];
         gc_mark_dense((RisaDenseValue*) entry->key);
 
-        if(IS_DENSE(entry->value))
-            gc_mark_dense(AS_DENSE(entry->value));
+        if(RISA_IS_DENSE(entry->value))
+            gc_mark_dense(RISA_AS_DENSE(entry->value));
     }
 }
 

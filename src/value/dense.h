@@ -63,13 +63,13 @@ typedef struct {
     RisaNativeFunction function;
 } RisaDenseNative;
 
-#define AS_STRING(value)   ((RisaDenseString*) ((value).as.dense))
-#define AS_ARRAY(value)    ((RisaDenseArray*) ((value).as.dense))
-#define AS_OBJECT(value)   ((RisaDenseObject*) ((value).as.dense))
-#define AS_CSTRING(value)  (((RisaDenseString*) ((value).as.dense))->chars)
-#define AS_FUNCTION(value) ((RisaDenseFunction*) ((value).as.dense))
-#define AS_CLOSURE(value)  ((RisaDenseClosure*) ((value).as.dense))
-#define AS_NATIVE(value)   ((RisaDenseNative*) ((value).as.dense))
+#define RISA_AS_STRING(value)   ((RisaDenseString*) ((value).as.dense))
+#define RISA_AS_ARRAY(value)    ((RisaDenseArray*) ((value).as.dense))
+#define RISA_AS_OBJECT(value)   ((RisaDenseObject*) ((value).as.dense))
+#define RISA_AS_CSTRING(value)  (((RisaDenseString*) ((value).as.dense))->chars)
+#define RISA_AS_FUNCTION(value) ((RisaDenseFunction*) ((value).as.dense))
+#define RISA_AS_CLOSURE(value)  ((RisaDenseClosure*) ((value).as.dense))
+#define RISA_AS_NATIVE(value)   ((RisaDenseNative*) ((value).as.dense))
 
 void               risa_dense_print               (RisaIO* io, RisaDenseValue* dense);
 char*              risa_dense_to_string           (RisaDenseValue* dense);

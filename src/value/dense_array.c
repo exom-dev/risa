@@ -12,11 +12,11 @@ void risa_dense_array_init(RisaDenseArray* array) {
     array->dense.link = NULL;
     array->dense.marked = false;
 
-    value_array_init(&array->data);
+    risa_value_array_init(&array->data);
 }
 
 void risa_dense_array_delete(RisaDenseArray* array) {
-    value_array_delete(&array->data);
+    risa_value_array_delete(&array->data);
     risa_dense_array_init(array);
 }
 
@@ -26,6 +26,6 @@ RisaValue risa_dense_array_get(RisaDenseArray* array, uint32_t index) {
 
 void risa_dense_array_set(RisaDenseArray* array, uint32_t index, RisaValue value) {
     if(index == array->data.size)
-        value_array_write(&array->data, value);
+        risa_value_array_write(&array->data, value);
     else array->data.values[index] = value;
 }

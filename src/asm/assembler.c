@@ -62,7 +62,7 @@ void risa_assembler_init(RisaAssembler* assembler) {
     assembler->super = NULL;
     assembler->strings = NULL;
 
-    cluster_init(&assembler->cluster);
+    risa_cluster_init(&assembler->cluster);
     risa_map_init(&assembler->identifiers);
 
     assembler->canSwitchToData = true;
@@ -291,7 +291,7 @@ static void risa_assembler_assemble_byte_data(RisaAssembler* assembler) {
 
         if(index == UINT16_MAX)
             return;
-        if(AS_INT(assembler->cluster.constants.values[index]) > 255) {
+        if(RISA_AS_INT(assembler->cluster.constants.values[index]) > 255) {
             risa_asm_parser_error_at_current(assembler->parser, "Byte value out of range (0-255)");
             return;
         }
@@ -468,7 +468,7 @@ static void risa_assembler_assemble_function_data(RisaAssembler* assembler) {
 
     risa_asm_parser_consume(assembler->parser, RISA_ASM_TOKEN_RIGHT_BRACE, "Expected '}'");
 
-    uint16_t index = risa_assembler_create_constant(assembler, DENSE_VALUE(func));
+    uint16_t index = risa_assembler_create_constant(assembler, RISA_DENSE_VALUE(func));
 
     if(id.type != RISA_ASM_TOKEN_ERROR)
         if(!risa_assembler_identifier_add(assembler, id.start, id.size, index))
@@ -1210,7 +1210,7 @@ static void risa_assembler_assemble_set(RisaAssembler* assembler) {
 }
 
 static void risa_assembler_emit_byte(RisaAssembler* assembler, uint8_t byte) {
-    cluster_write(&assembler->cluster, byte, 0);
+    risa_cluster_write(&assembler->cluster, byte, 0);
 }
 
 static void risa_assembler_emit_word(RisaAssembler* assembler, uint16_t word) {
@@ -1266,7 +1266,7 @@ static uint16_t risa_assembler_read_byte(RisaAssembler* assembler) {
         return UINT16_MAX;
     }
 
-    return risa_assembler_create_constant(assembler, BYTE_VALUE((uint8_t) num));
+    return risa_assembler_create_constant(assembler, RISA_BYTE_VALUE((uint8_t) num));
 }
 
 static uint16_t risa_assembler_read_int(RisaAssembler* assembler) {
@@ -1295,7 +1295,7 @@ static uint16_t risa_assembler_read_int(RisaAssembler* assembler) {
         return UINT16_MAX;
     }
 
-    return risa_assembler_create_constant(assembler, INT_VALUE(num));
+    return risa_assembler_create_constant(assembler, RISA_INT_VALUE(num));
 }
 
 static uint16_t risa_assembler_read_float(RisaAssembler* assembler) {
@@ -1324,7 +1324,7 @@ static uint16_t risa_assembler_read_float(RisaAssembler* assembler) {
         return UINT16_MAX;
     }
 
-    return risa_assembler_create_constant(assembler, FLOAT_VALUE(num));
+    return risa_assembler_create_constant(assembler, RISA_FLOAT_VALUE(num));
 }
 
 static uint16_t risa_assembler_read_string(RisaAssembler* assembler) {
@@ -1337,7 +1337,7 @@ static uint16_t risa_assembler_read_string(RisaAssembler* assembler) {
         } else {
             RisaValue* value = &assembler->cluster.constants.values[index];
 
-            if(!value_is_dense_of_type(*value, RISA_DVAL_STRING)) {
+            if(!risa_value_is_dense_of_type(*value, RISA_DVAL_STRING)) {
                 risa_asm_parser_error_at_current(assembler->parser, "Expected string");
                 return UINT16_MAX;
             }
@@ -1424,12 +1424,12 @@ static uint16_t risa_assembler_read_string(RisaAssembler* assembler) {
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(super->strings, interned, NULL_VALUE);
+        risa_map_set(super->strings, interned, RISA_NULL_VALUE);
     }
 
     RISA_MEM_FREE(str);
 
-    return risa_assembler_create_constant(assembler, DENSE_VALUE(interned));
+    return risa_assembler_create_constant(assembler, RISA_DENSE_VALUE(interned));
 }
 
 static uint16_t risa_assembler_read_identifier(RisaAssembler* assembler) {
@@ -1474,8 +1474,8 @@ static int64_t risa_assembler_read_number(RisaAssembler* assembler) {
             RisaValue* value = &assembler->cluster.constants.values[index];
 
             if(value->type == RISA_VAL_INT)
-                return AS_INT(*value);
-            return AS_BYTE(*value);
+                return RISA_AS_INT(*value);
+            return RISA_AS_BYTE(*value);
         }
     }
 
@@ -1514,7 +1514,7 @@ static bool risa_assembler_read_bool(RisaAssembler* assembler) {
             return false;
         } else {
             RisaValue* value = &assembler->cluster.constants.values[index];
-            return AS_BOOL(*value);
+            return RISA_AS_BOOL(*value);
         }
     }
 
@@ -1523,7 +1523,7 @@ static bool risa_assembler_read_bool(RisaAssembler* assembler) {
 
 static bool risa_assembler_identifier_add(RisaAssembler* assembler, const char* start, uint32_t length, uint16_t index) {
     if(risa_map_find(&assembler->identifiers, start, length, risa_map_hash(start, length)) == NULL) {
-        risa_map_set(&assembler->identifiers, risa_dense_string_from(start, length), INT_VALUE(index));
+        risa_map_set(&assembler->identifiers, risa_dense_string_from(start, length), RISA_INT_VALUE(index));
         return true;
     } else return false;
 }
@@ -1532,11 +1532,11 @@ static bool risa_assembler_identifier_add(RisaAssembler* assembler, const char* 
 static uint32_t risa_assembler_identifier_resolve(RisaAssembler* assembler, RisaAsmToken* token) {
     RisaMapEntry* entry = risa_map_find_entry(&assembler->identifiers, token->start, token->size, risa_map_hash(token->start, token->size));
 
-    return entry == NULL ? UINT32_MAX : AS_INT(entry->value);
+    return entry == NULL ? UINT32_MAX : RISA_AS_INT(entry->value);
 }
 
 static uint16_t risa_assembler_create_constant(RisaAssembler* assembler, RisaValue value) {
-    size_t index = cluster_write_constant(&assembler->cluster, value);
+    size_t index = risa_cluster_write_constant(&assembler->cluster, value);
 
     if(index > UINT16_MAX) {
         risa_asm_parser_error_at_previous(assembler->parser, "Constant limit exceeded (65535)");
@@ -1558,10 +1558,10 @@ static uint16_t risa_assembler_create_string_constant(RisaAssembler* assembler, 
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(super->strings, interned, NULL_VALUE);
+        risa_map_set(super->strings, interned, RISA_NULL_VALUE);
     }
 
-    return risa_assembler_create_constant(assembler, DENSE_VALUE(interned));
+    return risa_assembler_create_constant(assembler, RISA_DENSE_VALUE(interned));
 }
 
 static RisaDenseString* risa_assembler_create_string_entry(RisaAssembler* assembler, const char* start, uint32_t length) {
@@ -1576,7 +1576,7 @@ static RisaDenseString* risa_assembler_create_string_entry(RisaAssembler* assemb
 
     if(interned == NULL) {
         interned = risa_dense_string_from(start, length);
-        risa_map_set(super->strings, interned, NULL_VALUE);
+        risa_map_set(super->strings, interned, RISA_NULL_VALUE);
     }
 
     return interned;

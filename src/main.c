@@ -81,7 +81,7 @@ void run_repl(RisaIO io) {
         RisaInterpretStatus status = risa_interpret_string(&vm, line);
 
         if(status == RISA_INTERPRET_OK && vm.acc.type != RISA_VAL_NULL)
-            value_print(&vm.io, vm.acc);
+            risa_value_print(&vm.io, vm.acc);
         RISA_OUT(io, "\n");
     }
 }

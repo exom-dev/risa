@@ -1,7 +1,7 @@
 #include "vm.h"
 
 void risa_vm_register_string(RisaVM* vm, RisaDenseString* string) {
-    risa_map_set(&vm->strings, string, NULL_VALUE);
+    risa_map_set(&vm->strings, string, RISA_NULL_VALUE);
     risa_vm_register_dense(vm, (RisaDenseValue *) string);
 }
 
@@ -34,8 +34,8 @@ void risa_vm_register_dense_unchecked(RisaVM* vm, RisaDenseValue* dense) {
             RisaValueArray *constants = &((RisaDenseFunction *) dense)->cluster.constants;
 
             for(size_t i = 0; i < constants->size; ++i)
-                if(IS_DENSE(constants->values[i]))
-                    risa_vm_register_dense(vm, AS_DENSE(constants->values[i]));
+                if(RISA_IS_DENSE(constants->values[i]))
+                    risa_vm_register_dense(vm, RISA_AS_DENSE(constants->values[i]));
 
             break;
         }
@@ -45,8 +45,8 @@ void risa_vm_register_dense_unchecked(RisaVM* vm, RisaDenseValue* dense) {
             RisaValueArray *constants = &((RisaDenseClosure *) dense)->function->cluster.constants;
 
             for(size_t i = 0; i < constants->size; ++i)
-                if(IS_DENSE(constants->values[i]))
-                    risa_vm_register_dense(vm, AS_DENSE(constants->values[i]));
+                if(RISA_IS_DENSE(constants->values[i]))
+                    risa_vm_register_dense(vm, RISA_AS_DENSE(constants->values[i]));
 
             break;
         }
