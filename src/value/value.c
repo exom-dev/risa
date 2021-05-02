@@ -199,3 +199,27 @@ bool risa_value_strict_equals(RisaValue left, RisaValue right) {
 bool risa_value_is_dense_of_type(RisaValue value, RisaDenseValueType type) {
     return RISA_IS_DENSE(value) && RISA_AS_DENSE(value)->type == type;
 }
+
+RisaValue risa_value_from_null() {
+    return RISA_NULL_VALUE;
+}
+
+RisaValue risa_value_from_bool(bool value) {
+    return RISA_BOOL_VALUE(value);
+}
+
+RisaValue risa_value_from_byte(uint8_t value) {
+    return RISA_BYTE_VALUE(value);
+}
+
+RisaValue risa_value_from_int(uint64_t value) {
+    return RISA_INT_VALUE(value);
+}
+
+RisaValue risa_value_from_float(double value) {
+    return RISA_FLOAT_VALUE(value);
+}
+
+RisaValue risa_value_from_dense(RisaDenseValue* value) {
+    return RISA_DENSE_VALUE(value);
+}

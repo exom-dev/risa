@@ -319,6 +319,10 @@ size_t risa_dense_size(RisaDenseValue* dense) {
     }
 }
 
+RisaDenseValueType risa_dense_get_type(RisaDenseValue* dense) {
+    return dense->type;
+}
+
 void risa_dense_delete(RisaDenseValue* dense) {
     switch(dense->type) {
         case RISA_DVAL_STRING:

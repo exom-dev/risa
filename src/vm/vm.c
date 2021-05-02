@@ -95,6 +95,10 @@ void risa_vm_load_strings(RisaVM* vm, RisaMap* strings) {
     vm->strings = *strings;
 }
 
+RisaIO* risa_vm_get_io(RisaVM* vm) {
+    return &vm->io;
+}
+
 RisaVMStatus risa_vm_execute(RisaVM* vm) {
     return risa_vm_run(vm);
 }

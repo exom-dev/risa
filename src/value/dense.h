@@ -78,6 +78,7 @@ RISA_API bool               risa_dense_is_truthy           (RisaDenseValue* dens
 RISA_API RisaValue          risa_dense_clone               (RisaDenseValue* dense);
 RISA_API RisaValue          risa_dense_clone_under         (void* vm, RisaDenseValue* dense); // void* instead of RisaVM* in order to work around the circular dependency.
 RISA_API size_t             risa_dense_size                (RisaDenseValue* dense);
+RISA_API RisaDenseValueType risa_dense_get_type            (RisaDenseValue* dense);
 RISA_API void               risa_dense_delete              (RisaDenseValue* dense);
 
 RISA_API RisaDenseString*   risa_dense_string_prepare      (const char* chars, uint32_t length);
@@ -112,5 +113,6 @@ RISA_API RisaDenseClosure*  risa_dense_closure_create      (RisaDenseFunction* f
 
 RISA_API RisaDenseNative*   risa_dense_native_create       (RisaNativeFunction function);
 RISA_API RisaValue          risa_dense_native_value        (RisaNativeFunction function);
+RISA_API RisaValue          risa_dense_native_get_arg      (RisaValue* args, uint8_t index);
 
 #endif

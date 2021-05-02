@@ -65,6 +65,7 @@ RISA_API void             risa_vm_init                     (RisaVM* vm);
 RISA_API void             risa_vm_clean                    (RisaVM* vm);
 RISA_API void             risa_vm_load_function            (RisaVM* vm, RisaDenseFunction* function);
 RISA_API void             risa_vm_load_strings             (RisaVM* vm, RisaMap* strings);
+RISA_API RisaIO*          risa_vm_get_io                   (RisaVM* vm);
 RISA_API void             risa_vm_delete                   (RisaVM* vm);
 RISA_API void             risa_vm_free                     (RisaVM* vm);
 

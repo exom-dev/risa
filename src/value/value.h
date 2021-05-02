@@ -49,10 +49,10 @@ typedef struct {
     RisaValue* values;
 } RisaValueArray;
 
-#define RISA_NULL_VALUE         ((RisaValue) { RISA_VAL_NULL, { .integer = 0 } })
-#define RISA_BOOL_VALUE(value)  ((RisaValue) { RISA_VAL_BOOL, { .boolean = value} })
-#define RISA_BYTE_VALUE(value)  ((RisaValue) { RISA_VAL_BYTE, { .byte = value } })
-#define RISA_INT_VALUE(value)   ((RisaValue) { RISA_VAL_INT, { .integer = value } })
+#define RISA_NULL_VALUE         ((RisaValue) { RISA_VAL_NULL,  { .integer = 0 } })
+#define RISA_BOOL_VALUE(value)  ((RisaValue) { RISA_VAL_BOOL,  { .boolean = value} })
+#define RISA_BYTE_VALUE(value)  ((RisaValue) { RISA_VAL_BYTE,  { .byte = value } })
+#define RISA_INT_VALUE(value)   ((RisaValue) { RISA_VAL_INT,   { .integer = value } })
 #define RISA_FLOAT_VALUE(value) ((RisaValue) { RISA_VAL_FLOAT, { .floating = value } })
 #define RISA_DENSE_VALUE(value) ((RisaValue) { RISA_VAL_DENSE, { .dense = (RisaDenseValue*) value } })
 
@@ -79,6 +79,13 @@ RISA_API bool      risa_value_equals            (RisaValue left, RisaValue right
 RISA_API bool      risa_value_strict_equals     (RisaValue left, RisaValue right);
 
 RISA_API bool      risa_value_is_dense_of_type  (RisaValue value, RisaDenseValueType type);
+
+RISA_API RisaValue risa_value_from_null  ();
+RISA_API RisaValue risa_value_from_bool  (bool value);
+RISA_API RisaValue risa_value_from_byte  (uint8_t value);
+RISA_API RisaValue risa_value_from_int   (uint64_t value);
+RISA_API RisaValue risa_value_from_float (double value);
+RISA_API RisaValue risa_value_from_dense (RisaDenseValue* value);
 
 // Length is required for the first 2 in order to determine the base (prefixes 0x, 0b, ..., may or may not exist)
 RISA_API RisaValue risa_value_int_from_string   (char* str, uint32_t length);
