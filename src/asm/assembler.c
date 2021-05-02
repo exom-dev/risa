@@ -39,19 +39,19 @@ static void risa_assembler_assemble_set                       (RisaAssembler*); 
 static void risa_assembler_emit_byte                          (RisaAssembler*, uint8_t);
 static void risa_assembler_emit_word                          (RisaAssembler*, uint16_t);
 
-static uint8_t  risa_assembler_read_reg                       (RisaAssembler*);
-static uint16_t risa_assembler_read_const                     (RisaAssembler*);
-static uint16_t risa_assembler_read_byte                      (RisaAssembler*);
-static uint16_t risa_assembler_read_int                       (RisaAssembler*);
-static uint16_t risa_assembler_read_float                     (RisaAssembler*);
-static uint16_t risa_assembler_read_string                    (RisaAssembler*);
-static uint16_t risa_assembler_read_any_const                 (RisaAssembler*);
-static uint16_t risa_assembler_read_identifier                (RisaAssembler*);
-static int64_t  risa_assembler_read_number                    (RisaAssembler*);
-static bool     risa_assembler_read_bool                      (RisaAssembler*);
+static uint8_t          risa_assembler_read_reg               (RisaAssembler*);
+static uint16_t         risa_assembler_read_const             (RisaAssembler*);
+static uint16_t         risa_assembler_read_byte              (RisaAssembler*);
+static uint16_t         risa_assembler_read_int               (RisaAssembler*);
+static uint16_t         risa_assembler_read_float             (RisaAssembler*);
+static uint16_t         risa_assembler_read_string            (RisaAssembler*);
+static uint16_t         risa_assembler_read_any_const         (RisaAssembler*);
+static uint16_t         risa_assembler_read_identifier        (RisaAssembler*);
+static int64_t          risa_assembler_read_number            (RisaAssembler*);
+static bool             risa_assembler_read_bool              (RisaAssembler*);
 
-static bool     risa_assembler_identifier_add                 (RisaAssembler*, const char*, uint32_t, uint16_t);
-static uint32_t risa_assembler_identifier_resolve             (RisaAssembler*, RisaAsmToken*);
+static bool             risa_assembler_identifier_add         (RisaAssembler*, const char*, uint32_t, uint16_t);
+static uint32_t         risa_assembler_identifier_resolve     (RisaAssembler*, RisaAsmToken*);
 
 static uint16_t         risa_assembler_create_constant        (RisaAssembler*, RisaValue);
 static uint16_t         risa_assembler_create_string_constant (RisaAssembler*, const char*, uint32_t);
