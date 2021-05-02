@@ -43,8 +43,8 @@ typedef struct {
 } RisaValue;
 
 typedef struct {
-    size_t size;
-    size_t capacity;
+    uint32_t size;
+    uint32_t capacity;
 
     RisaValue* values;
 } RisaValueArray;

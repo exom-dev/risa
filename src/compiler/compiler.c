@@ -159,6 +159,14 @@ const RisaOperatorRule OPERATOR_RULES[] = {
         {  NULL,                                        NULL,                              RISA_PREC_NONE         },  // RISA_TOKEN_EOF
 };
 
+RisaCompiler* risa_compiler_create() {
+    RisaCompiler* compiler =  RISA_MEM_ALLOC(sizeof(RisaCompiler));
+
+    risa_compiler_init(compiler);
+
+    return compiler;
+}
+
 void risa_compiler_init(RisaCompiler* compiler) {
     risa_io_init(&compiler->io);
 
@@ -193,8 +201,33 @@ void risa_compiler_init(RisaCompiler* compiler) {
     compiler->scopeDepth = 0;
 }
 
+RisaIO* risa_compiler_get_io(RisaCompiler* compiler) {
+    return &compiler->io;
+}
+
+RisaDenseFunction* risa_compiler_get_function(RisaCompiler* compiler) {
+    return compiler->function;
+}
+
+RisaMap* risa_compiler_get_strings(RisaCompiler* compiler) {
+    return &compiler->strings;
+}
+
+void risa_compiler_set_repl_mode (RisaCompiler* compiler, bool value) {
+    compiler->options.replMode = value;
+}
+
 void risa_compiler_delete(RisaCompiler* compiler) {
     risa_map_delete(&compiler->strings);
+}
+
+void risa_compiler_free(RisaCompiler* compiler) {
+    risa_compiler_delete(compiler);
+    RISA_MEM_FREE(compiler);
+}
+
+void risa_compiler_shallow_free(RisaCompiler* compiler) {
+    RISA_MEM_FREE(compiler);
 }
 
 RisaCompilerStatus risa_compiler_compile(RisaCompiler* compiler, const char* str) {

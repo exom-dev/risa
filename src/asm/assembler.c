@@ -57,6 +57,14 @@ static uint16_t     risa_assembler_create_constant        (RisaAssembler*, RisaV
 static uint16_t     risa_assembler_create_string_constant (RisaAssembler*, const char*, uint32_t);
 static RisaDenseString* risa_assembler_create_string_entry    (RisaAssembler* assembler, const char* start, uint32_t length);
 
+RisaAssembler* risa_assembler_create() {
+    RisaAssembler* assembler = RISA_MEM_ALLOC(sizeof(RisaAssembler));
+
+    risa_assembler_init(assembler);
+
+    return assembler;
+}
+
 void risa_assembler_init(RisaAssembler* assembler) {
     risa_io_init(&assembler->io);
     assembler->super = NULL;
@@ -78,6 +86,12 @@ void risa_assembler_delete(RisaAssembler* assembler) {
     }
 
     risa_map_delete(&assembler->identifiers);
+}
+
+void risa_assembler_free(RisaAssembler* assembler) {
+    risa_assembler_delete(assembler);
+
+    RISA_MEM_FREE(assembler);
 }
 
 AssemblerStatus risa_assembler_assemble(RisaAssembler* assembler, const char* str, const char* stoppers) {

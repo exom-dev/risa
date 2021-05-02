@@ -60,9 +60,13 @@ typedef enum {
     RISA_VM_STATUS_ERROR
 } RisaVMStatus;
 
+RISA_API RisaVM*          risa_vm_create                   ();
 RISA_API void             risa_vm_init                     (RisaVM* vm);
 RISA_API void             risa_vm_clean                    (RisaVM* vm);
+RISA_API void             risa_vm_load_function            (RisaVM* vm, RisaDenseFunction* function);
+RISA_API void             risa_vm_load_strings             (RisaVM* vm, RisaMap* strings);
 RISA_API void             risa_vm_delete                   (RisaVM* vm);
+RISA_API void             risa_vm_free                     (RisaVM* vm);
 
 RISA_API RisaVMStatus     risa_vm_execute                  (RisaVM* vm);
 RISA_API RisaVMStatus     risa_vm_run                      (RisaVM* vm);

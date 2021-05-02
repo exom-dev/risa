@@ -41,7 +41,7 @@ typedef struct {
     RisaTokenType type;
     const char* start;
 
-    size_t size;
+    uint32_t size;
     uint32_t index;
 } RisaToken;
 
@@ -50,7 +50,7 @@ typedef struct {
     const char* start;
     const char* current;
 
-    size_t index;
+    uint32_t index;
 } RisaLexer;
 
 RISA_API void      risa_lexer_init              (RisaLexer* lexer);

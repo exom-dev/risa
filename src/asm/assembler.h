@@ -36,8 +36,10 @@ typedef enum {
     RISA_ASM_STATUS_ERROR
 } AssemblerStatus;
 
-RISA_API void risa_assembler_init   (RisaAssembler* assembler);
-RISA_API void risa_assembler_delete (RisaAssembler* assembler);
+RISA_API RisaAssembler*  risa_assembler_create ();
+RISA_API void            risa_assembler_init   (RisaAssembler* assembler);
+RISA_API void            risa_assembler_delete (RisaAssembler* assembler);
+RISA_API void            risa_assembler_free   (RisaAssembler* assembler);
 
 RISA_API AssemblerStatus risa_assembler_assemble (RisaAssembler* assembler, const char* str, const char* stoppers);
 

@@ -141,8 +141,15 @@ typedef struct {
     RisaOperatorPrecedence precedence;
 } RisaOperatorRule;
 
-RISA_API void               risa_compiler_init    (RisaCompiler* compiler);
-RISA_API void               risa_compiler_delete  (RisaCompiler* compiler);
+RISA_API RisaCompiler*      risa_compiler_create        ();
+RISA_API void               risa_compiler_init          (RisaCompiler* compiler);
+RISA_API RisaIO*            risa_compiler_get_io        (RisaCompiler* compiler);
+RISA_API RisaDenseFunction* risa_compiler_get_function  (RisaCompiler* compiler);
+RISA_API RisaMap*           risa_compiler_get_strings   (RisaCompiler* compiler);
+RISA_API void               risa_compiler_set_repl_mode (RisaCompiler* compiler, bool value);
+RISA_API void               risa_compiler_delete        (RisaCompiler* compiler);
+RISA_API void               risa_compiler_free          (RisaCompiler* compiler);
+RISA_API void               risa_compiler_shallow_free  (RisaCompiler* compiler);
 
 RISA_API RisaCompilerStatus risa_compiler_compile (RisaCompiler* compiler, const char* str);
 

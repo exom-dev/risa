@@ -130,7 +130,7 @@ void run_file(RisaIO io, const char* path) {
 
 void print_info(RisaIO io) {
     RISA_OUT(io, "Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
-    RISA_OUT(io, "(c) 2020 The Exom Developers (exom.dev)\n\n");
+    RISA_OUT(io, "(c) 2020-2021 The Exom Developers (exom.dev)\n\n");
 
     RISA_OUT(io, "     _____________________      _______\n");
     RISA_OUT(io, "    |#####################\\    /######/\n");

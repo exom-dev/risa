@@ -102,9 +102,11 @@ RISA_API void               risa_dense_object_set          (RisaDenseObject* obj
 
 RISA_API RisaDenseUpvalue*  risa_dense_upvalue_create      (RisaValue* value);
 
-RISA_API RisaDenseFunction* risa_dense_function_create     ();
-RISA_API void               risa_dense_function_init       (RisaDenseFunction* function);
-RISA_API void               risa_dense_function_delete     (RisaDenseFunction* function);
+RISA_API RisaDenseFunction* risa_dense_function_create      ();
+RISA_API void               risa_dense_function_init        (RisaDenseFunction* function);
+RISA_API RisaCluster*       risa_dense_function_get_cluster (RisaDenseFunction* function);
+RISA_API void               risa_dense_function_delete      (RisaDenseFunction* function);
+RISA_API void               risa_dense_function_free        (RisaDenseFunction* function);
 
 RISA_API RisaDenseClosure*  risa_dense_closure_create      (RisaDenseFunction* function, uint8_t upvalueCount);
 

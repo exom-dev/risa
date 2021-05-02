@@ -58,11 +58,23 @@ void RISA_IO_STDERR(const char* data) {
     fprintf(stderr, "%s", data);
 }
 
+RisaIO* risa_io_create() {
+    RisaIO* io = RISA_MEM_ALLOC(sizeof(RisaIO));
+
+    risa_io_init(io);
+
+    return io;
+}
+
 void risa_io_init(RisaIO* io) {
     io->in = &RISA_IO_STDIN;
     io->out = &RISA_IO_STDOUT;
     io->err = &RISA_IO_STDERR;
     io->freeInput = true;
+}
+
+void risa_io_free(RisaIO* io) {
+    RISA_MEM_FREE(io);
 }
 
 void risa_io_redirect_in(RisaIO* io, RisaInHandler handler) {
@@ -82,6 +94,10 @@ void risa_io_clone(RisaIO* dest, RisaIO* src) {
     dest->out = src->out;
     dest->err = src->err;
     dest->freeInput = src->freeInput;
+}
+
+bool risa_io_should_free_input (RisaIO* io) {
+    return (io->in == RISA_IO_STDIN) || (io->freeInput);
 }
 
 void risa_io_set_free_input(RisaIO* io, bool value) {

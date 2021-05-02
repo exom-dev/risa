@@ -17,7 +17,16 @@ void risa_dense_function_init(RisaDenseFunction* function) {
     risa_cluster_init(&function->cluster);
 }
 
+RisaCluster* risa_dense_function_get_cluster (RisaDenseFunction* function) {
+    return &function->cluster;
+}
+
 void risa_dense_function_delete(RisaDenseFunction* function) {
     risa_cluster_delete(&function->cluster);
     risa_dense_function_init(function);
+}
+
+void risa_dense_function_free(RisaDenseFunction* function) {
+    risa_dense_function_delete(function);
+    RISA_MEM_FREE(function);
 }

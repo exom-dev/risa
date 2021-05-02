@@ -22,14 +22,17 @@ typedef struct {
     bool freeInput;
 } RisaIO;
 
-RISA_API void  risa_io_init (RisaIO* io);
+RISA_API RisaIO*  risa_io_create ();
+RISA_API void     risa_io_init   (RisaIO* io);
+RISA_API void     risa_io_free   (RisaIO* io);
 
 RISA_API void  risa_io_redirect_in    (RisaIO* io, RisaInHandler handler);
 RISA_API void  risa_io_redirect_out   (RisaIO* io, RisaOutHandler handler);
 RISA_API void  risa_io_redirect_err   (RisaIO* io, RisaOutHandler handler);
 
-RISA_API void  risa_io_clone          (RisaIO* dest, RisaIO* src);
-RISA_API void  risa_io_set_free_input (RisaIO* io, bool value);
+RISA_API void  risa_io_clone             (RisaIO* dest, RisaIO* src);
+RISA_API bool  risa_io_should_free_input (RisaIO* io);
+RISA_API void  risa_io_set_free_input    (RisaIO* io, bool value);
 
 RISA_API char* risa_io_in             (RisaIO* io, uint8_t mode);
 RISA_API void  risa_io_out            (RisaIO* io, const char* fmt, ...);

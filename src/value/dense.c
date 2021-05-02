@@ -325,11 +325,11 @@ void risa_dense_delete(RisaDenseValue* dense) {
             RISA_MEM_FREE(dense);
             break;
         case RISA_DVAL_ARRAY:
-            risa_dense_array_delete((RisaDenseArray *) dense);
+            risa_dense_array_delete((RisaDenseArray*) dense);
             RISA_MEM_FREE(dense);
             break;
         case RISA_DVAL_OBJECT:
-            risa_dense_object_delete((RisaDenseObject *) dense);
+            risa_dense_object_delete((RisaDenseObject*) dense);
             RISA_MEM_FREE(dense);
             break;
         case RISA_DVAL_UPVALUE:
@@ -337,7 +337,7 @@ void risa_dense_delete(RisaDenseValue* dense) {
             RISA_MEM_FREE(dense);
             break;
         case RISA_DVAL_FUNCTION:
-            risa_cluster_delete(&((RisaDenseFunction *) dense)->cluster);
+            risa_dense_function_delete((RisaDenseFunction*) dense);
             RISA_MEM_FREE(dense);
             break;
         case RISA_DVAL_CLOSURE:

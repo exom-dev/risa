@@ -26,13 +26,7 @@ RisaExecuteStatus risa_execute_cluster(RisaVM* vm, RisaCluster cluster) {
 }
 
 RisaExecuteStatus risa_execute_function(RisaVM* vm, RisaDenseFunction* function) {
-    risa_vm_clean(vm);
-
-    vm->frames[0] = risa_vm_frame_from_function(vm, NULL, function, true);
-    vm->frameCount = 1;
-    vm->stackTop += 250;
-
-    risa_vm_register_dense(vm, (RisaDenseValue *) function);
+    risa_vm_load_function(vm, function);
 
     if(risa_vm_execute(vm) == RISA_VM_STATUS_ERROR)
         return RISA_EXECUTE_ERROR;
@@ -54,7 +48,7 @@ RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
-    vm->strings = compiler.strings;
+    risa_vm_load_strings(vm, &compiler.strings);
 
     /*for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
         RisaDenseString* string = compiler.strings.entries[i].key;

@@ -19,6 +19,14 @@ static bool risa_vm_call_native   (RisaVM*, RisaValue*, RisaValue, uint8_t, bool
 static RisaDenseUpvalue* risa_vm_upvalue_capture    (RisaVM* vm, RisaValue* local);
 static void              risa_vm_upvalue_close_from (RisaVM* vm, RisaValue* slot);
 
+RisaVM* risa_vm_create() {
+    RisaVM* vm = RISA_MEM_ALLOC(sizeof(RisaVM));
+
+    risa_vm_init(vm);
+
+    return vm;
+}
+
 void risa_vm_init(RisaVM* vm) {
     risa_io_init(&vm->io);
 
@@ -27,6 +35,7 @@ void risa_vm_init(RisaVM* vm) {
     risa_map_init(&vm->strings);
     risa_map_init(&vm->globals);
 
+    vm->frameCount = 0;
     vm->values = NULL;
     vm->options.replMode = false; // TODO: Split compiler and vm options into separate structs.
     vm->heapSize = 0;
@@ -47,6 +56,12 @@ void risa_vm_delete(RisaVM* vm) {
     }
 }
 
+void risa_vm_free(RisaVM* vm) {
+    risa_vm_delete(vm);
+
+    RISA_MEM_FREE(vm);
+}
+
 void risa_vm_clean(RisaVM* vm) {
     while(vm->frameCount > 1) {
         RisaCallFrame* frame = &vm->frames[vm->frameCount - 1];
@@ -63,7 +78,21 @@ void risa_vm_clean(RisaVM* vm) {
 
     risa_vm_stack_reset(vm);
 
-    risa_gc_check(vm);
+    risa_gc_run(vm);
+}
+
+void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
+    risa_vm_clean(vm);
+
+    vm->frames[0] = risa_vm_frame_from_function(vm, NULL, function, true);
+    vm->frameCount = 1;
+    vm->stackTop += 250;
+
+    risa_vm_register_dense(vm, (RisaDenseValue*) function);
+}
+
+void risa_vm_load_strings(RisaVM* vm, RisaMap* strings) {
+    vm->strings = *strings;
 }
 
 RisaVMStatus risa_vm_execute(RisaVM* vm) {

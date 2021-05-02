@@ -67,7 +67,7 @@ static RisaValue risa_std_io_read_char(void* vm, uint8_t argc, RisaValue* args) 
 
     RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, chr, 1));
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(chr);
 
     return result;
@@ -83,7 +83,7 @@ static RisaValue risa_std_io_read_string(void* vm, uint8_t argc, RisaValue* args
 
     RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, str, size));
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
 
     return result;
@@ -106,7 +106,7 @@ static RisaValue risa_std_io_read_line(void* vm, uint8_t argc, RisaValue* args) 
 
     RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, line, size));
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(line);
 
     return result;
@@ -122,7 +122,7 @@ static RisaValue risa_std_io_read_int(void* vm, uint8_t argc, RisaValue* args) {
 
     RisaValue result = risa_value_int_from_string(str, length);
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
 
     return result;
@@ -138,7 +138,7 @@ static RisaValue risa_std_io_read_byte(void* vm, uint8_t argc, RisaValue* args) 
 
     RisaValue result = risa_value_byte_from_string(str, length);
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
 
     return result;
@@ -152,7 +152,7 @@ static RisaValue risa_std_io_read_float(void* vm, uint8_t argc, RisaValue* args)
 
     RisaValue result = risa_value_float_from_string(str);
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
 
     return result;
@@ -166,7 +166,7 @@ static RisaValue risa_std_io_read_bool(void* vm, uint8_t argc, RisaValue* args) 
 
     RisaValue result = risa_value_bool_from_string(str);
 
-    if(((RisaVM*) vm)->io.freeInput)
+    if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
 
     return result;

@@ -11,7 +11,7 @@
     static size_t unfreedAllocations = 0;
 #endif
 
-void* risa_mem_alloc(size_t size, const char* file, uint32_t line) {
+void* risa_mem_alloc(uint32_t size, const char* file, uint32_t line) {
     void* ptr = malloc(size);
 
     if(ptr == NULL)
@@ -25,7 +25,7 @@ void* risa_mem_alloc(size_t size, const char* file, uint32_t line) {
     return ptr;
 }
 
-void* risa_mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file, uint32_t line) {
+void* risa_mem_realloc(void* ptr, uint32_t size, uint32_t unitSize, const char* file, uint32_t line) {
     void* newPtr = realloc(ptr, size * unitSize);
 
     if(newPtr == NULL)
@@ -43,7 +43,7 @@ void* risa_mem_realloc(void* ptr, size_t size, size_t unitSize, const char* file
     return newPtr;
 }
 
-void* risa_mem_expand(void* ptr, size_t* size, size_t unitSize, const char* file, uint32_t line) {
+void* risa_mem_expand(void* ptr, uint32_t* size, uint32_t unitSize, const char* file, uint32_t line) {
     if(*size < MEM_BLOCK_START_SIZE)
         *size = MEM_BLOCK_START_SIZE;
     else (*size) *= 2;

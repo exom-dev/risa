@@ -28,6 +28,14 @@ static void risa_disassembler_disassemble_get_instruction           (RisaDisasse
 static void risa_disassembler_disassemble_set_instruction           (RisaDisassembler*, const char*, uint8_t);
 static void risa_disassembler_disassembler_process_instruction      (RisaDisassembler*);
 
+RisaDisassembler* risa_disassembler_create() {
+    RisaDisassembler* disassembler = RISA_MEM_ALLOC(sizeof(RisaDisassembler));
+
+    risa_disassembler_init(disassembler);
+
+    return disassembler;
+}
+
 void risa_disassembler_init(RisaDisassembler* disassembler) {
     risa_io_init(&disassembler->io);
     disassembler->cluster = NULL;
@@ -71,8 +79,18 @@ void risa_disassembler_reset(RisaDisassembler* disassembler) {
     disassembler->offset = 0;
 }
 
+void risa_disassembler_delete(RisaDisassembler* disassembler) {
+    risa_disassembler_init(disassembler);
+}
+
+void risa_disassembler_free(RisaDisassembler* disassembler) {
+    risa_disassembler_delete(disassembler);
+
+    RISA_MEM_FREE(disassembler);
+}
+
 static void risa_disassembler_disassembler_process_instruction(RisaDisassembler* disassembler) {
-    RISA_OUT(disassembler->io, "%04zu %4u ", RISA_DISASM_OFFSET, RISA_DISASM_CLUSTER->indices[RISA_DISASM_OFFSET]);
+    RISA_OUT(disassembler->io, "%04u %4u ", RISA_DISASM_OFFSET, RISA_DISASM_CLUSTER->indices[RISA_DISASM_OFFSET]);
 
     uint8_t instruction = RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET];
     uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
