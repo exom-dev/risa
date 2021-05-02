@@ -5,56 +5,56 @@
 
 #include <stdlib.h>
 
-static void risa_assembler_assemble_mode_line        (RisaAssembler*);
-static void risa_assembler_assemble_data_mode_switch (RisaAssembler*);
-static void risa_assembler_assemble_code_mode_switch (RisaAssembler*);
-static void risa_assembler_assemble_data_line        (RisaAssembler*);
-static void risa_assembler_assemble_code_line        (RisaAssembler*);
+static void risa_assembler_assemble_mode_line                 (RisaAssembler*);
+static void risa_assembler_assemble_data_mode_switch          (RisaAssembler*);
+static void risa_assembler_assemble_code_mode_switch          (RisaAssembler*);
+static void risa_assembler_assemble_data_line                 (RisaAssembler*);
+static void risa_assembler_assemble_code_line                 (RisaAssembler*);
 
-static void risa_assembler_assemble_byte_data        (RisaAssembler*);
-static void risa_assembler_assemble_int_data         (RisaAssembler*);
-static void risa_assembler_assemble_float_data       (RisaAssembler*);
-static void risa_assembler_assemble_string_data      (RisaAssembler*);
-static void risa_assembler_assemble_bool_data        (RisaAssembler*);
-static void risa_assembler_assemble_function_data    (RisaAssembler*);
+static void risa_assembler_assemble_byte_data                 (RisaAssembler*);
+static void risa_assembler_assemble_int_data                  (RisaAssembler*);
+static void risa_assembler_assemble_float_data                (RisaAssembler*);
+static void risa_assembler_assemble_string_data               (RisaAssembler*);
+static void risa_assembler_assemble_bool_data                 (RisaAssembler*);
+static void risa_assembler_assemble_function_data             (RisaAssembler*);
 
 // The functions with the '_instruction' suffix are shared between multiple instructions.
-static void risa_assembler_assemble_global_instruction   (RisaAssembler*); // Takes a string and a register/constant.
-static void risa_assembler_assemble_cnst_instruction     (RisaAssembler*); // Takes a register and a constant.
-static void risa_assembler_assemble_copy_instruction     (RisaAssembler*); // Takes two registers.
-static void risa_assembler_assemble_producer_instruction (RisaAssembler*); // Takes a register.
-static void risa_assembler_assemble_unary_instruction    (RisaAssembler*); // Takes a register and a register/constant.
-static void risa_assembler_assemble_binary_instruction   (RisaAssembler*); // Takes a register and two registers/constants.
-static void risa_assembler_assemble_jump_instruction     (RisaAssembler*); // Takes a number, either byte or word.
-static void risa_assembler_assemble_consumer_instruction (RisaAssembler*); // Takes a register or RISA_TODLR_REGISTER_NULL.
-static void risa_assembler_assemble_call                 (RisaAssembler*); // Takes a register and a number.
-static void risa_assembler_assemble_gglob                (RisaAssembler*); // Takes a register and a string.
-static void risa_assembler_assemble_upval                (RisaAssembler*); // Takes two numbers and a bool.
-static void risa_assembler_assemble_gupval               (RisaAssembler*); // Takes a register and two numbers.
-static void risa_assembler_assemble_supval               (RisaAssembler*); // Takes two numbers and a register.
-static void risa_assembler_assemble_clsr                 (RisaAssembler*); // Takes two registers and a number.
-static void risa_assembler_assemble_get                  (RisaAssembler*); // Takes two registers and a register/constant.
-static void risa_assembler_assemble_set                  (RisaAssembler*); // Takes a register and two registers/constants.
+static void risa_assembler_assemble_global_instruction        (RisaAssembler*); // Takes a string and a register/constant.
+static void risa_assembler_assemble_cnst_instruction          (RisaAssembler*); // Takes a register and a constant.
+static void risa_assembler_assemble_copy_instruction          (RisaAssembler*); // Takes two registers.
+static void risa_assembler_assemble_producer_instruction      (RisaAssembler*); // Takes a register.
+static void risa_assembler_assemble_unary_instruction         (RisaAssembler*); // Takes a register and a register/constant.
+static void risa_assembler_assemble_binary_instruction        (RisaAssembler*); // Takes a register and two registers/constants.
+static void risa_assembler_assemble_jump_instruction          (RisaAssembler*); // Takes a number, either byte or word.
+static void risa_assembler_assemble_consumer_instruction      (RisaAssembler*); // Takes a register or RISA_TODLR_REGISTER_NULL.
+static void risa_assembler_assemble_call                      (RisaAssembler*); // Takes a register and a number.
+static void risa_assembler_assemble_gglob                     (RisaAssembler*); // Takes a register and a string.
+static void risa_assembler_assemble_upval                     (RisaAssembler*); // Takes two numbers and a bool.
+static void risa_assembler_assemble_gupval                    (RisaAssembler*); // Takes a register and two numbers.
+static void risa_assembler_assemble_supval                    (RisaAssembler*); // Takes two numbers and a register.
+static void risa_assembler_assemble_clsr                      (RisaAssembler*); // Takes two registers and a number.
+static void risa_assembler_assemble_get                       (RisaAssembler*); // Takes two registers and a register/constant.
+static void risa_assembler_assemble_set                       (RisaAssembler*); // Takes a register and two registers/constants.
 
-static void risa_assembler_emit_byte (RisaAssembler*, uint8_t);
-static void risa_assembler_emit_word (RisaAssembler*, uint16_t);
+static void risa_assembler_emit_byte                          (RisaAssembler*, uint8_t);
+static void risa_assembler_emit_word                          (RisaAssembler*, uint16_t);
 
-static uint8_t  risa_assembler_read_reg        (RisaAssembler*);
-static uint16_t risa_assembler_read_const      (RisaAssembler*);
-static uint16_t risa_assembler_read_byte       (RisaAssembler*);
-static uint16_t risa_assembler_read_int        (RisaAssembler*);
-static uint16_t risa_assembler_read_float      (RisaAssembler*);
-static uint16_t risa_assembler_read_string     (RisaAssembler*);
-static uint16_t risa_assembler_read_any_const  (RisaAssembler*);
-static uint16_t risa_assembler_read_identifier (RisaAssembler*);
-static int64_t  risa_assembler_read_number     (RisaAssembler*);
-static bool     risa_assembler_read_bool       (RisaAssembler*);
+static uint8_t  risa_assembler_read_reg                       (RisaAssembler*);
+static uint16_t risa_assembler_read_const                     (RisaAssembler*);
+static uint16_t risa_assembler_read_byte                      (RisaAssembler*);
+static uint16_t risa_assembler_read_int                       (RisaAssembler*);
+static uint16_t risa_assembler_read_float                     (RisaAssembler*);
+static uint16_t risa_assembler_read_string                    (RisaAssembler*);
+static uint16_t risa_assembler_read_any_const                 (RisaAssembler*);
+static uint16_t risa_assembler_read_identifier                (RisaAssembler*);
+static int64_t  risa_assembler_read_number                    (RisaAssembler*);
+static bool     risa_assembler_read_bool                      (RisaAssembler*);
 
-static bool     risa_assembler_identifier_add     (RisaAssembler*, const char*, uint32_t, uint16_t);
-static uint32_t risa_assembler_identifier_resolve (RisaAssembler*, RisaAsmToken*);
+static bool     risa_assembler_identifier_add                 (RisaAssembler*, const char*, uint32_t, uint16_t);
+static uint32_t risa_assembler_identifier_resolve             (RisaAssembler*, RisaAsmToken*);
 
-static uint16_t     risa_assembler_create_constant        (RisaAssembler*, RisaValue);
-static uint16_t     risa_assembler_create_string_constant (RisaAssembler*, const char*, uint32_t);
+static uint16_t         risa_assembler_create_constant        (RisaAssembler*, RisaValue);
+static uint16_t         risa_assembler_create_string_constant (RisaAssembler*, const char*, uint32_t);
 static RisaDenseString* risa_assembler_create_string_entry    (RisaAssembler* assembler, const char* start, uint32_t length);
 
 RisaAssembler* risa_assembler_create() {
