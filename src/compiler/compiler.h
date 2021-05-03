@@ -66,7 +66,7 @@ typedef struct RisaCompiler {
         bool isLvalue;        // Whether or not the last value is a lvalue.
         bool isPostIncrement; // Whether or not the last value is the result of a post increment operation.
         bool isEqualOp;       // Whether or not the last value is the result of an equality operation.
-        bool canOverwrite;    // Whether or not the last value can be overwritten (TODO: explain this better).
+        bool canOverwrite;    // Whether or not the last value register can be overwritten. Used to prevent an object property from overwriting a global value in a temporary reg.
         bool fromBranched;    // Whether or not the last value comes from one of multiple branches (e.g. ternary). Required to disable bad CNST optimizations.
 
         struct {
