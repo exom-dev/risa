@@ -8,7 +8,7 @@
 #define MAP_MAX_LOAD 0.75
 #define MAP_START_SIZE 8
 
-static RisaMapEntry* risa_map_find_bucket     (RisaMapEntry* entries, int capacity, DenseStringPtr key);
+static RisaMapEntry* risa_map_find_bucket     (RisaMapEntry* entries, int capacity, RisaDenseStringPtr key);
 static void          risa_map_adjust_capacity (RisaMap* map);
 
 void risa_map_init(RisaMap* map) {
@@ -34,7 +34,7 @@ uint32_t risa_map_hash(const char* chars, uint32_t length) {
     return hash;
 }
 
-bool risa_map_get(RisaMap* map, DenseStringPtr key, RisaValue* value) {
+bool risa_map_get(RisaMap* map, RisaDenseStringPtr key, RisaValue* value) {
     if(map->count == 0)
         return false;
 
@@ -47,7 +47,7 @@ bool risa_map_get(RisaMap* map, DenseStringPtr key, RisaValue* value) {
     return true;
 }
 
-bool risa_map_set(RisaMap* map, DenseStringPtr key, RisaValue value) {
+bool risa_map_set(RisaMap* map, RisaDenseStringPtr key, RisaValue value) {
     risa_map_adjust_capacity(map);
 
     RisaMapEntry* entry = risa_map_find_bucket(map->entries, map->capacity, key);
@@ -62,7 +62,7 @@ bool risa_map_set(RisaMap* map, DenseStringPtr key, RisaValue value) {
     return isNewKey;
 }
 
-bool risa_map_erase(RisaMap* map, DenseStringPtr key) {
+bool risa_map_erase(RisaMap* map, RisaDenseStringPtr key) {
     if(map->count == 0)
         return false;
 
@@ -84,7 +84,7 @@ void risa_map_copy(RisaMap* map, RisaMap* from) {
     }
 }
 
-DenseStringPtr risa_map_find(RisaMap* map, const char* chars, int length, uint32_t hash) {
+RisaDenseStringPtr risa_map_find(RisaMap* map, const char* chars, int length, uint32_t hash) {
     if(map->count == 0)
         return NULL;
 
@@ -128,7 +128,7 @@ RisaMapEntry* risa_map_find_entry(RisaMap* map, const char* chars, int length, u
     }
 }
 
-static RisaMapEntry* risa_map_find_bucket(RisaMapEntry* entries, int capacity, DenseStringPtr key) {
+static RisaMapEntry* risa_map_find_bucket(RisaMapEntry* entries, int capacity, RisaDenseStringPtr key) {
     uint32_t index = ((RisaDenseString*) key)->hash & (capacity - 1);
     RisaMapEntry* tombstone = NULL;
 

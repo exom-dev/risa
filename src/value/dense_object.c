@@ -18,7 +18,7 @@ RisaDenseObject* risa_dense_object_create_under(void* vm, uint32_t entryCount, .
     for(uint32_t i = 0; i < entryCount; ++i) {
         char* key        = va_arg(args, char*);
         uint32_t keySize = va_arg(args, uint32_t);
-        RisaValue val        = va_arg(args, RisaValue);
+        RisaValue val    = va_arg(args, RisaValue);
 
         risa_dense_object_set(obj, risa_vm_string_create((RisaVM *) vm, key, keySize), val);
 
@@ -44,6 +44,22 @@ void risa_dense_object_init(RisaDenseObject* object) {
 void risa_dense_object_delete(RisaDenseObject* object) {
     risa_map_delete(&object->data);
     risa_dense_object_init(object);
+}
+
+uint32_t risa_dense_object_get_count(RisaDenseObject* object) {
+    return object->data.count;
+}
+
+RisaMapEntry* risa_dense_object_get_entry(RisaDenseObject* object, uint32_t index) {
+    for(uint32_t i = 0; i < object->data.capacity; ++i) {
+        if(object->data.entries[i].key != NULL) {
+            if(index == 0)
+                return &object->data.entries[i];
+            --index;
+        }
+    }
+
+    return NULL;
 }
 
 bool risa_dense_object_get(RisaDenseObject* object, RisaDenseString* key, RisaValue* value) {

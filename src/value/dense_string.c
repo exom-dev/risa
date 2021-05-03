@@ -32,6 +32,10 @@ RisaDenseString* risa_dense_string_from(const char* chars, uint32_t length) {
     return string;
 }
 
+char* risa_dense_string_as_cstring(RisaDenseString* string) {
+    return string->chars;
+}
+
 RisaDenseString* risa_dense_string_concat(RisaDenseString* left, RisaDenseString* right) {
     uint32_t length = left->length + right->length;
 

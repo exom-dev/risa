@@ -20,6 +20,10 @@ void risa_dense_array_delete(RisaDenseArray* array) {
     risa_dense_array_init(array);
 }
 
+uint32_t risa_dense_array_get_count(RisaDenseArray* array) {
+    return array->data.size;
+}
+
 RisaValue risa_dense_array_get(RisaDenseArray* array, uint32_t index) {
     return array->data.values[index];
 }

@@ -85,12 +85,14 @@ RISA_API RisaDenseString*   risa_dense_string_prepare      (const char* chars, u
 RISA_API uint32_t           risa_dense_string_hash         (RisaDenseString* string);
 RISA_API void               risa_dense_string_hash_inplace (RisaDenseString* string);
 RISA_API RisaDenseString*   risa_dense_string_from         (const char* chars, uint32_t length);
+RISA_API char*              risa_dense_string_as_cstring   (RisaDenseString* string);
 RISA_API RisaDenseString*   risa_dense_string_concat       (RisaDenseString* left, RisaDenseString* right);
 RISA_API void               risa_dense_string_delete       (RisaDenseString* string);
 
 RISA_API RisaDenseArray*    risa_dense_array_create        ();
 RISA_API void               risa_dense_array_init          (RisaDenseArray* array);
 RISA_API void               risa_dense_array_delete        (RisaDenseArray* array);
+RISA_API uint32_t           risa_dense_array_get_count     (RisaDenseArray* array);
 RISA_API RisaValue          risa_dense_array_get           (RisaDenseArray* array, uint32_t index);
 RISA_API void               risa_dense_array_set           (RisaDenseArray* array, uint32_t index, RisaValue value);
 
@@ -98,6 +100,8 @@ RISA_API RisaDenseObject*   risa_dense_object_create       ();
 RISA_API RisaDenseObject*   risa_dense_object_create_under (void* vm, uint32_t entryCount, ...);
 RISA_API void               risa_dense_object_init         (RisaDenseObject* object);
 RISA_API void               risa_dense_object_delete       (RisaDenseObject* object);
+RISA_API uint32_t           risa_dense_object_get_count    (RisaDenseObject* object);
+RISA_API RisaMapEntry*      risa_dense_object_get_entry    (RisaDenseObject* object, uint32_t index);
 RISA_API bool               risa_dense_object_get          (RisaDenseObject* object, RisaDenseString* key, RisaValue* value);
 RISA_API void               risa_dense_object_set          (RisaDenseObject* object, RisaDenseString* key, RisaValue value);
 

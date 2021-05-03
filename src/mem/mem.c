@@ -19,7 +19,10 @@ void* risa_mem_alloc(uint32_t size, const char* file, uint32_t line) {
 
     #ifdef DEBUG_TRACE_MEMORY_OPS
         ++unfreedAllocations;
-        RISA_MEMORY("+ %p                 %-8zu     at line %u in %s", ptr, unfreedAllocations, line, file);
+
+        if(file != NULL)
+            RISA_MEMORY("+ %p                 %-8zu     at line %u in %s", ptr, unfreedAllocations, line, file);
+        else RISA_MEMORY("+ %p                 %-8zu     ", ptr, unfreedAllocations);
     #endif
 
     return ptr;
@@ -34,9 +37,14 @@ void* risa_mem_realloc(void* ptr, uint32_t size, uint32_t unitSize, const char* 
     #ifdef DEBUG_TRACE_MEMORY_OPS
         if(ptr == NULL) {
             ++unfreedAllocations;
-            RISA_MEMORY("+ %p                 %-8zu     at line %u in %s", newPtr, unfreedAllocations, line, file);
+
+            if(file != NULL)
+                RISA_MEMORY("+ %p                 %-8zu     at line %u in %s", newPtr, unfreedAllocations, line, file);
+            else RISA_MEMORY("+ %p                 %-8zu     ", newPtr, unfreedAllocations);
         } else {
-            RISA_MEMORY("~ %p -> %p     %-8zu     at line %u in %s", ptr, newPtr, unfreedAllocations, line, file);
+            if(file != NULL)
+                RISA_MEMORY("~ %p -> %p     %-8zu     at line %u in %s", ptr, newPtr, unfreedAllocations, line, file);
+            else RISA_MEMORY("~ %p -> %p     %-8zu     ", ptr, newPtr, unfreedAllocations);
         }
     #endif
 
@@ -57,7 +65,10 @@ void risa_mem_free(void* ptr, const char* file, uint32_t line) {
     #ifdef DEBUG_TRACE_MEMORY_OPS
         if(ptr != NULL) {
             --unfreedAllocations;
-            RISA_MEMORY("- %p                 %-8zu     at line %u in %s", ptr, unfreedAllocations, line, file);
+
+            if(file != NULL)
+                RISA_MEMORY("- %p                 %-8zu     at line %u in %s", ptr, unfreedAllocations, line, file);
+            else RISA_MEMORY("- %p                 %-8zu     ", ptr, unfreedAllocations);
         }
     #endif
 }
