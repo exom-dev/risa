@@ -15,6 +15,7 @@ static bool risa_vm_call_value    (RisaVM*, RisaValue*, RisaValue, uint8_t, bool
 static bool risa_vm_call_function (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
 static bool risa_vm_call_closure  (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
 static bool risa_vm_call_native   (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
+static RisaValue risa_vm_invoke_directly(RisaVM*, RisaValue*, RisaValue, uint8_t);
 
 static RisaDenseUpvalue* risa_vm_upvalue_capture    (RisaVM* vm, RisaValue* local);
 static void              risa_vm_upvalue_close_from (RisaVM* vm, RisaValue* slot);
@@ -1277,19 +1278,41 @@ RisaValue risa_vm_invoke(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t 
 
     va_end(args);
 
+    return risa_vm_invoke_directly(vm, base, callee, argc);
+}
+
+RisaValue risa_vm_invoke_args(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, RisaValue* args) {
+    // Check the frame count before pushing anything on the stack.
+    if(vm->frameCount == RISA_VM_CALLFRAME_COUNT) {
+        VM_RUNTIME_ERROR(vm, "Stack overflow");
+        return RISA_NULL_VALUE;
+    }
+
+    RisaValue* ptr = base + 1;
+    RisaValue* end = ptr + argc;
+
+    // Push the args on the stack.
+    while(ptr < end) {
+        *ptr++ = *args++;
+    }
+
+    return risa_vm_invoke_directly(vm, base, callee, argc);
+}
+
+static RisaValue risa_vm_invoke_directly(RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc) {
     if(RISA_IS_DENSE(callee)) {
         switch(RISA_AS_DENSE(callee)->type) {
             case RISA_DVAL_FUNCTION: {
                 if(!risa_vm_call_function(vm, base, callee, argc, true))
                     return RISA_NULL_VALUE;
 
-                goto _vm_invoke_run;
+                goto _vm_invoke_directly_run;
             }
             case RISA_DVAL_CLOSURE: {
                 if(!risa_vm_call_closure(vm, base, callee, argc, true))
                     return RISA_NULL_VALUE;
 
-            _vm_invoke_run:
+            _vm_invoke_directly_run:
 
                 if(risa_vm_run(vm) == RISA_VM_STATUS_ERROR)
                     return RISA_NULL_VALUE;

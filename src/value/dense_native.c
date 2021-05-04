@@ -18,3 +18,7 @@ RisaValue risa_dense_native_value(RisaNativeFunction function) {
 RisaValue risa_dense_native_get_arg(RisaValue* args, uint8_t index) {
     return args[index];
 }
+
+RisaValue* risa_dense_native_get_base(RisaValue* args, uint8_t argc) {
+    return args + argc;
+}

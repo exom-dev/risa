@@ -72,6 +72,7 @@ RISA_API void             risa_vm_free                     (RisaVM* vm);
 RISA_API RisaVMStatus     risa_vm_execute                  (RisaVM* vm);
 RISA_API RisaVMStatus     risa_vm_run                      (RisaVM* vm);
 RISA_API RisaValue        risa_vm_invoke                   (RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, ...);
+RISA_API RisaValue        risa_vm_invoke_args              (RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, RisaValue* args);
 
 RISA_API void             risa_vm_register_string          (RisaVM* vm, RisaDenseString* string);
 RISA_API void             risa_vm_register_dense           (RisaVM* vm, RisaDenseValue* dense);

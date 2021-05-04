@@ -118,5 +118,6 @@ RISA_API RisaDenseClosure*  risa_dense_closure_create      (RisaDenseFunction* f
 RISA_API RisaDenseNative*   risa_dense_native_create       (RisaNativeFunction function);
 RISA_API RisaValue          risa_dense_native_value        (RisaNativeFunction function);
 RISA_API RisaValue          risa_dense_native_get_arg      (RisaValue* args, uint8_t index);
+RISA_API RisaValue*         risa_dense_native_get_base     (RisaValue* args, uint8_t argc);
 
 #endif
