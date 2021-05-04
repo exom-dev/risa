@@ -426,7 +426,7 @@ static void risa_assembler_assemble_function_data(RisaAssembler* assembler) {
     int64_t argc = 0;
 
     if(assembler->parser->current.type == RISA_ASM_TOKEN_INT) {
-        if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &argc) || argc < 0 || argc > RISA_TODLR_REGISTER_COUNT) {
+        if(!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &argc) || argc < 0 || argc > RISA_TODLR_REGISTER_COUNT) {
             risa_asm_parser_error_at_current(assembler->parser, "Argument count out of range (0-250)");
             return;
         }
@@ -1235,7 +1235,7 @@ static void risa_assembler_emit_word(RisaAssembler* assembler, uint16_t word) {
 static uint8_t risa_assembler_read_reg(RisaAssembler* assembler) {
     int64_t num;
 
-    if (!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > (RISA_TODLR_REGISTER_COUNT - 1)) {
+    if (!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > (RISA_TODLR_REGISTER_COUNT - 1)) {
         risa_asm_parser_error_at_current(assembler->parser, "Number is not a valid register (0-249)");
         return RISA_TODLR_REGISTER_NULL;
     }
@@ -1246,7 +1246,7 @@ static uint8_t risa_assembler_read_reg(RisaAssembler* assembler) {
 static uint16_t risa_assembler_read_const(RisaAssembler* assembler) {
     int64_t num;
 
-    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT16_MAX) {
+    if(!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT16_MAX) {
         risa_asm_parser_error_at_current(assembler->parser, "Number is not a valid constant (0-65535)");
         return UINT16_MAX;
     }
@@ -1275,7 +1275,7 @@ static uint16_t risa_assembler_read_byte(RisaAssembler* assembler) {
 
     int64_t num;
 
-    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
+    if(!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
         risa_asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'byte'");
         return UINT16_MAX;
     }
@@ -1304,7 +1304,7 @@ static uint16_t risa_assembler_read_int(RisaAssembler* assembler) {
 
     int64_t num;
 
-    if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
+    if(!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
         risa_asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'int'");
         return UINT16_MAX;
     }
@@ -1496,7 +1496,7 @@ static int64_t risa_assembler_read_number(RisaAssembler* assembler) {
     if(assembler->parser->current.type == RISA_ASM_TOKEN_INT) {
         int64_t num;
 
-        if (!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
+        if (!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num)) {
             risa_asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'int'");
             return INT64_MAX;
         }
@@ -1507,7 +1507,7 @@ static int64_t risa_assembler_read_number(RisaAssembler* assembler) {
     if(assembler->parser->current.type == RISA_ASM_TOKEN_BYTE){
         int64_t num;
 
-        if(!risa_lib_charlib_strntol(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
+        if(!risa_lib_charlib_strntoll(assembler->parser->current.start, assembler->parser->current.size, 10, &num) || num > UINT8_MAX) {
             risa_asm_parser_error_at_current(assembler->parser, "Number is invalid for type 'byte'");
             return INT64_MAX;
         }

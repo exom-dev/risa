@@ -30,7 +30,7 @@ RISA_API_HIDDEN char* risa_lib_charlib_strndup      (const char* src, size_t siz
 
 RISA_API_HIDDEN bool risa_lib_charlib_strtod        (const char* src, double* dest);
 RISA_API_HIDDEN bool risa_lib_charlib_strntod       (const char* src, uint32_t size, double* dest);
-RISA_API_HIDDEN bool risa_lib_charlib_strtol        (const char* src, int base, int64_t* dest); // TODO: write a strtol function that also determines the base (0x, 0b, ...)
-RISA_API_HIDDEN bool risa_lib_charlib_strntol       (const char* src, uint32_t size, int base, int64_t* dest);
+RISA_API_HIDDEN bool risa_lib_charlib_strtoll       (const char* src, int base, int64_t* dest); // TODO: write a strtol function that also determines the base (0x, 0b, ...)
+RISA_API_HIDDEN bool risa_lib_charlib_strntoll      (const char* src, uint32_t size, int base, int64_t* dest);
 
 #endif

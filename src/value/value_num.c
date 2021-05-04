@@ -30,7 +30,7 @@ static RisaValue value_num_from_string(char* str, uint32_t length) {
 
     int64_t num;
 
-    if (!risa_lib_charlib_strtol(str + offset, base, &num)) {
+    if (!risa_lib_charlib_strtoll(str + offset, base, &num)) {
         return RISA_NULL_VALUE;
     }
 

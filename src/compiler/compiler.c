@@ -267,7 +267,7 @@ static void risa_compiler_compile_byte(RisaCompiler* compiler, bool allowAssignm
 
         int64_t num;
 
-        if (!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num) || num > UINT8_MAX) {
+        if (!risa_lib_charlib_strntoll(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num) || num > UINT8_MAX) {
             risa_parser_error_at_previous(compiler->parser, "Number is invalid for type 'byte'");
             return;
         }
@@ -302,7 +302,7 @@ static void risa_compiler_compile_int(RisaCompiler* compiler, bool allowAssignme
 
         int64_t num;
 
-        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
+        if(!risa_lib_charlib_strntoll(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
             risa_parser_error_at_previous(compiler->parser, "Number is invalid for type 'int'");
             return;
         }
@@ -1430,7 +1430,7 @@ static void risa_compiler_compile_continue_statement(RisaCompiler* compiler) {
 
         int64_t num;
 
-        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
+        if(!risa_lib_charlib_strntoll(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
             risa_parser_error_at_previous(compiler->parser, "Number is invalid for type 'int'");
             return;
         }
@@ -1479,7 +1479,7 @@ static void risa_compiler_compile_break_statement(RisaCompiler* compiler) {
 
         int64_t num;
 
-        if(!risa_lib_charlib_strntol(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
+        if(!risa_lib_charlib_strntoll(compiler->parser->previous.start, compiler->parser->previous.size, 10, &num)) {
             risa_parser_error_at_previous(compiler->parser, "Number is too large for type 'int'");
             return;
         }

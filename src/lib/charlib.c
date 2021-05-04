@@ -142,9 +142,11 @@ char* risa_lib_charlib_strndup(const char* src, size_t size) {
 
 bool risa_lib_charlib_strtod(const char* src, double* dest) {
     char* end;
+    errno = 0;
+
     *dest = strtod(src, &end);
 
-    return (errno != ERANGE && *end == '\0');
+    return (errno == 0 && *end == '\0');
 }
 
 RISA_API_HIDDEN bool risa_lib_charlib_strntod(const char* src, uint32_t size, double* dest) {
@@ -160,20 +162,22 @@ RISA_API_HIDDEN bool risa_lib_charlib_strntod(const char* src, uint32_t size, do
     return success;
 }
 
-RISA_API_HIDDEN bool risa_lib_charlib_strtol(const char* src, int base, int64_t* dest) {
+RISA_API_HIDDEN bool risa_lib_charlib_strtoll(const char* src, int base, int64_t* dest) {
     char* end;
-    *dest = strtol(src, &end, base);
+    errno = 0;
 
-    return (errno != ERANGE && *end == '\0');
+    *dest = strtoll(src, &end, base);
+
+    return (errno == 0 && *end == '\0');
 }
 
-RISA_API_HIDDEN bool risa_lib_charlib_strntol(const char* src, uint32_t size, int base, int64_t* dest) {
+RISA_API_HIDDEN bool risa_lib_charlib_strntoll(const char* src, uint32_t size, int base, int64_t* dest) {
     char* temp = RISA_MEM_ALLOC(sizeof(char) * (size + 1));
     memcpy(temp, src, size);
 
     temp[size] = '\0';
 
-    bool success = risa_lib_charlib_strtol(temp, base, dest);
+    bool success = risa_lib_charlib_strtoll(temp, base, dest);
 
     RISA_MEM_FREE(temp);
 
