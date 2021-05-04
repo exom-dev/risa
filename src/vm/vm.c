@@ -100,6 +100,10 @@ RisaIO* risa_vm_get_io(RisaVM* vm) {
     return &vm->io;
 }
 
+RisaValue risa_vm_get_acc(RisaVM* vm) {
+    return vm->acc;
+}
+
 RisaVMStatus risa_vm_execute(RisaVM* vm) {
     return risa_vm_run(vm);
 }
