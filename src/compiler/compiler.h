@@ -143,6 +143,8 @@ typedef struct {
 
 RISA_API RisaCompiler*      risa_compiler_create        ();
 RISA_API void               risa_compiler_init          (RisaCompiler* compiler);
+RISA_API void               risa_compiler_target        (RisaCompiler* compiler, void* vm); // Avoid importing the VM in the header.
+RISA_API void               risa_compiler_load_strings  (RisaCompiler* compiler, RisaMap* strings);
 RISA_API RisaIO*            risa_compiler_get_io        (RisaCompiler* compiler);
 RISA_API RisaDenseFunction* risa_compiler_get_function  (RisaCompiler* compiler);
 RISA_API RisaMap*           risa_compiler_get_strings   (RisaCompiler* compiler);

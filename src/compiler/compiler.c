@@ -6,6 +6,8 @@
 #include "../asm/assembler.h"
 #include "../lib/charlib.h"
 
+#include "../vm/vm.h"
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -199,6 +201,17 @@ void risa_compiler_init(RisaCompiler* compiler) {
     compiler->leapCount = 0;
 
     compiler->scopeDepth = 0;
+}
+
+void risa_compiler_target(RisaCompiler* compiler, void* vm) {
+    risa_compiler_load_strings(compiler, &((RisaVM*) vm)->strings);
+
+    compiler->options = ((RisaVM*) vm)->options;
+}
+
+void risa_compiler_load_strings(RisaCompiler* compiler, RisaMap* strings) {
+    risa_map_delete(&compiler->strings);
+    compiler->strings = *strings;
 }
 
 RisaIO* risa_compiler_get_io(RisaCompiler* compiler) {

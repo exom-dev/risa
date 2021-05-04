@@ -18,7 +18,9 @@ void risa_map_init(RisaMap* map) {
 }
 
 void risa_map_delete(RisaMap* map) {
-    RISA_MEM_FREE(map->entries);
+    if(map->entries != NULL)
+        RISA_MEM_FREE(map->entries);
+
     risa_map_init(map);
 }
 

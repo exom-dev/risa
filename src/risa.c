@@ -35,10 +35,9 @@ RisaExecuteStatus risa_execute_function(RisaVM* vm, RisaDenseFunction* function)
 
 RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
     RisaCompiler compiler;
-    risa_compiler_init(&compiler);
 
-    compiler.strings = vm->strings;
-    compiler.options = vm->options;
+    risa_compiler_init(&compiler);
+    risa_compiler_target(&compiler, vm);
 
     if(risa_compile_string(&compiler, str) == RISA_COMPILE_ERROR) {
         //risa_compiler_delete(&compiler);
@@ -48,7 +47,7 @@ RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
         return RISA_INTERPRET_COMPILE_ERROR;
     }
 
-    risa_vm_load_strings(vm, &compiler.strings);
+    risa_vm_load_compiler_data(vm, &compiler);
 
     /*for(uint32_t i = 0; i < compiler.strings.capacity; ++i) {
         RisaDenseString* string = compiler.strings.entries[i].key;

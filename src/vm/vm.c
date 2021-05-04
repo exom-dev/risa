@@ -6,6 +6,7 @@
 #include "../io/log.h"
 #include "../value/dense.h"
 #include "../asm/disassembler.h"
+#include "../compiler/compiler.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
     fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.bytecode], ##__VA_ARGS__ )
@@ -38,6 +39,7 @@ void risa_vm_init(RisaVM* vm) {
 
     vm->frameCount = 0;
     vm->values = NULL;
+    vm->acc = RISA_NULL_VALUE;
     vm->options.replMode = false; // TODO: Split compiler and vm options into separate structs.
     vm->heapSize = 0;
     vm->heapThreshold = RISA_VM_HEAP_INITIAL_THRESHOLD;
@@ -82,18 +84,28 @@ void risa_vm_clean(RisaVM* vm) {
     risa_gc_run(vm);
 }
 
-void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
-    risa_vm_clean(vm);
+void risa_vm_load_compiler_data(RisaVM* vm, void* compiler) {
+    risa_vm_load_strings(vm, &((RisaCompiler*) compiler)->strings);
+}
 
+void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
     vm->frames[0] = risa_vm_frame_from_function(vm, NULL, function, true);
-    vm->frameCount = 1;
-    vm->stackTop += 250;
 
     risa_vm_register_dense(vm, (RisaDenseValue*) function);
+
+    if(vm->frameCount > 1)
+        risa_vm_clean(vm);
+
+    vm->frameCount = 1;
+    vm->stackTop += 250;
 }
 
 void risa_vm_load_strings(RisaVM* vm, RisaMap* strings) {
     vm->strings = *strings;
+}
+
+RisaMap* risa_vm_get_strings(RisaVM* vm) {
+    return &vm->strings;
 }
 
 RisaIO* risa_vm_get_io(RisaVM* vm) {
@@ -102,6 +114,10 @@ RisaIO* risa_vm_get_io(RisaVM* vm) {
 
 RisaValue risa_vm_get_acc(RisaVM* vm) {
     return vm->acc;
+}
+
+void risa_vm_set_repl_mode(RisaVM* vm, bool mode) {
+    vm->options.replMode = mode;
 }
 
 RisaVMStatus risa_vm_execute(RisaVM* vm) {
