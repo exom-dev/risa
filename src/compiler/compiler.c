@@ -2851,11 +2851,12 @@ static uint16_t risa_compiler_declare_variable(RisaCompiler* compiler) {
 }
 
 static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
-    return compiler->last.isConst && !compiler->last.fromBranched;
+    // isConst, CNST, and not from branched.
+    // Note: when isConst is true, the last instruction is not always CNST (e.g. it can be UPVAL, when closing a function with CLSR).
+    return compiler->last.isConst && compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] == RISA_OP_CNST && !compiler->last.fromBranched;
 }
 
 static void risa_compiler_optimize_last_cnst(RisaCompiler* compiler) {
-    // Do not optimize if the last CNST is part of a branch (e.g. ternary).
     if(risa_compiler_can_optimize_last_cnst(compiler)) {
         risa_compiler_register_free(compiler);
         compiler->last.reg = compiler->function->cluster.bytecode[compiler->function->cluster.size - 2];
