@@ -9,7 +9,7 @@ static RisaValue risa_std_string_begins_with (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_string_ends_with   (void*, uint8_t, RisaValue*);
 
 void risa_std_register_string(RisaVM* vm) {
-    #define STD_STRING_ENTRY(name, fn)           RISA_STRINGIFY_DIRECTLY(name), sizeof(RISA_STRINGIFY_DIRECTLY(name)) - 1, risa_std_string_##fn
+    #define STD_STRING_ENTRY(name, fn) RISA_STRINGIFY_DIRECTLY(name), sizeof(RISA_STRINGIFY_DIRECTLY(name)) - 1, risa_std_string_##fn
 
     risa_vm_global_set_native(vm, STD_STRING_ENTRY(substr, substr));
     risa_vm_global_set_native(vm, STD_STRING_ENTRY(toUpper, to_upper));

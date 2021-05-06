@@ -78,11 +78,12 @@ bool risa_map_erase(RisaMap* map, RisaDenseStringPtr key) {
     return true;
 }
 
-void risa_map_copy(RisaMap* map, RisaMap* from) {
-    for(uint32_t i = 0; i < from->capacity; ++i) {
-        RisaMapEntry* entry = &from->entries[i];
+void risa_map_copy(RisaMap* dest, RisaMap* src) {
+    for(uint32_t i = 0; i < src->capacity; ++i) {
+        RisaMapEntry* entry = &src->entries[i];
+
         if(entry->key != NULL)
-            risa_map_set(map, entry->key, entry->value);
+            risa_map_set(dest, entry->key, entry->value);
     }
 }
 
@@ -164,11 +165,12 @@ static void risa_map_adjust_capacity(RisaMap* map) {
 
         map->count = 0;
         for(uint32_t i = 0; i < map->capacity; ++i) {
-            RisaMapEntry *entry = &map->entries[i];
-            if (entry->key == NULL)
+            RisaMapEntry* entry = &map->entries[i];
+
+            if(entry->key == NULL)
                 continue;
 
-            RisaMapEntry *dest = risa_map_find_bucket(entries, capacity, entry->key);
+            RisaMapEntry* dest = risa_map_find_bucket(entries, capacity, entry->key);
             dest->key = entry->key;
             dest->value = entry->value;
 
