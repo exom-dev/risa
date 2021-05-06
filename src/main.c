@@ -37,6 +37,7 @@ RisaVM create_vm() {
 
     risa_std_register_core(&vm);
     risa_std_register_io(&vm);
+    risa_std_register_string(&vm);
     risa_std_register_debug(&vm);
 
     //risa_vm_global_set_native(&vm, "print", 5, print);

@@ -28,8 +28,8 @@ void risa_map_delete(RisaMap* map) {
 uint32_t risa_map_hash(const char* chars, uint32_t length) {
     uint32_t hash = 2166136261u;
 
-    for (uint32_t i = 0; i < length; i++) {
-        hash ^= chars[i];
+    for (uint64_t i = 0; i < length; i++) {
+        hash ^= chars[(uint32_t) i];
         hash *= 16777619;
     }
 
