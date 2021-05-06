@@ -133,7 +133,7 @@ static RisaValue risa_std_string_begins_with(void* vm, uint8_t argc, RisaValue* 
 
 static RisaValue risa_std_string_ends_with(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 2 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING)
-       || !risa_value_is_dense_of_type(args[1], RISA_DVAL_STRING))
+                || !risa_value_is_dense_of_type(args[1], RISA_DVAL_STRING))
         return RISA_NULL_VALUE;
 
     RisaDenseString* str = RISA_AS_STRING(args[0]);
