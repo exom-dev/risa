@@ -733,9 +733,11 @@ static void risa_compiler_compile_array(RisaCompiler* compiler, bool allowAssign
             if (compiler->last.isNew)
                 risa_compiler_register_free(compiler);
 
+            bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
             risa_compiler_optimize_last_cnst(compiler);
 
-            #define L_TYPE (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK)
+            #define L_TYPE (isOptimized * RISA_TODLR_TYPE_LEFT_MASK)
 
             risa_compiler_emit_byte(compiler, RISA_OP_PARR | L_TYPE);
             risa_compiler_emit_byte(compiler, reg);
@@ -845,9 +847,11 @@ static void risa_compiler_compile_object(RisaCompiler* compiler, bool allowAssig
             if(compiler->last.isNew)
                 risa_compiler_register_free(compiler);
 
+            bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
             risa_compiler_optimize_last_cnst(compiler);
 
-            #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK))
+            #define LR_TYPES ((isConst * RISA_TODLR_TYPE_LEFT_MASK) | (isOptimized * RISA_TODLR_TYPE_RIGHT_MASK))
 
             risa_compiler_emit_byte(compiler, RISA_OP_SET | LR_TYPES);//HERE2
             risa_compiler_emit_byte(compiler, reg);
@@ -1016,6 +1020,8 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
     if(compiler->last.isNew)
         risa_compiler_register_free(compiler);
 
+    bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
     risa_compiler_optimize_last_cnst(compiler);
 
     // TODO: check if this ^^^^^ is a perfect replacement.
@@ -1025,7 +1031,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
         cluster->size -= 4;
     }*/
 
-    #define L_TYPE (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK)
+    #define L_TYPE (isOptimized * RISA_TODLR_TYPE_LEFT_MASK)
 
     risa_compiler_emit_byte(compiler, RISA_OP_DGLOB | L_TYPE);
     risa_compiler_emit_byte(compiler, index);
@@ -1054,6 +1060,8 @@ static void risa_compiler_compile_function_declaration(RisaCompiler* compiler) {
     if(compiler->scopeDepth > 0)
         return;
 
+    bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
     risa_compiler_optimize_last_cnst(compiler);
 
     // TODO: Check if this ^^^^^^ is a good replacement.
@@ -1063,12 +1071,12 @@ static void risa_compiler_compile_function_declaration(RisaCompiler* compiler) {
         cluster->size -= 4;
     }*/
 
-    if(!risa_compiler_can_optimize_last_cnst(compiler))
+    if(!isOptimized)
         compiler->last.reg = compiler->regIndex - 1;
 
     risa_compiler_register_free(compiler);
 
-    #define L_TYPE (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK)
+    #define L_TYPE (isOptimized * RISA_TODLR_TYPE_LEFT_MASK)
 
     risa_compiler_emit_byte(compiler, RISA_OP_DGLOB | L_TYPE);
     risa_compiler_emit_byte(compiler, (uint8_t) index);
@@ -1741,10 +1749,12 @@ static void risa_compiler_compile_dot(RisaCompiler* compiler, bool allowAssignme
         risa_parser_advance(compiler->parser);
         risa_compiler_compile_expression(compiler);
 
+        bool isRightOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
         // TODO: Test this for all cases.
         risa_compiler_optimize_last_cnst(compiler);
 
-        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (isRightOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
         risa_compiler_emit_byte(compiler, RISA_OP_SET | LR_TYPES);
         risa_compiler_emit_byte(compiler, leftReg);
@@ -2002,6 +2012,8 @@ static void risa_compiler_compile_accessor(RisaCompiler* compiler, bool allowAss
 
     risa_parser_consume(compiler->parser, RISA_TOKEN_RIGHT_BRACKET, "Expected ']' after expression");
 
+    bool isRightOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
     risa_compiler_optimize_last_cnst(compiler);
 
     if(allowAssignment && (compiler->parser->current.type == RISA_TOKEN_EQUAL)) {
@@ -2013,15 +2025,16 @@ static void risa_compiler_compile_accessor(RisaCompiler* compiler, bool allowAss
         uint8_t rightReg = compiler->last.reg;
         bool isRightConst = compiler->last.isConst;
         bool isRightNew = compiler->last.isNew;
-        bool isRightOptimized = risa_compiler_can_optimize_last_cnst(compiler);
 
         risa_parser_advance(compiler->parser);
         risa_compiler_compile_expression(compiler);
 
+        bool isExpressionOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
         // TODO: Test this for all cases.
         risa_compiler_optimize_last_cnst(compiler);
 
-        #define LR_TYPES (isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (isExpressionOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
         risa_compiler_emit_byte(compiler, RISA_OP_SET | LR_TYPES);
         risa_compiler_emit_byte(compiler, leftReg);
@@ -2057,7 +2070,7 @@ static void risa_compiler_compile_accessor(RisaCompiler* compiler, bool allowAss
             destReg = compiler->regIndex - 1;
         }
 
-        #define R_TYPE (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define R_TYPE (isRightOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
         risa_compiler_emit_byte(compiler, isLength ? RISA_OP_LEN : RISA_OP_GET | R_TYPE);
         risa_compiler_emit_byte(compiler, destReg);
@@ -2175,11 +2188,13 @@ static void risa_compiler_compile_binary(RisaCompiler* compiler, bool allowAssig
     const RisaOperatorRule* rule = &OPERATOR_RULES[operatorType];
     risa_compiler_compile_expression_precedence(compiler, (RisaOperatorPrecedence) (rule->precedence + 1));
 
+    bool isRightOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
     risa_compiler_optimize_last_cnst(compiler);
 
     // The GT and GTE instructions are simulated with reversed LT and LTE. Therefore, switch the operands and use the REV def.
-    #define LR_TYPES ((isLeftOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK))
-    #define LR_TYPES_REV ((risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_LEFT_MASK) | (isLeftOptimized * RISA_TODLR_TYPE_RIGHT_MASK))
+    #define LR_TYPES ((isLeftOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (isRightOptimized * RISA_TODLR_TYPE_RIGHT_MASK))
+    #define LR_TYPES_REV ((isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (isLeftOptimized * RISA_TODLR_TYPE_RIGHT_MASK))
 
     switch(operatorType) {
         case RISA_TOKEN_PLUS:
@@ -2311,9 +2326,11 @@ static void risa_compiler_compile_equal_op(RisaCompiler* compiler, bool allowAss
 
     risa_compiler_compile_expression(compiler);
 
+    bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+
     risa_compiler_optimize_last_cnst(compiler);
 
-    #define R_TYPE (risa_compiler_can_optimize_last_cnst(compiler) * RISA_TODLR_TYPE_RIGHT_MASK)
+    #define R_TYPE (isOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
     switch(operator) {
         case RISA_TOKEN_PLUS_EQUAL:
@@ -2851,9 +2868,12 @@ static uint16_t risa_compiler_declare_variable(RisaCompiler* compiler) {
 }
 
 static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
-    // isConst, CNST, and not from branched.
+    // isConst, has at least one instruction in the cluster, the instruction is CNST, and not from branched.
     // Note: when isConst is true, the last instruction is not always CNST (e.g. it can be UPVAL, when closing a function with CLSR).
-    return compiler->last.isConst && compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] == RISA_OP_CNST && !compiler->last.fromBranched;
+    return compiler->last.isConst
+        && compiler->function->cluster.size >= 4
+        && compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] == RISA_OP_CNST
+        && !compiler->last.fromBranched;
 }
 
 static void risa_compiler_optimize_last_cnst(RisaCompiler* compiler) {

@@ -41,8 +41,6 @@ RisaVM create_vm() {
     risa_std_register_reflect(&vm);
     risa_std_register_debug(&vm);
 
-    //risa_vm_global_set_native(&vm, "print", 5, print);
-
     return vm;
 }
 
@@ -84,6 +82,7 @@ void run_repl(RisaIO io) {
 
         if(status == RISA_INTERPRET_OK && vm.acc.type != RISA_VAL_NULL)
             risa_value_print(&vm.io, vm.acc);
+
         RISA_OUT(io, "\n");
     }
 }
