@@ -1,21 +1,24 @@
 #include "std.h"
 #include "../value/value.h"
 #include "../def/macro.h"
+#include "../mem/gc.h"
 
 static RisaValue risa_std_debug_type          (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_acc        (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_heap_size  (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_stack_size (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_debug_vm_gc         (void*, uint8_t, RisaValue*);
 
 static RisaValue risa_std_debug_type_internal (RisaVM*, RisaValue);
 
 void risa_std_register_debug(RisaVM* vm) {
     #define STD_DEBUG_OBJ_ENTRY(name, fn) , RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, risa_dense_native_value(risa_std_debug_##fn)
 
-    RisaDenseObject* objVm = risa_dense_object_create_under(vm, 3
+    RisaDenseObject* objVm = risa_dense_object_create_under(vm, 4
                                                             STD_DEBUG_OBJ_ENTRY(acc, vm_acc)
                                                             STD_DEBUG_OBJ_ENTRY(heapSize, vm_heap_size)
-                                                            STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size));
+                                                            STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size)
+                                                            STD_DEBUG_OBJ_ENTRY(gc, vm_gc));
 
     RisaDenseObject* obj = risa_dense_object_create_under(vm, 2,
                                                           "vm", sizeof("vm") - 1, RISA_DENSE_VALUE((RisaDenseValue *) objVm)
@@ -48,6 +51,12 @@ static RisaValue risa_std_debug_vm_heap_size(void* vm, uint8_t argc, RisaValue* 
 
 static RisaValue risa_std_debug_vm_stack_size(void* vm, uint8_t argc, RisaValue* args) {
     return (RISA_INT_VALUE((uint64_t) (RISA_VM_STACK_SIZE * sizeof(RisaValue))));
+}
+
+static RisaValue risa_std_debug_vm_gc(void* vm, uint8_t argc, RisaValue* args) {
+    risa_gc_run((RisaVM*) vm);
+
+    return RISA_NULL_VALUE;
 }
 
 static RisaValue risa_std_debug_type_internal(RisaVM* vm, RisaValue val) {
