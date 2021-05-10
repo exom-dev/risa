@@ -82,7 +82,7 @@ static RisaValue risa_std_string_to_upper(void* vm, uint8_t argc, RisaValue* arg
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* result = risa_dense_string_prepare(str->chars, str->length);
 
-    for(uint64_t i = 0; i < result->length; ++i) {
+    for(uint32_t i = 0; i < result->length; ++i) {
         if(result->chars[i] >= 'a' && result->chars[i] <= 'z')
             result->chars[i] = result->chars[i] - 32;
     }
@@ -99,7 +99,7 @@ static RisaValue risa_std_string_to_lower(void* vm, uint8_t argc, RisaValue* arg
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* result = risa_dense_string_prepare(str->chars, str->length);
 
-    for(uint64_t i = 0; i < result->length; ++i) {
+    for(uint32_t i = 0; i < result->length; ++i) {
         if(result->chars[i] >= 'A' && result->chars[i] <= 'Z')
             result->chars[i] = result->chars[i] + 32;
     }
@@ -123,7 +123,7 @@ static RisaValue risa_std_string_begins_with(void* vm, uint8_t argc, RisaValue* 
     if(substr->length == str->length)
         return RISA_BOOL_VALUE(substr == str);
 
-    for(uint64_t i = 0; i < substr->length; ++i) {
+    for(uint32_t i = 0; i < substr->length; ++i) {
         if(substr->chars[i] != str->chars[i])
             return RISA_BOOL_VALUE(false);
     }
