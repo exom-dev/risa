@@ -10,6 +10,7 @@ static RisaValue risa_std_math_max   (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_floor (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_ceil  (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_abs   (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_math_map   (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_sin   (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_cos   (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_math_tan   (void*, uint8_t, RisaValue*);
@@ -30,12 +31,13 @@ void risa_std_register_math(RisaVM* vm) {
     #define STD_MATH_OBJ_FN_ENTRY(name) , RISA_STRINGIFY_DIRECTLY(name), sizeof(RISA_STRINGIFY_DIRECTLY(name)) - 1, risa_dense_native_value(risa_std_math_##name)
     #define STD_MATH_OBJ_FLOAT_ENTRY(name, val) , RISA_STRINGIFY_DIRECTLY(name), sizeof(RISA_STRINGIFY_DIRECTLY(name)) - 1, val
 
-    RisaDenseObject* objMath = risa_dense_object_create_under(vm, 20
+    RisaDenseObject* objMath = risa_dense_object_create_under(vm, 21
                                                               STD_MATH_OBJ_FN_ENTRY(min)
                                                               STD_MATH_OBJ_FN_ENTRY(max)
                                                               STD_MATH_OBJ_FN_ENTRY(floor)
                                                               STD_MATH_OBJ_FN_ENTRY(ceil)
                                                               STD_MATH_OBJ_FN_ENTRY(abs)
+                                                              STD_MATH_OBJ_FN_ENTRY(map)
                                                               STD_MATH_OBJ_FN_ENTRY(sin)
                                                               STD_MATH_OBJ_FN_ENTRY(cos)
                                                               STD_MATH_OBJ_FN_ENTRY(tan)
@@ -342,6 +344,28 @@ static RisaValue risa_std_math_abs(void* vm, uint8_t argc, RisaValue* args) {
 
     if(errno != 0)
         return RISA_NULL_VALUE;
+    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+}
+
+static RisaValue risa_std_math_map(void* vm, uint8_t argc, RisaValue* args) {
+    if(argc < 5)
+        return RISA_NULL_VALUE;
+
+    for(uint8_t i = 0; i < 5; ++i)
+        if(!risa_value_is_num(args[i]))
+            return RISA_NULL_VALUE;
+
+    double x = risa_value_as_float(args[0]);
+    double start = risa_value_as_float(args[1]);
+    double end = risa_value_as_float(args[2]);
+    double newStart = risa_value_as_float(args[3]);
+    double newEnd = risa_value_as_float(args[4]);
+
+    if(end == start)
+        return RISA_NULL_VALUE;
+
+    double result = ((x - start) / (end - start)) * (newEnd - newStart) + newStart;
+
     return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
 }
 
