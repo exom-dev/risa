@@ -12,7 +12,7 @@ static RisaValue risa_std_core_to_float  (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_core_to_bool   (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_core_foreach   (void*, uint8_t, RisaValue*);
 
-static RisaValue risa_std_core_typeof_internal (RisaVM*, RisaValue);
+static RisaValue risa_std_core_internal_typeof (RisaVM*, RisaValue);
 
 void risa_std_register_core(RisaVM* vm) {
     #define STD_CORE_ENTRY(name, fn) RISA_STRINGIFY(name), sizeof(RISA_STRINGIFY(name)) - 1, risa_std_core_##fn
@@ -32,7 +32,7 @@ static RisaValue risa_std_core_typeof(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
         return RISA_NULL_VALUE;
 
-    return risa_std_core_typeof_internal((RisaVM *) vm, args[0]);
+    return risa_std_core_internal_typeof((RisaVM *) vm, args[0]);
 }
 
 static RisaValue risa_std_core_to_string(void* vm, uint8_t argc, RisaValue* args) {
@@ -202,7 +202,7 @@ _std_core_foreach_work: ;
     return RISA_NULL_VALUE;
 }
 
-static RisaValue risa_std_core_typeof_internal(RisaVM* vm, RisaValue val) {
+static RisaValue risa_std_core_internal_typeof(RisaVM* vm, RisaValue val) {
     #define TYPEOF_RESULT(type) RISA_DENSE_VALUE(risa_vm_string_create(vm, type, sizeof(type) - 1))
 
     switch(val.type) {
@@ -217,7 +217,7 @@ static RisaValue risa_std_core_typeof_internal(RisaVM* vm, RisaValue val) {
                 case RISA_DVAL_STRING:   return TYPEOF_RESULT("string");
                 case RISA_DVAL_ARRAY:    return TYPEOF_RESULT("array");
                 case RISA_DVAL_OBJECT:   return TYPEOF_RESULT("object");
-                case RISA_DVAL_UPVALUE:  return risa_std_core_typeof_internal(vm, *((RisaDenseUpvalue *) (RISA_AS_DENSE(val)))->ref);
+                case RISA_DVAL_UPVALUE:  return risa_std_core_internal_typeof(vm, *((RisaDenseUpvalue *) (RISA_AS_DENSE(val)))->ref);
                 case RISA_DVAL_FUNCTION:
                 case RISA_DVAL_CLOSURE:
                 case RISA_DVAL_NATIVE:   return TYPEOF_RESULT("function");

@@ -223,3 +223,16 @@ RisaValue risa_value_from_float(double value) {
 RisaValue risa_value_from_dense(RisaDenseValue* value) {
     return RISA_DENSE_VALUE(value);
 }
+
+double risa_value_as_float(RisaValue value) {
+    switch(value.type) {
+        case RISA_VAL_BYTE:
+            return (double) RISA_AS_BYTE(value);
+        case RISA_VAL_INT:
+            return (double) RISA_AS_INT(value);
+        case RISA_VAL_FLOAT:
+            return RISA_AS_FLOAT(value);
+        default:
+            return RISA_VALUE_FLOAT_MIN;
+    }
+}

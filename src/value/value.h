@@ -87,6 +87,10 @@ RISA_API RisaValue risa_value_from_int   (uint64_t value);
 RISA_API RisaValue risa_value_from_float (double value);
 RISA_API RisaValue risa_value_from_dense (RisaDenseValue* value);
 
+RISA_API double risa_value_as_float      (RisaValue value);
+
+RISA_API bool risa_value_is_num          (RisaValue value);
+
 // Length is required for the first 2 in order to determine the base (prefixes 0x, 0b, ..., may or may not exist)
 RISA_API RisaValue risa_value_int_from_string   (char* str, uint32_t length);
 RISA_API RisaValue risa_value_byte_from_string  (char* str, uint32_t length);

@@ -37,6 +37,17 @@ static RisaValue value_num_from_string(char* str, uint32_t length) {
     return RISA_INT_VALUE(num);
 }
 
+bool risa_value_is_num(RisaValue value) {
+    switch(value.type) {
+        case RISA_VAL_BYTE:
+        case RISA_VAL_INT:
+        case RISA_VAL_FLOAT:
+            return true;
+        default:
+            return false;
+    }
+}
+
 RisaValue risa_value_int_from_string(char* str, uint32_t length) {
     return value_num_from_string(str, length);
 }
