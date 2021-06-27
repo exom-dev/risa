@@ -1543,6 +1543,8 @@ static void risa_compiler_compile_inline_asm_statement(RisaCompiler* compiler) {
         risa_parser_advance(compiler->parser);
     }
 
+    uint32_t indexBackup = compiler->parser->current.index;
+
     RisaAssembler iasm;
 
     risa_assembler_init(&iasm);
@@ -1555,14 +1557,14 @@ static void risa_compiler_compile_inline_asm_statement(RisaCompiler* compiler) {
     iasm.cluster = compiler->function->cluster;
     iasm.strings = &super->strings;
 
-    risa_assembler_assemble(&iasm, compiler->parser->lexer.start, isBlock ? "}" : "\r\n");
+    risa_assembler_assemble(&iasm, compiler->parser->lexer.start, isBlock ? "}" : "\r\n;");
 
     compiler->function->cluster = iasm.cluster;
     compiler->function->cluster.constants = iasm.cluster.constants;
 
     compiler->parser->lexer.start = iasm.parser->lexer.start;
     compiler->parser->lexer.current = iasm.parser->lexer.current;
-    compiler->parser->lexer.index += iasm.parser->lexer.index - 1;
+    compiler->parser->lexer.index = indexBackup + iasm.parser->lexer.index;
 
     if(iasm.parser->error)
         compiler->parser->error = true;
@@ -1572,7 +1574,8 @@ static void risa_compiler_compile_inline_asm_statement(RisaCompiler* compiler) {
     risa_assembler_delete(&iasm);
 
     if(isBlock)
-        risa_parser_consume(compiler->parser, RISA_TOKEN_RIGHT_BRACE, "Expected '}' after inline asm statement");
+        risa_parser_consume(compiler->parser, RISA_TOKEN_RIGHT_BRACE, "Expected '}' after inline asm block statement");
+    else risa_parser_consume(compiler->parser, RISA_TOKEN_SEMICOLON, "Expected ';' after inline asm statement");
 }
 
 static void risa_compiler_compile_disasm_statement(RisaCompiler* compiler) {
