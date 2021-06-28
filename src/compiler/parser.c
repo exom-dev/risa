@@ -59,18 +59,12 @@ void risa_parser_error_at(RisaParser* parser, RisaToken token, const char* msg) 
 
     if(token.type == RISA_TOKEN_EOF)
         RISA_ERROR(parser->io, "at EOF: %s\n", msg);
-    else if(token.type != RISA_TOKEN_ERROR) {
+    else {
         size_t ln;
         size_t col;
 
         risa_lib_mem_lncol(parser->lexer.source, (size_t) token.index, &ln, &col);
         RISA_ERROR(parser->io, "at %zu:%zu in script: %s\n", ln, col, msg);
-    } else {
-        size_t ln;
-        size_t col;
-
-        risa_lib_mem_lncol(parser->lexer.source, (size_t) token.index, &ln, &col);
-        RISA_ERROR(parser->io, "at %zu:%zu in script: Invalid token\n", ln, col);
     }
 
     parser->error = true;

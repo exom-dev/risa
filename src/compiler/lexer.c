@@ -123,7 +123,13 @@ RisaToken risa_lexer_next(RisaLexer* lexer) {
                                                 MATCH('=') ? RISA_TOKEN_PIPE_EQUAL : RISA_TOKEN_PIPE);
         case '"': return risa_lexer_next_string(lexer);
 
-        default: return risa_lexer_error(lexer, "Unexpected character");
+        default:
+            // The index needs to point to the character, so decrement the index;
+            --lexer->index;
+            RisaToken errorToken = risa_lexer_error(lexer, "Unexpected character");
+            ++lexer->index;
+
+            return errorToken;
     }
 }
 

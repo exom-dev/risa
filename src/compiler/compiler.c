@@ -626,6 +626,7 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
             }/*compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] = index;*/
         } else {
             if(set == RISA_OP_SGLOB) {
+                bool lastConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
                 risa_compiler_optimize_last_cnst(compiler);
 
                 // TODO: check if this works for all cases
@@ -635,7 +636,7 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
                     cluster->size -= 4;
                 }*/
 
-                #define L_TYPE ((risa_compiler_can_optimize_last_cnst(compiler)) * RISA_TODLR_TYPE_LEFT_MASK)
+                #define L_TYPE ((lastConstOptimized) * RISA_TODLR_TYPE_LEFT_MASK)
 
                 set |= L_TYPE;
 
@@ -2873,6 +2874,7 @@ static uint16_t risa_compiler_declare_variable(RisaCompiler* compiler) {
 static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
     // isConst, has at least one instruction in the cluster, the instruction is CNST, and not from branched.
     // Note: when isConst is true, the last instruction is not always CNST (e.g. it can be UPVAL, when closing a function with CLSR).
+
     return compiler->last.isConst
         && compiler->function->cluster.size >= 4
         && compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] == RISA_OP_CNST
@@ -2880,6 +2882,7 @@ static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
 }
 
 static void risa_compiler_optimize_last_cnst(RisaCompiler* compiler) {
+    // TODO: make this function return bool (true if optimized, false otherwise).
     if(risa_compiler_can_optimize_last_cnst(compiler)) {
         risa_compiler_register_free(compiler);
         compiler->last.reg = compiler->function->cluster.bytecode[compiler->function->cluster.size - 2];

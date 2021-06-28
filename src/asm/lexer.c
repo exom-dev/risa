@@ -154,7 +154,13 @@ RisaAsmToken risa_asm_lexer_next(RisaAsmLexer* lexer) {
         case '{': return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_LEFT_BRACE);
         case '}': return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_RIGHT_BRACE);
         case '"': return risa_asm_lexer_next_string(lexer);
-        default: return risa_asm_lexer_error(lexer, "Unexpected character");
+        default:
+            // The index needs to point to the character, so decrement the index;
+            --lexer->index;
+            RisaAsmToken errorToken = risa_asm_lexer_error(lexer, "Unexpected character");
+            ++lexer->index;
+
+            return errorToken;
     }
 }
 

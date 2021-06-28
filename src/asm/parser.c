@@ -59,7 +59,7 @@ void risa_asm_parser_error_at(RisaAsmParser* parser, RisaAsmToken token, const c
 
     if(token.type == RISA_ASM_TOKEN_EOF)
         RISA_ERROR(parser->io, "at EOF: %s\n", msg);
-    else if(token.type != RISA_ASM_TOKEN_ERROR) {
+    else {
         size_t ln;
         size_t col;
 
