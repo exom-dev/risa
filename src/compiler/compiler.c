@@ -2877,7 +2877,7 @@ static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
 
     return compiler->last.isConst
         && compiler->function->cluster.size >= 4
-        && compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] == RISA_OP_CNST
+        && compiler->function->cluster.bytecode[compiler->function->cluster.size - 4] == RISA_OP_CNST
         && !compiler->last.fromBranched;
 }
 
