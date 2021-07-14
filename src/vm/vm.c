@@ -246,6 +246,7 @@ RisaVMStatus risa_vm_run(RisaVM* vm) {
                 break;
             }
             case RISA_OP_CLSR: {
+                // TODO: Check if right reg is a dense function, in case someone injects bytecode with a CLSR instruction.
                 RisaDenseFunction* function = (RisaDenseFunction*) RISA_AS_DENSE(LEFT_REG);
                 RisaDenseClosure* closure = risa_dense_closure_create(function, RIGHT);
 

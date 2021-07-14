@@ -2873,7 +2873,8 @@ static uint16_t risa_compiler_declare_variable(RisaCompiler* compiler) {
 
 static bool risa_compiler_can_optimize_last_cnst(RisaCompiler* compiler) {
     // isConst, has at least one instruction in the cluster, the instruction is CNST, and not from branched.
-    // Note: when isConst is true, the last instruction is not always CNST (e.g. it can be UPVAL, when closing a function with CLSR).
+    // Note: when isConst is true, the last instruction is not always CNST (e.g. it can be UPVAL, when closing a function with CLSR)
+    // because CLSR generates a closure which is constant.
 
     return compiler->last.isConst
         && compiler->function->cluster.size >= 4

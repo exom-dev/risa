@@ -254,7 +254,7 @@ static RisaAsmToken risa_asm_lexer_next_identifier(RisaAsmLexer* lexer) {
                     case 'u': case 'U': return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 6, "nction", RISA_ASM_TOKEN_FUNCTION_TYPE));
                     default: return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
                 }
-            } else return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 4, "alse", RISA_ASM_TOKEN_FALSE));
+            } else return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
         case 'g': case 'G':
             if(lexer->current - lexer->start > 1) {
                 switch(lexer->start[1]) {
@@ -318,7 +318,14 @@ static RisaAsmToken risa_asm_lexer_next_identifier(RisaAsmLexer* lexer) {
                     default: return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
                 }
             } else return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
-        case 't': case 'T': return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 3, "est", RISA_ASM_TOKEN_TEST));
+        case 't': case 'T':
+            if(lexer->current - lexer->start > 1) {
+                switch(lexer->start[1]) {
+                    case 'e': case 'E': return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 2, "st", RISA_ASM_TOKEN_TEST));
+                    case 'r': case 'R': return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(2, 2, "ue", RISA_ASM_TOKEN_TRUE));
+                    default: return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
+                }
+            } else return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
         case 'u': case 'U': return risa_asm_lexer_emit(lexer, CLASSIFY_INSENS(1, 4, "pval", RISA_ASM_TOKEN_UPVAL));
         default: return risa_asm_lexer_emit(lexer, RISA_ASM_TOKEN_IDENTIFIER);
     }
