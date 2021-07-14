@@ -5,6 +5,7 @@
 #include "asm/disassembler.h"
 #include "io/log.h"
 #include "def/def.h"
+#include "mem/gc.h"
 
 RisaCompileStatus risa_compile_string(RisaCompiler* compiler, const char* str) {
     if(risa_compiler_compile(compiler, str) == RISA_COMPILER_STATUS_ERROR)
@@ -56,15 +57,12 @@ RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
             risa_vm_register_string(vm, string);
     }*/
 
-    if(risa_execute_function(vm, compiler.function) == RISA_EXECUTE_ERROR) {
-        //risa_compiler_delete(&compiler);
-        //risa_vm_delete(vm);
+    RisaExecuteStatus status = risa_execute_function(vm, compiler.function);
 
-        return RISA_INTERPRET_EXECUTE_ERROR;
-    }
+    risa_vm_clean(vm);
 
     //risa_compiler_delete(&compiler);
     //risa_vm_delete(&vm);
 
-    return RISA_INTERPRET_OK;
+    return (status == RISA_EXECUTE_ERROR) ? RISA_INTERPRET_EXECUTE_ERROR : RISA_INTERPRET_OK;
 }

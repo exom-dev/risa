@@ -10,15 +10,23 @@ file(GLOB SOURCE_FILES
         src/**/*.h
         src/**/*.c)
 
+string(TOLOWER "${CMAKE_BUILD_TYPE}" PROJECT_BUILD_TYPE)
+
+if(PROJECT_BUILD_TYPE MATCHES release OR PROJECT_BUILD_TYPE MATCHES minsizerel)
+    message("-- RISA: Compiling for RELEASE")
+else()
+    message("-- RISA: Compiling for DEBUG")
+endif()
+
 if(TARGET_TYPE STREQUAL "library")
-    message("Target Type: library")
+    message("-- RISA: Target Type: library")
 
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     add_definitions(-DTARGET_TYPE_LIBRARY)
     list(FILTER SOURCE_FILES EXCLUDE REGEX ".*/src/main.c$")
     add_library(risa SHARED ${SOURCE_FILES})
 else()
-    message("Target Type: executable")
+    message("-- RISA: Target Type: executable")
     add_executable(risa ${SOURCE_FILES})
 endif()
 

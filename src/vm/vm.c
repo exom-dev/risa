@@ -7,9 +7,20 @@
 #include "../value/dense.h"
 #include "../asm/disassembler.h"
 #include "../compiler/compiler.h"
+#include "../def/macro.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
     fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.bytecode], ##__VA_ARGS__ )
+
+#ifdef DEBUG
+    #define VM_DEBUG_CHECK_STACK                                                          \
+        do {                                                                              \
+            if(vm->stack + RISA_VM_STACK_SIZE < vm->stackTop || vm->stackTop < vm->stack) \
+                RISA_PANIC("VM stack top out of bounds");                                 \
+        } while(false)
+#else
+    #define VM_DEBUG_CHECK_STACK
+#endif
 
 static bool risa_vm_call_register (RisaVM*, uint8_t, uint8_t);
 static bool risa_vm_call_value    (RisaVM*, RisaValue*, RisaValue, uint8_t, bool);
@@ -95,6 +106,7 @@ void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
 
     if(vm->frameCount > 1)
         risa_vm_clean(vm);
+    else risa_vm_stack_reset(vm);
 
     vm->frameCount = 1;
     vm->stackTop += 250;
@@ -151,6 +163,8 @@ RisaVMStatus risa_vm_run(RisaVM* vm) {
     #define BSKIP(count)    (frame->ip -= count)
 
     while(1) {
+        VM_DEBUG_CHECK_STACK;
+
         uint8_t instruction = NEXT_BYTE();
         uint8_t types = instruction & RISA_TODLR_TYPE_MASK;
         instruction &= RISA_TODLR_INSTRUCTION_MASK;
