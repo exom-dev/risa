@@ -17,7 +17,7 @@ RISA_API void              risa_disassembler_init   (RisaDisassembler* disassemb
 RISA_API void              risa_disassembler_load   (RisaDisassembler* disassembler, RisaCluster* chunk);
 RISA_API void              risa_disassembler_run    (RisaDisassembler* disassembler);
 RISA_API void              risa_disassembler_reset  (RisaDisassembler* disassembler);
-RISA_API void              risa_disassembler_delete  (RisaDisassembler* disassembler);
+RISA_API void              risa_disassembler_delete (RisaDisassembler* disassembler);
 RISA_API void              risa_disassembler_free   (RisaDisassembler* disassembler);
 
 #endif

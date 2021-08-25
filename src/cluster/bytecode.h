@@ -5,7 +5,7 @@
 #include "../def/types.h"
 #include "../def/macro.h"
 
-#define RISA_TODLR_INSTRUCTION_SIZE 4
+#define RISA_TODLR_INSTRUCTION_SIZE  4
 #define RISA_TODLR_INSTRUCTION_MASK  0x3F
 
 #define RISA_TODLR_TYPE_MASK         0xC0
@@ -74,7 +74,7 @@ typedef enum {
     RISA_OP_DIS
 } RisaOpCode;
 
-// Wether or not an operation has a direct register destination (e.g. MOV, ADD, ...)
+// Whether or not an operation has a direct register destination (e.g. MOV, ADD, ...)
 // Used for optimizations (e.g. to move the result directly in a local variable without an extra MOV)
 RISA_API bool risa_op_has_direct_dest (RisaOpCode op);
 

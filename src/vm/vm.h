@@ -57,6 +57,7 @@ typedef struct {
 
 typedef enum {
     RISA_VM_STATUS_OK,
+    RISA_VM_STATUS_HALTED,
     RISA_VM_STATUS_ERROR
 } RisaVMStatus;
 
@@ -74,7 +75,7 @@ RISA_API void             risa_vm_delete                   (RisaVM* vm);
 RISA_API void             risa_vm_free                     (RisaVM* vm);
 
 RISA_API RisaVMStatus     risa_vm_execute                  (RisaVM* vm);
-RISA_API RisaVMStatus     risa_vm_run                      (RisaVM* vm);
+RISA_API RisaVMStatus     risa_vm_run                      (RisaVM* vm, uint32_t maxInstr);
 RISA_API RisaValue        risa_vm_invoke                   (RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, ...);
 RISA_API RisaValue        risa_vm_invoke_args              (RisaVM* vm, RisaValue* base, RisaValue callee, uint8_t argc, RisaValue* args);
 

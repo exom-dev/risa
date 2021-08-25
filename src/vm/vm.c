@@ -133,11 +133,12 @@ void risa_vm_set_repl_mode(RisaVM* vm, bool mode) {
 }
 
 RisaVMStatus risa_vm_execute(RisaVM* vm) {
-    return risa_vm_run(vm);
+    return risa_vm_run(vm, 0);
 }
 
-RisaVMStatus risa_vm_run(RisaVM* vm) {
+RisaVMStatus risa_vm_run(RisaVM* vm, uint32_t maxInstr) {
     RisaCallFrame* frame = &vm->frames[vm->frameCount - 1];
+    bool forever = maxInstr == 0;
 
     #define NEXT_BYTE()     (*frame->ip++)
     #define NEXT_CONSTANT() (VM_FRAME_FUNCTION(*frame)->cluster.constants.values[NEXT_BYTE()])
@@ -1266,7 +1267,17 @@ RisaVMStatus risa_vm_run(RisaVM* vm) {
                 return RISA_VM_STATUS_ERROR;
             }
         }
+
+        if(forever) {
+            continue;
+        }
+
+        if(--maxInstr == 0) {
+            break;
+        }
     }
+
+    return RISA_VM_STATUS_HALTED;
 
     #undef BSKIP
     #undef SKIP
@@ -1349,7 +1360,7 @@ static RisaValue risa_vm_invoke_directly(RisaVM* vm, RisaValue* base, RisaValue 
 
             _vm_invoke_directly_run:
 
-                if(risa_vm_run(vm) == RISA_VM_STATUS_ERROR)
+                if(risa_vm_run(vm, 0) == RISA_VM_STATUS_ERROR)
                     return RISA_NULL_VALUE;
 
                 return *base;
