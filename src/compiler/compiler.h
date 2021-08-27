@@ -60,14 +60,15 @@ typedef struct RisaCompiler {
     RisaOptions options;
 
     struct {
-        uint8_t reg;          // In which register the last value resides.
-        bool isNew;           // Whether or not the last value resides in a newly-reserved register.
-        bool isConst;         // Whether or not the last value is a constant.
-        bool isLvalue;        // Whether or not the last value is a lvalue.
-        bool isPostIncrement; // Whether or not the last value is the result of a post increment operation.
-        bool isEqualOp;       // Whether or not the last value is the result of an equality operation.
-        bool canOverwrite;    // Whether or not the last value register can be overwritten. Used to prevent an object property from overwriting a global value in a temporary reg.
-        bool fromBranched;    // Whether or not the last value comes from one of multiple branches (e.g. ternary). Required to disable bad CNST optimizations.
+        uint8_t reg;               // Either the register in which the last value resides, or the index of the last value constant.
+        bool isConstOptimized; // Whether or not reg represents the index of a constant (if false, reg is a register).
+        bool isNew;                // Whether or not the last value resides in a newly-reserved register.
+        bool isConst;              // Whether or not the last value is a constant (most likely comes from a CNST instruction).
+        bool isLvalue;             // Whether or not the last value is an lvalue.
+        bool isPostIncrement;      // Whether or not the last value is the result of a post increment operation.
+        bool isEqualOp;            // Whether or not the last value is the result of an equality operation.
+        bool canOverwrite;         // Whether or not the last value register can be overwritten. Used to prevent an object property from overwriting a global value in a temporary reg.
+        bool fromBranched;         // Whether or not the last value comes from one of multiple branches (e.g. ternary). Required to disable bad CNST optimizations.
 
         struct {
             enum LValType {

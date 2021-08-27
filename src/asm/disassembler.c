@@ -10,6 +10,7 @@
 static void risa_disassembler_disassemble_unary_instruction         (RisaDisassembler*, const char*, uint8_t);
 static void risa_disassembler_disassemble_binary_instruction        (RisaDisassembler*, const char*, uint8_t);
 static void risa_disassembler_disassemble_byte_instruction          (RisaDisassembler*, const char*);
+static void risa_disassembler_disassemble_acc_instruction           (RisaDisassembler*, const char*, uint8_t);
 static void risa_disassembler_disassemble_word_instruction          (RisaDisassembler*, const char*);
 static void risa_disassembler_disassemble_constant_instruction      (RisaDisassembler*, const char*);
 static void risa_disassembler_disassemble_mov_instruction           (RisaDisassembler*, const char*);
@@ -242,7 +243,7 @@ static void risa_disassembler_disassembler_process_instruction(RisaDisassembler*
             risa_disassembler_disassemble_byte_instruction(disassembler, "RET");
             break;
         case RISA_OP_ACC:
-            risa_disassembler_disassemble_byte_instruction(disassembler, "ACC");
+            risa_disassembler_disassemble_acc_instruction(disassembler, "ACC", types);
             break;
         case RISA_OP_DIS:
             risa_disassembler_disassemble_byte_instruction(disassembler, "DIS");
@@ -273,6 +274,12 @@ void risa_disassembler_disassemble_unary_instruction(RisaDisassembler* disassemb
 void risa_disassembler_disassemble_byte_instruction(RisaDisassembler* disassembler, const char* name) {
     RISA_OUT(disassembler->io, "%-16s %4d\n", name,
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1]);
+}
+
+void risa_disassembler_disassemble_acc_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
+    RISA_OUT(disassembler->io, "%-16s %4d%c\n", name,
+             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+             (types & RISA_TODLR_TYPE_LEFT_MASK ? 'c' : 'r'));
 }
 
 void risa_disassembler_disassemble_word_instruction(RisaDisassembler* disassembler, const char* name) {

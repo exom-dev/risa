@@ -1,6 +1,11 @@
 #include "vm.h"
 
+#include <stdio.h>
 void risa_vm_stack_reset(RisaVM* vm) {
+    for(size_t i = 0; i < sizeof(vm->stack) / sizeof(vm->stack[0]); ++i) {
+        vm->stack[i] = RISA_NULL_VALUE;
+    }
+
     vm->frameCount = 0;
     vm->stackTop = vm->stack;
     vm->upvalues = NULL;

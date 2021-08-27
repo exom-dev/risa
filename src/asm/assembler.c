@@ -18,23 +18,23 @@ static void risa_assembler_assemble_string_data               (RisaAssembler*);
 static void risa_assembler_assemble_bool_data                 (RisaAssembler*);
 static void risa_assembler_assemble_function_data             (RisaAssembler*);
 
-// The functions with the '_instruction' suffix are shared between multiple instructions.
-static void risa_assembler_assemble_global_instruction        (RisaAssembler*); // Takes a string and a register/constant.
-static void risa_assembler_assemble_cnst_instruction          (RisaAssembler*); // Takes a register and a constant.
-static void risa_assembler_assemble_copy_instruction          (RisaAssembler*); // Takes two registers.
-static void risa_assembler_assemble_producer_instruction      (RisaAssembler*); // Takes a register.
-static void risa_assembler_assemble_unary_instruction         (RisaAssembler*); // Takes a register and a register/constant.
-static void risa_assembler_assemble_binary_instruction        (RisaAssembler*); // Takes a register and two registers/constants.
-static void risa_assembler_assemble_jump_instruction          (RisaAssembler*); // Takes a number, either byte or word.
-static void risa_assembler_assemble_consumer_instruction      (RisaAssembler*); // Takes a register or RISA_TODLR_REGISTER_NULL.
-static void risa_assembler_assemble_call                      (RisaAssembler*); // Takes a register and a number.
-static void risa_assembler_assemble_gglob                     (RisaAssembler*); // Takes a register and a string.
-static void risa_assembler_assemble_upval                     (RisaAssembler*); // Takes two numbers and a bool.
-static void risa_assembler_assemble_gupval                    (RisaAssembler*); // Takes a register and two numbers.
-static void risa_assembler_assemble_supval                    (RisaAssembler*); // Takes two numbers and a register.
-static void risa_assembler_assemble_clsr                      (RisaAssembler*); // Takes two registers and a number.
-static void risa_assembler_assemble_get                       (RisaAssembler*); // Takes two registers and a register/constant.
-static void risa_assembler_assemble_set                       (RisaAssembler*); // Takes a register and two registers/constants.
+static void risa_assembler_assemble_global   (RisaAssembler*); // Takes a string and a register/constant.
+static void risa_assembler_assemble_cnst     (RisaAssembler*); // Takes a register and a constant.
+static void risa_assembler_assemble_copy     (RisaAssembler*); // Takes two registers.
+static void risa_assembler_assemble_producer (RisaAssembler*); // Takes a register.
+static void risa_assembler_assemble_acc      (RisaAssembler*); // Takes either a register or a constant.
+static void risa_assembler_assemble_unary    (RisaAssembler*); // Takes a register and a register/constant.
+static void risa_assembler_assemble_binary   (RisaAssembler*); // Takes a register and two registers/constants.
+static void risa_assembler_assemble_jump     (RisaAssembler*); // Takes a number, either byte or word.
+static void risa_assembler_assemble_consumer (RisaAssembler*); // Takes a register or RISA_TODLR_REGISTER_NULL.
+static void risa_assembler_assemble_call     (RisaAssembler*); // Takes a register and a number.
+static void risa_assembler_assemble_gglob    (RisaAssembler*); // Takes a register and a string.
+static void risa_assembler_assemble_upval    (RisaAssembler*); // Takes two numbers and a bool.
+static void risa_assembler_assemble_gupval   (RisaAssembler*); // Takes a register and two numbers.
+static void risa_assembler_assemble_supval   (RisaAssembler*); // Takes two numbers and a register.
+static void risa_assembler_assemble_clsr     (RisaAssembler*); // Takes two registers and a number.
+static void risa_assembler_assemble_get      (RisaAssembler*); // Takes two registers and a register/constant.
+static void risa_assembler_assemble_set      (RisaAssembler*); // Takes a register and two registers/constants.
 
 static void risa_assembler_emit_byte                          (RisaAssembler*, uint8_t);
 static void risa_assembler_emit_word                          (RisaAssembler*, uint16_t);
@@ -194,16 +194,16 @@ static void risa_assembler_assemble_code_line(RisaAssembler* assembler) {
     switch(assembler->parser->current.type) {
         case RISA_ASM_TOKEN_CNST:
         case RISA_ASM_TOKEN_CNSTW:
-            risa_assembler_assemble_cnst_instruction(assembler);
+            risa_assembler_assemble_cnst(assembler);
             break;
         case RISA_ASM_TOKEN_MOV:
         case RISA_ASM_TOKEN_CLONE:
         case RISA_ASM_TOKEN_LEN:
-            risa_assembler_assemble_copy_instruction(assembler);
+            risa_assembler_assemble_copy(assembler);
             break;
         case RISA_ASM_TOKEN_DGLOB:
         case RISA_ASM_TOKEN_SGLOB:
-            risa_assembler_assemble_global_instruction(assembler);
+            risa_assembler_assemble_global(assembler);
             break;
         case RISA_ASM_TOKEN_GGLOB:
             risa_assembler_assemble_gglob(assembler);
@@ -231,19 +231,21 @@ static void risa_assembler_assemble_code_line(RisaAssembler* assembler) {
         case RISA_ASM_TOKEN_FALSE:
         case RISA_ASM_TOKEN_ARR:
         case RISA_ASM_TOKEN_OBJ:
-        case RISA_ASM_TOKEN_ACC:
         case RISA_ASM_TOKEN_INC:
         case RISA_ASM_TOKEN_DEC:
         case RISA_ASM_TOKEN_TEST:
         case RISA_ASM_TOKEN_NTEST:
         case RISA_ASM_TOKEN_CUPVAL:
-            risa_assembler_assemble_producer_instruction(assembler);
+            risa_assembler_assemble_producer(assembler);
+            break;
+        case RISA_ASM_TOKEN_ACC:
+            risa_assembler_assemble_acc(assembler);
             break;
         case RISA_ASM_TOKEN_NOT:
         case RISA_ASM_TOKEN_BNOT:
         case RISA_ASM_TOKEN_NEG:
         case RISA_ASM_TOKEN_PARR:
-            risa_assembler_assemble_unary_instruction(assembler);
+            risa_assembler_assemble_unary(assembler);
             break;
         case RISA_ASM_TOKEN_ADD:
         case RISA_ASM_TOKEN_SUB:
@@ -259,20 +261,20 @@ static void risa_assembler_assemble_code_line(RisaAssembler* assembler) {
         case RISA_ASM_TOKEN_BAND:
         case RISA_ASM_TOKEN_BXOR:
         case RISA_ASM_TOKEN_BOR:
-            risa_assembler_assemble_binary_instruction(assembler);
+            risa_assembler_assemble_binary(assembler);
             break;
         case RISA_ASM_TOKEN_JMP:
         case RISA_ASM_TOKEN_JMPW:
         case RISA_ASM_TOKEN_BJMP:
         case RISA_ASM_TOKEN_BJMPW:
-            risa_assembler_assemble_jump_instruction(assembler);
+            risa_assembler_assemble_jump(assembler);
             break;
         case RISA_ASM_TOKEN_CALL:
             risa_assembler_assemble_call(assembler);
             break;
         case RISA_ASM_TOKEN_RET:
         case RISA_ASM_TOKEN_DIS:
-            risa_assembler_assemble_consumer_instruction(assembler);
+            risa_assembler_assemble_consumer(assembler);
             break;
         default:
             risa_asm_parser_error_at_current(assembler->parser, "Expected instruction");
@@ -489,7 +491,7 @@ static void risa_assembler_assemble_function_data(RisaAssembler* assembler) {
             risa_asm_parser_error_at_current(assembler->parser, "Identifier already exists");
 }
 
-static void risa_assembler_assemble_global_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_global(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);
@@ -536,7 +538,7 @@ static void risa_assembler_assemble_global_instruction(RisaAssembler* assembler)
     risa_assembler_emit_byte(assembler, 0);
 }
 
-static void risa_assembler_assemble_cnst_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_cnst(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
     bool isWord = (op == RISA_OP_CNSTW);
 
@@ -581,7 +583,7 @@ static void risa_assembler_assemble_cnst_instruction(RisaAssembler* assembler) {
     }
 }
 
-static void risa_assembler_assemble_copy_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_copy(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);
@@ -616,7 +618,7 @@ static void risa_assembler_assemble_copy_instruction(RisaAssembler* assembler) {
     risa_assembler_emit_byte(assembler, 0);
 }
 
-static void risa_assembler_assemble_producer_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_producer(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);
@@ -639,7 +641,42 @@ static void risa_assembler_assemble_producer_instruction(RisaAssembler* assemble
     risa_assembler_emit_byte(assembler, 0);
 }
 
-static void risa_assembler_assemble_unary_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_acc(RisaAssembler* assembler) {
+    uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
+
+    risa_asm_parser_advance(assembler->parser);
+
+    uint8_t dest;
+
+    if(assembler->parser->current.type == RISA_ASM_TOKEN_REGISTER) {
+        dest = risa_assembler_read_reg(assembler);
+
+        if(assembler->parser->panic)
+            return;
+
+        risa_assembler_emit_byte(assembler, op);
+    } else {
+        dest = risa_assembler_read_any_const(assembler);
+
+        if(assembler->parser->panic)
+            return;
+
+        if(dest > UINT8_MAX) {
+            risa_asm_parser_error_at_current(assembler->parser, "Constant index is too large (0-255)");
+            return;
+        }
+
+        risa_assembler_emit_byte(assembler, op | RISA_TODLR_TYPE_LEFT_MASK);
+    }
+
+    risa_asm_parser_advance(assembler->parser);
+
+    risa_assembler_emit_byte(assembler, (uint8_t) dest);
+    risa_assembler_emit_byte(assembler, 0);
+    risa_assembler_emit_byte(assembler, 0);
+}
+
+static void risa_assembler_assemble_unary(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);
@@ -686,7 +723,7 @@ static void risa_assembler_assemble_unary_instruction(RisaAssembler* assembler) 
     risa_assembler_emit_byte(assembler, 0);
 }
 
-static void risa_assembler_assemble_binary_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_binary(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);
@@ -776,7 +813,7 @@ static void risa_assembler_assemble_binary_instruction(RisaAssembler* assembler)
     risa_assembler_emit_byte(assembler, (uint8_t) right);
 }
 
-static void risa_assembler_assemble_jump_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_jump(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
     bool isWord = (op == RISA_OP_JMPW || op == RISA_OP_BJMPW); // Word variation: 0-65535 instead of 0-255
 
@@ -813,7 +850,7 @@ static void risa_assembler_assemble_jump_instruction(RisaAssembler* assembler) {
     risa_assembler_emit_byte(assembler, 0);
 }
 
-static void risa_assembler_assemble_consumer_instruction(RisaAssembler* assembler) {
+static void risa_assembler_assemble_consumer(RisaAssembler* assembler) {
     uint8_t op = risa_asm_token_to_opcode(assembler->parser->current.type);
 
     risa_asm_parser_advance(assembler->parser);

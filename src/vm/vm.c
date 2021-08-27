@@ -91,7 +91,6 @@ void risa_vm_clean(RisaVM* vm) {
     }
 
     risa_vm_stack_reset(vm);
-
     risa_gc_run(vm);
 }
 
@@ -108,6 +107,7 @@ void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
         risa_vm_clean(vm);
     else risa_vm_stack_reset(vm);
 
+    vm->acc = RISA_NULL_VALUE;
     vm->frameCount = 1;
     vm->stackTop += 250;
 }
@@ -157,6 +157,7 @@ RisaVMStatus risa_vm_run(RisaVM* vm, uint32_t maxInstr) {
     #define LEFT_REG        (frame->regs[LEFT])
     #define RIGHT_REG       (frame->regs[RIGHT])
 
+    #define DEST_BY_TYPE    (types & RISA_TODLR_TYPE_LEFT_MASK ? DEST_CONST : DEST_REG)
     #define LEFT_BY_TYPE    (types & RISA_TODLR_TYPE_LEFT_MASK ? LEFT_CONST : LEFT_REG)
     #define RIGHT_BY_TYPE   (types & RISA_TODLR_TYPE_RIGHT_MASK ? RIGHT_CONST : RIGHT_REG)
 
@@ -1222,12 +1223,7 @@ RisaVMStatus risa_vm_run(RisaVM* vm, uint32_t maxInstr) {
                 break;
             }
             case RISA_OP_ACC: {
-                if(DEST > 249) {
-                    VM_RUNTIME_ERROR(vm, "Expected register");
-                    return RISA_VM_STATUS_ERROR;
-                }
-
-                vm->acc = DEST_REG;
+                vm->acc = DEST_BY_TYPE;
 
                 SKIP(3);
                 break;

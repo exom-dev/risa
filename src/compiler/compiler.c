@@ -181,6 +181,7 @@ void risa_compiler_init(RisaCompiler* compiler) {
     compiler->regIndex = 0;
     compiler->options.replMode = false;
     compiler->last.reg = 0;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = false;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -259,10 +260,15 @@ RisaCompilerStatus risa_compiler_compile(RisaCompiler* compiler, const char* str
         risa_compiler_compile_declaration(compiler);
 
         if(compiler->options.replMode) {
-            risa_compiler_emit_byte(compiler, RISA_OP_ACC);
+            // ACC is the only instruction that has a type for DEST, and it uses the left type flag for it.
+            #define D_TYPE (compiler->last.isConstOptimized * RISA_TODLR_TYPE_LEFT_MASK)
+
+            risa_compiler_emit_byte(compiler, RISA_OP_ACC |  D_TYPE);
             risa_compiler_emit_byte(compiler, compiler->last.reg);
             risa_compiler_emit_byte(compiler, 0);
             risa_compiler_emit_byte(compiler, 0);
+
+            #undef D_TYPE
         }
     }
 
@@ -289,6 +295,7 @@ static void risa_compiler_compile_byte(RisaCompiler* compiler, bool allowAssignm
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
@@ -297,6 +304,7 @@ static void risa_compiler_compile_byte(RisaCompiler* compiler, bool allowAssignm
         compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
@@ -324,6 +332,7 @@ static void risa_compiler_compile_int(RisaCompiler* compiler, bool allowAssignme
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
@@ -332,6 +341,7 @@ static void risa_compiler_compile_int(RisaCompiler* compiler, bool allowAssignme
         compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
@@ -359,6 +369,7 @@ static void risa_compiler_compile_float(RisaCompiler* compiler, bool allowAssign
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isPostIncrement = false;
@@ -366,6 +377,7 @@ static void risa_compiler_compile_float(RisaCompiler* compiler, bool allowAssign
         compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isPostIncrement = false;
@@ -463,6 +475,7 @@ static void risa_compiler_compile_string(RisaCompiler* compiler, bool allowAssig
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
@@ -471,6 +484,7 @@ static void risa_compiler_compile_string(RisaCompiler* compiler, bool allowAssig
         compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
@@ -507,6 +521,7 @@ static void risa_compiler_compile_literal(RisaCompiler* compiler, bool allowAssi
 
         compiler->last.reg = compiler->regIndex - 1;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, compiler->parser->previous };
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = true;
         compiler->last.isLvalue = false;
@@ -515,6 +530,7 @@ static void risa_compiler_compile_literal(RisaCompiler* compiler, bool allowAssi
         compiler->last.fromBranched = false;
     } else {
         compiler->last.reg = reg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = false;
         compiler->last.isConst = false;
         compiler->last.isLvalue = false;
@@ -626,7 +642,7 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
             }/*compiler->function->cluster.bytecode[compiler->function->cluster.size - 3] = index;*/
         } else {
             if(set == RISA_OP_SGLOB) {
-                bool lastConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+                compiler->last.isConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
                 risa_compiler_optimize_last_cnst(compiler);
 
                 // TODO: check if this works for all cases
@@ -636,7 +652,7 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
                     cluster->size -= 4;
                 }*/
 
-                #define L_TYPE ((lastConstOptimized) * RISA_TODLR_TYPE_LEFT_MASK)
+                #define L_TYPE ((compiler->last.isConstOptimized) * RISA_TODLR_TYPE_LEFT_MASK)
 
                 set |= L_TYPE;
 
@@ -654,7 +670,9 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
 
         //risa_compiler_register_free(compiler);
     } else {
-        uint8_t reg = risa_compiler_register_find(compiler, get == RISA_OP_MOV ? RISA_REG_LOCAL : (get == RISA_OP_GUPVAL ? RISA_REG_UPVAL : RISA_REG_GLOBAL), compiler->parser->previous);
+        uint8_t reg = risa_compiler_register_find(compiler, get == RISA_OP_MOV ? RISA_REG_LOCAL :
+                                                            (get == RISA_OP_GUPVAL ? RISA_REG_UPVAL : RISA_REG_GLOBAL),
+                                                  compiler->parser->previous);
 
         // Eliminate GGLOB after DGLOB
         if(reg == 251) {
@@ -679,7 +697,10 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
             }
 
             compiler->last.reg = compiler->regIndex - 1;
-            compiler->regs[compiler->last.reg] = (RisaRegInfo) {get == RISA_OP_MOV ? RISA_REG_LOCAL : (get == RISA_OP_GUPVAL ? RISA_REG_UPVAL : RISA_REG_GLOBAL), compiler->parser->previous };
+            compiler->regs[compiler->last.reg] = (RisaRegInfo) { get == RISA_OP_MOV ? RISA_REG_LOCAL : (
+                                                                     get == RISA_OP_GUPVAL ? RISA_REG_UPVAL :
+                                                                     RISA_REG_GLOBAL),
+                                                                 compiler->parser->previous };
             compiler->last.isNew = true;
         } else {
             compiler->last.reg = reg;
@@ -707,6 +728,8 @@ static void risa_compiler_compile_identifier(RisaCompiler* compiler, bool allowA
             default:
                 break;
         }
+
+        compiler->last.isConstOptimized = false;
     }
 
     compiler->last.isConst = false;
@@ -757,6 +780,7 @@ static void risa_compiler_compile_array(RisaCompiler* compiler, bool allowAssign
     risa_parser_consume(compiler->parser, RISA_TOKEN_RIGHT_BRACKET, "Expected ']' after array contents");
 
     compiler->last.reg = reg;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -871,6 +895,7 @@ static void risa_compiler_compile_object(RisaCompiler* compiler, bool allowAssig
     risa_parser_consume(compiler->parser, RISA_TOKEN_RIGHT_BRACE, "Expected '}' after object properties");
 
     compiler->last.reg = reg;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -1002,6 +1027,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
 
         compiler->last.reg = compiler->localCount - 1;
+        compiler->last.isConstOptimized = false;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_LOCAL, lastRegToken };
         compiler->last.isNew = true;
         compiler->last.isLvalue = false;
@@ -1021,7 +1047,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
     if(compiler->last.isNew)
         risa_compiler_register_free(compiler);
 
-    bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+    compiler->last.isConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
 
     risa_compiler_optimize_last_cnst(compiler);
 
@@ -1032,7 +1058,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
         cluster->size -= 4;
     }*/
 
-    #define L_TYPE (isOptimized * RISA_TODLR_TYPE_LEFT_MASK)
+    #define L_TYPE (compiler->last.isConstOptimized * RISA_TODLR_TYPE_LEFT_MASK)
 
     risa_compiler_emit_byte(compiler, RISA_OP_DGLOB | L_TYPE);
     risa_compiler_emit_byte(compiler, index);
@@ -1061,7 +1087,7 @@ static void risa_compiler_compile_function_declaration(RisaCompiler* compiler) {
     if(compiler->scopeDepth > 0)
         return;
 
-    bool isOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+    compiler->last.isConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
 
     risa_compiler_optimize_last_cnst(compiler);
 
@@ -1072,12 +1098,12 @@ static void risa_compiler_compile_function_declaration(RisaCompiler* compiler) {
         cluster->size -= 4;
     }*/
 
-    if(!isOptimized)
+    if(!compiler->last.isConstOptimized)
         compiler->last.reg = compiler->regIndex - 1;
 
     risa_compiler_register_free(compiler);
 
-    #define L_TYPE (isOptimized * RISA_TODLR_TYPE_LEFT_MASK)
+    #define L_TYPE (compiler->last.isConstOptimized * RISA_TODLR_TYPE_LEFT_MASK)
 
     risa_compiler_emit_byte(compiler, RISA_OP_DGLOB | L_TYPE);
     risa_compiler_emit_byte(compiler, (uint8_t) index);
@@ -1174,6 +1200,7 @@ static void risa_compiler_compile_function(RisaCompiler* compiler) {
         }
     }
 
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -1667,6 +1694,7 @@ static void risa_compiler_compile_call(RisaCompiler* compiler, bool allowAssignm
 
     compiler->last.reg = functionReg;
     compiler->regs[functionReg] = (RisaRegInfo) {RISA_REG_TEMP };
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -1699,6 +1727,7 @@ static void risa_compiler_compile_clone(RisaCompiler* compiler, bool allowAssign
 
     compiler->last.reg = destReg;
     compiler->regs[destReg] = (RisaRegInfo) {RISA_REG_TEMP };
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -1753,12 +1782,12 @@ static void risa_compiler_compile_dot(RisaCompiler* compiler, bool allowAssignme
         risa_parser_advance(compiler->parser);
         risa_compiler_compile_expression(compiler);
 
-        bool isRightOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+        compiler->last.isConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
 
         // TODO: Test this for all cases.
         risa_compiler_optimize_last_cnst(compiler);
 
-        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (isRightOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (identifierConst * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConstOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
         risa_compiler_emit_byte(compiler, RISA_OP_SET | LR_TYPES);
         risa_compiler_emit_byte(compiler, leftReg);
@@ -1832,6 +1861,7 @@ static void risa_compiler_compile_dot(RisaCompiler* compiler, bool allowAssignme
         else compiler->last.lvalMeta.propIndex.as.reg = compiler->last.reg;
 
         compiler->last.reg = destReg;
+        compiler->last.isConstOptimized = false;
         compiler->last.isNew = true;
         compiler->last.isConst = false;
         compiler->last.isLvalue = true;
@@ -1994,6 +2024,7 @@ static void risa_compiler_compile_lambda(RisaCompiler* compiler) {
 
     compiler->last.reg = compiler->regIndex - 1;
     compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_CONSTANT, {RISA_TOKEN_IDENTIFIER, "lambda", 6 } };
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = true;
     compiler->last.isLvalue = false;
@@ -2033,12 +2064,12 @@ static void risa_compiler_compile_accessor(RisaCompiler* compiler, bool allowAss
         risa_parser_advance(compiler->parser);
         risa_compiler_compile_expression(compiler);
 
-        bool isExpressionOptimized = risa_compiler_can_optimize_last_cnst(compiler);
+        compiler->last.isConstOptimized = risa_compiler_can_optimize_last_cnst(compiler);
 
         // TODO: Test this for all cases.
         risa_compiler_optimize_last_cnst(compiler);
 
-        #define LR_TYPES (isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (isExpressionOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
+        #define LR_TYPES (isRightOptimized * RISA_TODLR_TYPE_LEFT_MASK) | (compiler->last.isConstOptimized * RISA_TODLR_TYPE_RIGHT_MASK)
 
         risa_compiler_emit_byte(compiler, RISA_OP_SET | LR_TYPES);
         risa_compiler_emit_byte(compiler, leftReg);
@@ -2156,8 +2187,8 @@ static void risa_compiler_compile_unary(RisaCompiler* compiler, bool allowAssign
             return;
     }
 
-    compiler->last.isNew = true;
     compiler->last.reg = destReg;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -2276,6 +2307,7 @@ static void risa_compiler_compile_binary(RisaCompiler* compiler, bool allowAssig
 
     compiler->regs[destReg] = (RisaRegInfo) {RISA_REG_TEMP };
     compiler->last.reg = destReg;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -2376,6 +2408,7 @@ static void risa_compiler_compile_equal_op(RisaCompiler* compiler, bool allowAss
 
     #define L_TYPE (compiler->last.lvalMeta.propIndex.isConst * RISA_TODLR_TYPE_LEFT_MASK)
 
+    // TODO: propagations may need to set compiler->last.isConstOptimized
     switch(compiler->last.lvalMeta.type) {
         case LVAL_LOCAL_PROP:
             risa_compiler_emit_bytes(compiler, RISA_OP_SET | L_TYPE, compiler->last.lvalMeta.propOrigin, compiler->last.lvalMeta.propIndex.isConst ? (uint8_t) compiler->last.lvalMeta.propIndex.as.cnst
@@ -2412,6 +2445,7 @@ static void risa_compiler_compile_equal_op(RisaCompiler* compiler, bool allowAss
     #undef L_TYPE
 
     compiler->last.reg = destReg;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = isNew;
     compiler->last.isConst = isConst;
     compiler->last.isLvalue = isLvalue;
@@ -2490,6 +2524,7 @@ static void risa_compiler_compile_prefix(RisaCompiler* compiler, bool allowAssig
     #undef L_TYPE
 
     compiler->last.fromBranched = false;
+    compiler->last.isConstOptimized = false;
 
     /* Currently, this will give you 13:
      *
@@ -2571,6 +2606,7 @@ static void risa_compiler_compile_postfix(RisaCompiler* compiler, bool allowAssi
     #undef L_TYPE
 
     compiler->last.reg = compiler->regIndex - 1;
+    compiler->last.isConstOptimized = false;
     compiler->last.isNew = true;
     compiler->last.isConst = false;
     compiler->last.isLvalue = false;
@@ -2887,8 +2923,9 @@ static void risa_compiler_optimize_last_cnst(RisaCompiler* compiler) {
     if(risa_compiler_can_optimize_last_cnst(compiler)) {
         risa_compiler_register_free(compiler);
         compiler->last.reg = compiler->function->cluster.bytecode[compiler->function->cluster.size - 2];
-        compiler->function->cluster.size -= 4;
+        compiler->last.isConstOptimized = true;
         compiler->last.isNew = false;
+        compiler->function->cluster.size -= 4;
     }
 }
 
