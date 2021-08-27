@@ -3,7 +3,10 @@
 #include "../def/macro.h"
 #include "../mem/gc.h"
 
+#include <stdio.h>
+
 static RisaValue risa_std_debug_type          (void*, uint8_t, RisaValue*);
+static RisaValue risa_std_debug_addr          (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_acc        (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_heap_size  (void*, uint8_t, RisaValue*);
 static RisaValue risa_std_debug_vm_stack_size (void*, uint8_t, RisaValue*);
@@ -20,9 +23,10 @@ void risa_std_register_debug(RisaVM* vm) {
                                                             STD_DEBUG_OBJ_ENTRY(stackSize, vm_stack_size)
                                                             STD_DEBUG_OBJ_ENTRY(gc, vm_gc));
 
-    RisaDenseObject* obj = risa_dense_object_create_under(vm, 2,
+    RisaDenseObject* obj = risa_dense_object_create_under(vm, 3,
                                                           "vm", sizeof("vm") - 1, RISA_DENSE_VALUE((RisaDenseValue *) objVm)
-                                                          STD_DEBUG_OBJ_ENTRY(type, type));
+                                                          STD_DEBUG_OBJ_ENTRY(type, type)
+                                                          STD_DEBUG_OBJ_ENTRY(addr, addr));
 
     risa_vm_global_set(vm, "debug", sizeof("debug") - 1, RISA_DENSE_VALUE((RisaDenseValue *) obj));
 
@@ -32,6 +36,26 @@ void risa_std_register_debug(RisaVM* vm) {
 static RisaValue risa_std_debug_type(void* vm, uint8_t argc, RisaValue* args) {
     if(argc > 0) {
         return risa_std_debug_type_internal((RisaVM *) vm, args[0]);
+    }
+
+    return RISA_NULL_VALUE;
+}
+
+static RisaValue risa_std_debug_addr(void* vm, uint8_t argc, RisaValue* args) {
+    if(argc > 0) {
+        if(!RISA_IS_DENSE(args[0])) {
+            return RISA_NULL_VALUE;
+        }
+
+        size_t size = snprintf(NULL, 0, "%p", RISA_AS_DENSE(args[0]));
+        char* buffer = RISA_MEM_ALLOC(size + 1);
+
+        snprintf(buffer, size + 1, "%p", RISA_AS_DENSE(args[0]));
+
+        RisaValue addr = RISA_DENSE_VALUE(risa_vm_string_create(vm, buffer, size));
+        RISA_MEM_FREE(buffer);
+
+        return addr;
     }
 
     return RISA_NULL_VALUE;
