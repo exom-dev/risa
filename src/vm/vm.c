@@ -10,7 +10,7 @@
 #include "../def/macro.h"
 
 #define VM_RUNTIME_ERROR(vm, fmt, ...) \
-    fprintf(stderr, "[error] at index %u: " fmt "\n", VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.bytecode], ##__VA_ARGS__ )
+    RISA_ERROR(vm->io, "at index %u: " fmt, VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.indices[vm->frames[vm->frameCount - 1].ip - VM_FRAME_FUNCTION(vm->frames[vm->frameCount - 1])->cluster.bytecode], ##__VA_ARGS__)
 
 #ifdef DEBUG
     #define VM_DEBUG_CHECK_STACK                                                          \
