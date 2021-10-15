@@ -28,6 +28,10 @@ void risa_gc_run(RisaVM* vm) {
 
     gc_mark_map(&vm->globals);
 
+    if(RISA_IS_DENSE(vm->acc)) {
+        gc_mark_dense(RISA_AS_DENSE(vm->acc));
+    }
+
     for(uint32_t i = 0; i < vm->strings.capacity; ++i) {
         RisaMapEntry* entry = &vm->strings.entries[i];
 
