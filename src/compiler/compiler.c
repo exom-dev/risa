@@ -1854,11 +1854,13 @@ static void risa_compiler_compile_dot(RisaCompiler* compiler, bool allowAssignme
         }
 
         compiler->last.lvalMeta.propOrigin = leftReg;
-        compiler->last.lvalMeta.propIndex.isConst = compiler->last.isConst;
+        compiler->last.lvalMeta.propIndex.isConst = identifierConst;
 
-        if(compiler->last.isConst)
+        if(identifierConst) {
             compiler->last.lvalMeta.propIndex.as.cnst = compiler->last.reg;
-        else compiler->last.lvalMeta.propIndex.as.reg = compiler->last.reg;
+        } else {
+            compiler->last.lvalMeta.propIndex.as.reg = compiler->last.reg;
+        }
 
         compiler->last.reg = destReg;
         compiler->last.isConstOptimized = false;
