@@ -366,12 +366,10 @@ void risa_disassembler_disassemble_upvalue_close_instruction(RisaDisassembler* d
 }
 
 void risa_disassembler_disassemble_closure_instruction(RisaDisassembler* disassembler, const char* name) {
-    RISA_OUT(disassembler->io, "%-16s %4d %4d %4d   '", name,
+    RISA_OUT(disassembler->io, "%-16s %4d %4d %4d", name,
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3]);
-
-    risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2]]);
 
     RISA_OUT(disassembler->io, "'\n");
 }
