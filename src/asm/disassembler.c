@@ -386,11 +386,22 @@ void risa_disassembler_disassemble_array_length_instruction(RisaDisassembler* di
 }
 
 void risa_disassembler_disassemble_get_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {
-    RISA_OUT(disassembler->io, "%-16s %4d %4d %4d%c\n", name,
-             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
-             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
-             RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
-             (types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r'));
+    if(types & RISA_TODLR_TYPE_RIGHT_MASK) {
+        RISA_OUT(disassembler->io, "%-16s %4d %4d %4d%c '", name,
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
+                 (types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r'));
+
+        risa_value_print(&disassembler->io, RISA_DISASM_CLUSTER->constants.values[RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3]]);
+        RISA_OUT(disassembler->io, "'\n");
+    } else {
+        RISA_OUT(disassembler->io, "%-16s %4d %4d %4d%c\n", name,
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 1],
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
+                 RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3],
+                 (types & RISA_TODLR_TYPE_RIGHT_MASK ? 'c' : 'r'));
+    }
 }
 
 void risa_disassembler_disassemble_set_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {

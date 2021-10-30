@@ -99,13 +99,13 @@ void risa_vm_load_compiler_data(RisaVM* vm, void* compiler) {
 }
 
 void risa_vm_load_function(RisaVM* vm, RisaDenseFunction* function) {
-    vm->frames[0] = risa_vm_frame_from_function(vm, NULL, function, true);
-
-    risa_vm_register_dense(vm, (RisaDenseValue*) function);
-
     if(vm->frameCount > 1)
         risa_vm_clean(vm);
     else risa_vm_stack_reset(vm);
+
+    vm->frames[0] = risa_vm_frame_from_function(vm, NULL, function, true);
+
+    risa_vm_register_dense(vm, (RisaDenseValue*) function);
 
     vm->acc = RISA_NULL_VALUE;
     vm->frameCount = 1;
