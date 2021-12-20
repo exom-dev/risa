@@ -14,21 +14,21 @@
     } while(0)
 
 void run_repl(RisaIO io);
+void run_args(RisaIO io, int argc, char* argv[]);
 void run_file(RisaIO io, const char* path);
+void compile_file(RisaIO io, const char* input, const char* output);
 
 RisaVM create_vm();
 
 void print_info(RisaIO io);
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
     RisaIO io;
     risa_io_init(&io);
 
-    if(argc == 1)
+    if(argc == 1) {
         run_repl(io);
-    else if(argc == 2)
-        run_file(io, argv[1]);
-    else TERMINATE(io, 64, "Invalid arguments");
+    } else run_args(io, argc, argv);
 }
 
 RisaVM create_vm() {
@@ -88,6 +88,18 @@ void run_repl(RisaIO io) {
     }
 }
 
+void run_args(RisaIO io, int argc, char* argv[]) {
+    if(0 == strcmp(argv[1], "-c")) {
+        if(argc < 3) {
+            TERMINATE(io, 64, "Invalid arguments");
+        }
+
+        compile_file(io, argv[2], argv[3]);
+    } else {
+        run_file(io, argv[1]);
+    }
+}
+
 void run_file(RisaIO io, const char* path) {
     RisaVM vm = create_vm();
 
@@ -122,16 +134,64 @@ void run_file(RisaIO io, const char* path) {
         RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);
     #endif
 
-    if(status == RISA_INTERPRET_OK)
+    if(status == RISA_INTERPRET_OK) {
         exit(0);
-    if(status == RISA_INTERPRET_COMPILE_ERROR)
+    } if(status == RISA_INTERPRET_COMPILE_ERROR)
         exit(1);
     if(status == RISA_INTERPRET_EXECUTE_ERROR)
         exit(1);
 }
 
+void compile_file(RisaIO io, const char* input, const char* output) {
+    FILE* file = fopen(input, "rb");
+
+    if(file == NULL)
+        TERMINATE(io, 74, "Cannot open file '%s'\n", input);
+
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char* data = (char*) RISA_MEM_ALLOC(size + 1);
+
+    if(fread(data, sizeof(char), size, file) < size) {
+        fclose(file);
+        RISA_MEM_FREE(data);
+        TERMINATE(io, 74, "Cannot read file '%s'\n", input);
+    }
+
+    data[size] = '\0';
+
+    fclose(file);
+
+    RisaCompiler compiler;
+    risa_compiler_init(&compiler);
+
+    RisaCompileStatus status = risa_compile_string(&compiler, data);
+
+    RISA_MEM_FREE(data);
+
+    if(status == RISA_COMPILER_STATUS_OK) {
+        uint32_t compiledSize = 0;
+        uint8_t* compiled = risa_serialize_cluster(&compiler.function->cluster, &compiledSize);
+
+        file = fopen(output, "wb");
+
+        if(file == NULL) {
+            TERMINATE(io, 75, "Cannot write file '%s'\n", output);
+        }
+
+        fwrite(compiled, sizeof(uint8_t), compiledSize, file);
+        fclose(file);
+
+        risa_compiler_delete(&compiler);
+    } else {
+        exit(1);
+    }
+}
+
 void print_info(RisaIO io) {
-    RISA_OUT(io, "Risa v%s '%s'\n", RISA_VERSION, RISA_CODENAME);
+    RISA_OUT(io, "Risa v%s '%s'\n", RISA_VERSION_STRING, RISA_VERSION_CODENAME);
     RISA_OUT(io, "(c) 2020-2021 The Exom Developers (exom.dev)\n\n");
 
     RISA_OUT(io, "     _____________________      _______\n");

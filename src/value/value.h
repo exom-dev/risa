@@ -6,22 +6,22 @@
 #include "../def/types.h"
 
 typedef enum {
-    RISA_VAL_NULL,
-    RISA_VAL_BOOL,
-    RISA_VAL_BYTE,
-    RISA_VAL_INT,
-    RISA_VAL_FLOAT,
-    RISA_VAL_DENSE
+    RISA_VAL_NULL  = 0,
+    RISA_VAL_BOOL  = 1,
+    RISA_VAL_BYTE  = 2,
+    RISA_VAL_INT   = 3,
+    RISA_VAL_FLOAT = 4,
+    RISA_VAL_DENSE = 5
 } RisaValueType;
 
 typedef enum {
-    RISA_DVAL_STRING,
-    RISA_DVAL_ARRAY,
-    RISA_DVAL_OBJECT,
-    RISA_DVAL_UPVALUE,
-    RISA_DVAL_FUNCTION,
-    RISA_DVAL_CLOSURE,
-    RISA_DVAL_NATIVE
+    RISA_DVAL_STRING   = 0,
+    RISA_DVAL_ARRAY    = 1,
+    RISA_DVAL_OBJECT   = 2,
+    RISA_DVAL_UPVALUE  = 3,
+    RISA_DVAL_FUNCTION = 4,
+    RISA_DVAL_CLOSURE  = 5,
+    RISA_DVAL_NATIVE   = 6
 } RisaDenseValueType;
 
 typedef struct RisaDenseValue {

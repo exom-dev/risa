@@ -66,3 +66,17 @@ RisaInterpretStatus risa_interpret_string(RisaVM* vm, const char* str) {
 
     return (status == RISA_EXECUTE_ERROR) ? RISA_INTERPRET_EXECUTE_ERROR : RISA_INTERPRET_OK;
 }
+
+uint8_t* risa_serialize_cluster(RisaCluster* cluster, uint32_t* size) {
+    RisaClusterSerializer serializer;
+    risa_cluster_serializer_init(&serializer);
+
+    RisaBuffer* serialized = risa_cluster_serializer_serialize(&serializer, cluster);
+    *size = serialized->size;
+
+    uint8_t* data = risa_buffer_release(serialized);
+
+    risa_cluster_serializer_delete(&serializer);
+
+    return data;
+}

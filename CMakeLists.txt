@@ -3,12 +3,9 @@ project(risa C)
 
 set(CMAKE_C_STANDARD 99)
 
-file(GLOB SOURCE_FILES
+file(GLOB_RECURSE SOURCE_FILES
         src/*.h
-        src/*.c
-
-        src/**/*.h
-        src/**/*.c)
+        src/*.c)
 
 string(TOLOWER "${CMAKE_BUILD_TYPE}" PROJECT_BUILD_TYPE)
 

@@ -491,8 +491,9 @@ static RisaValue risa_std_math_atan2(void* vm, uint8_t argc, RisaValue* args) {
     double y = risa_value_as_float(args[0]);
     double x = risa_value_as_float(args[1]);
 
-    if(y == 0 && x == 0)
-        return RISA_NULL_VALUE;
+    if(y == 0 && x == 0) {
+        return RISA_FLOAT_VALUE(0);
+    }
 
     errno = 0;
 

@@ -19,6 +19,17 @@ void risa_cluster_init(RisaCluster* cluster) {
     risa_value_array_init(&cluster->constants);
 }
 
+void risa_cluster_reserve(RisaCluster* cluster, uint32_t capacity) {
+    if(cluster->capacity >= capacity) {
+        return;
+    }
+
+    while(cluster->capacity <= cluster->capacity + capacity) {
+        cluster->bytecode = (uint8_t*) RISA_MEM_EXPAND(cluster->bytecode, &cluster->capacity, sizeof(uint8_t));
+        cluster->indices = (uint32_t*) RISA_MEM_REALLOC(cluster->indices, cluster->capacity, sizeof(uint32_t));
+    }
+}
+
 void risa_cluster_write(RisaCluster* cluster, uint8_t byte, uint32_t index) {
     while(cluster->capacity <= cluster->size) {
         cluster->bytecode = (uint8_t*) RISA_MEM_EXPAND(cluster->bytecode, &cluster->capacity, sizeof(uint8_t));

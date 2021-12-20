@@ -2455,7 +2455,8 @@ static void risa_compiler_compile_equal_op(RisaCompiler* compiler, bool allowAss
     compiler->last.isEqualOp = true;
     compiler->last.fromBranched = false;
 
-    compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_TEMP };
+    // Don't overwrite the reg info
+    //compiler->regs[compiler->last.reg] = (RisaRegInfo) { RISA_REG_TEMP };
 }
 
 static void risa_compiler_compile_prefix(RisaCompiler* compiler, bool allowAssignment) {

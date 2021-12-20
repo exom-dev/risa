@@ -67,6 +67,7 @@ typedef struct {
 #define RISA_AS_STRING(value)   ((RisaDenseString*) ((value).as.dense))
 #define RISA_AS_ARRAY(value)    ((RisaDenseArray*) ((value).as.dense))
 #define RISA_AS_OBJECT(value)   ((RisaDenseObject*) ((value).as.dense))
+#define RISA_AS_UPVALUE(value)   ((RisaDenseUpvalue*) ((value).as.dense))
 #define RISA_AS_CSTRING(value)  (((RisaDenseString*) ((value).as.dense))->chars)
 #define RISA_AS_FUNCTION(value) ((RisaDenseFunction*) ((value).as.dense))
 #define RISA_AS_CLOSURE(value)  ((RisaDenseClosure*) ((value).as.dense))

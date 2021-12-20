@@ -5,9 +5,7 @@
 #include "vm/vm.h"
 #include "std/std.h"
 #include "compiler/compiler.h"
-
-#define RISA_VERSION "0.0.B"
-#define RISA_CODENAME "PREVIEW"
+#include "version.h"
 
 typedef enum {
     RISA_COMPILE_OK,
@@ -25,9 +23,10 @@ typedef enum {
     RISA_INTERPRET_EXECUTE_ERROR
 } RisaInterpretStatus;
 
-RISA_API RisaCompileStatus   risa_compile_string   (RisaCompiler* compiler, const char* str);
-RISA_API RisaExecuteStatus   risa_execute_cluster  (RisaVM* vm, RisaCluster cluster);
-RISA_API RisaExecuteStatus   risa_execute_function (RisaVM* vm, RisaDenseFunction* function);
-RISA_API RisaInterpretStatus risa_interpret_string (RisaVM* vm, const char* str);
+RISA_API RisaCompileStatus   risa_compile_string    (RisaCompiler* compiler, const char* str);
+RISA_API RisaExecuteStatus   risa_execute_cluster   (RisaVM* vm, RisaCluster cluster);
+RISA_API RisaExecuteStatus   risa_execute_function  (RisaVM* vm, RisaDenseFunction* function);
+RISA_API RisaInterpretStatus risa_interpret_string  (RisaVM* vm, const char* str);
+RISA_API uint8_t*            risa_serialize_cluster (RisaCluster* cluster, uint32_t* size);
 
 #endif
