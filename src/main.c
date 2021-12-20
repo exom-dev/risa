@@ -90,7 +90,7 @@ void run_repl(RisaIO io) {
 
 void run_args(RisaIO io, int argc, char* argv[]) {
     if(0 == strcmp(argv[1], "-c")) {
-        if(argc < 3) {
+        if(argc < 4) {
             TERMINATE(io, 64, "Invalid arguments");
         }
 
@@ -124,22 +124,48 @@ void run_file(RisaIO io, const char* path) {
 
     fclose(file);
 
-    RisaInterpretStatus status = risa_interpret_string(&vm, data);
+    if(size >= sizeof(RISA_CLUSTER_MAGIC) - 1 && memcmp(data, RISA_CLUSTER_MAGIC, sizeof(RISA_CLUSTER_MAGIC) - 1) == 0) {
+        RisaClusterDeserializer deserializer;
 
-    RISA_MEM_FREE(data);
+        risa_cluster_deserializer_init(&deserializer);
+        risa_cluster_deserializer_target(&deserializer, &vm);
 
-    risa_vm_delete(&vm);
+        RisaClusterDeserializationStatus result = risa_cluster_deserializer_deserialize(&deserializer, (uint8_t*) data, size);
 
-    #ifdef DEBUG_SHOW_HEAP_SIZE
-        RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);
-    #endif
+        RISA_MEM_FREE(data);
 
-    if(status == RISA_INTERPRET_OK) {
-        exit(0);
-    } if(status == RISA_INTERPRET_COMPILE_ERROR)
-        exit(1);
-    if(status == RISA_INTERPRET_EXECUTE_ERROR)
-        exit(1);
+        if(result != RISA_DESERIALIZATION_OK) {
+            RISA_ERROR(vm.io, "error: cannot load compiled script (file is corrupted)\n");
+            exit(1);
+        }
+
+        RisaExecuteStatus status = risa_execute_cluster(&vm, deserializer.output);
+
+        risa_vm_delete(&vm);
+        risa_cluster_deserializer_delete(&deserializer);
+
+        #ifdef DEBUG_SHOW_HEAP_SIZE
+                RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);
+        #endif
+
+        if(status != RISA_EXECUTE_OK) {
+            exit(1);
+        }
+    } else {
+        RisaInterpretStatus status = risa_interpret_string(&vm, data);
+
+        RISA_MEM_FREE(data);
+
+        risa_vm_delete(&vm);
+
+        #ifdef DEBUG_SHOW_HEAP_SIZE
+                RISA_OUT(vm.io, "\n\nHeap size: %zu\n", vm.heapSize);
+        #endif
+
+        if(status != RISA_INTERPRET_OK) {
+            exit(1);
+        }
+    }
 }
 
 void compile_file(RisaIO io, const char* input, const char* output) {

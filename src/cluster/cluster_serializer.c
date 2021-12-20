@@ -12,8 +12,6 @@ void risa_cluster_serializer_init(RisaClusterSerializer* serializer) {
     risa_map_init(&serializer->strings);
     risa_buffer_init(&serializer->output);
     risa_buffer_init(&serializer->stringsBuffer);
-
-    serializer->stringCount = 0;
 }
 
 void risa_cluster_serializer_delete(RisaClusterSerializer* serializer) {
@@ -37,7 +35,7 @@ RisaBuffer* risa_cluster_serializer_serialize(RisaClusterSerializer* serializer,
 
     // Patch the data + bytecode size and write the strings section
     risa_buffer_patch_size(&serializer->output, dataBytecodeSizeOffset);
-    risa_buffer_write_uint32(&serializer->output, serializer->stringCount);
+    risa_buffer_write_uint32(&serializer->output, serializer->strings.count);
     risa_buffer_write(&serializer->output, serializer->stringsBuffer.data, serializer->stringsBuffer.size);
 
     risa_buffer_delete(&serializer->stringsBuffer);
@@ -102,11 +100,10 @@ static void risa_cluster_serialize_value(RisaClusterSerializer* serializer, Risa
                         risa_buffer_write_uint32(&serializer->stringsBuffer, str->length);
                         risa_buffer_write(&serializer->stringsBuffer, (uint8_t*) str->chars, str->length);
 
-                        ++serializer->stringCount;
+                        uint32_t index = serializer->strings.count;
 
-                        risa_map_set(&serializer->strings, str, RISA_INT_VALUE(serializer->strings.count));
-
-                        risa_buffer_write_uint32(&serializer->output, serializer->strings.count);
+                        risa_map_set(&serializer->strings, str, RISA_INT_VALUE(index));
+                        risa_buffer_write_uint32(&serializer->output, index);
                     } else {
                         risa_buffer_write_uint32(&serializer->output, (uint32_t) RISA_AS_INT(strIndex));
                     }

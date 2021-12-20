@@ -25,7 +25,6 @@ typedef struct {
 
     RisaBuffer output;
     RisaBuffer stringsBuffer;
-    uint32_t stringCount;
 } RisaClusterSerializer;
 
 typedef struct {

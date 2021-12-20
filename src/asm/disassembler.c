@@ -43,16 +43,17 @@ void risa_disassembler_init(RisaDisassembler* disassembler) {
     disassembler->offset = 0;
 }
 
-void risa_disassembler_load(RisaDisassembler* disassembler, RisaCluster* chunk) {
-    disassembler->cluster = chunk;
+void risa_disassembler_load(RisaDisassembler* disassembler, RisaCluster* cluster) {
+    disassembler->cluster = cluster;
 }
 
 void risa_disassembler_run(RisaDisassembler* disassembler) {
     if(disassembler->cluster != NULL) {
         RISA_OUT(disassembler->io, "\nOFFS INDX OP\n");
 
-        while(disassembler->offset < disassembler->cluster->size)
+        while(disassembler->offset < disassembler->cluster->size) {
             risa_disassembler_disassembler_process_instruction(disassembler);
+        }
 
         // Decompile all of the functions contained in the cluster.
         for(size_t i = 0; i < disassembler->cluster->constants.size; ++i) {
@@ -371,7 +372,7 @@ void risa_disassembler_disassemble_closure_instruction(RisaDisassembler* disasse
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 2],
              RISA_DISASM_CLUSTER->bytecode[RISA_DISASM_OFFSET + 3]);
 
-    RISA_OUT(disassembler->io, "'\n");
+    RISA_OUT(disassembler->io, "\n");
 }
 
 void risa_disassembler_disassemble_array_push_instruction(RisaDisassembler* disassembler, const char* name, uint8_t types) {

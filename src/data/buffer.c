@@ -87,7 +87,13 @@ void risa_const_buffer_delete(RisaConstBuffer* buffer) {
 bool risa_const_buffer_skip(RisaConstBuffer* buffer, uint32_t amount, uint32_t* backup) {
     *backup = buffer->index;
 
-    return buffer->index + amount <= buffer->size;
+    if(buffer->index + amount > buffer->size) {
+        return false;
+    }
+
+    buffer->index += amount;
+
+    return true;
 }
 
 bool risa_const_buffer_rewind(RisaConstBuffer* buffer, uint32_t index) {
@@ -106,7 +112,7 @@ bool risa_const_buffer_read(RisaConstBuffer* buffer, uint8_t* dest, uint32_t amo
     }
 
     memcpy(dest, buffer->data + buffer->index, sizeof(uint8_t) * amount);
-    buffer->index += amount;
+    buffer->index += sizeof(uint8_t) * amount;
 
     return true;
 }

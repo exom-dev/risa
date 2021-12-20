@@ -24,7 +24,9 @@ void risa_cluster_reserve(RisaCluster* cluster, uint32_t capacity) {
         return;
     }
 
-    while(cluster->capacity <= cluster->capacity + capacity) {
+    uint32_t target = cluster->capacity + capacity;
+
+    while(cluster->capacity <= target) {
         cluster->bytecode = (uint8_t*) RISA_MEM_EXPAND(cluster->bytecode, &cluster->capacity, sizeof(uint8_t));
         cluster->indices = (uint32_t*) RISA_MEM_REALLOC(cluster->indices, cluster->capacity, sizeof(uint32_t));
     }

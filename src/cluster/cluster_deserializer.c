@@ -23,7 +23,15 @@ void risa_cluster_deserializer_init(RisaClusterDeserializer* deserializer) {
 }
 
 void risa_cluster_deserializer_delete(RisaClusterDeserializer* deserializer) {
+    if(deserializer->strings.data != NULL) {
+        RISA_MEM_FREE(deserializer->strings.data);
+    }
+
     risa_cluster_deserializer_init(deserializer);
+}
+
+void risa_cluster_deserializer_target(RisaClusterDeserializer* deserializer, void* vm) {
+    deserializer->vm = vm;
 }
 
 RisaClusterDeserializationStatus risa_cluster_deserializer_deserialize(RisaClusterDeserializer* deserializer, const uint8_t* input, uint32_t size) {
@@ -108,7 +116,7 @@ static bool risa_cluster_deserialize(RisaClusterDeserializer* deserializer, Risa
     RisaValueArray constants;
 
     if(!risa_cluster_deserialize_value_array(deserializer, &constants)) {
-        return RISA_DESERIALIZATION_ERROR_EOF;
+        return false;
     }
 
     risa_cluster_init(cluster);
@@ -129,6 +137,7 @@ static bool risa_cluster_deserialize(RisaClusterDeserializer* deserializer, Risa
         return false;
     }
 
+    cluster->size = size;
     cluster->constants = constants;
 
     return true;

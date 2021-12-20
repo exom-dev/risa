@@ -14,7 +14,7 @@ typedef struct {
 
 RISA_API RisaDisassembler* risa_disassembler_create ();
 RISA_API void              risa_disassembler_init   (RisaDisassembler* disassembler);
-RISA_API void              risa_disassembler_load   (RisaDisassembler* disassembler, RisaCluster* chunk);
+RISA_API void              risa_disassembler_load   (RisaDisassembler* disassembler, RisaCluster* cluster);
 RISA_API void              risa_disassembler_run    (RisaDisassembler* disassembler);
 RISA_API void              risa_disassembler_reset  (RisaDisassembler* disassembler);
 RISA_API void              risa_disassembler_delete (RisaDisassembler* disassembler);
