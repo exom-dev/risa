@@ -206,19 +206,21 @@ static RisaToken risa_lexer_next_number(RisaLexer* lexer) {
     while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
         ADVANCE(1);
 
-    switch(PEEK(0)) {
+    if(!AT_END(0)) {
+        switch (PEEK(0)) {
         case '.':
             type = RISA_TOKEN_FLOAT;
 
-            if(!AT_END(1) && risa_lib_charlib_is_digit(PEEK(1))) {
+            if (!AT_END(1) && risa_lib_charlib_is_digit(PEEK(1))) {
                 ADVANCE(1);
 
-                while(!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
+                while (!AT_END(0) && risa_lib_charlib_is_digit(PEEK(0)))
                     ADVANCE(1);
 
-                if(!AT_END(0) && PEEK(0) == 'f')
+                if (!AT_END(0) && PEEK(0) == 'f')
                     IGNORE(1);
-            } else return risa_lexer_error(lexer, "Expected digit after dot");
+            } else
+                return risa_lexer_error(lexer, "Expected digit after dot");
             break;
         case 'b':
             type = RISA_TOKEN_BYTE;
@@ -228,6 +230,7 @@ static RisaToken risa_lexer_next_number(RisaLexer* lexer) {
             type = RISA_TOKEN_FLOAT;
             IGNORE(1);
             break;
+        }
     }
 
     return risa_lexer_emit(lexer, type);
