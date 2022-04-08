@@ -52,7 +52,7 @@ static RisaValue risa_std_debug_addr(void* vm, uint8_t argc, RisaValue* args) {
 
         snprintf(buffer, size + 1, "%p", risa_value_as_dense(args[0]));
 
-        RisaValue addr = risa_value_from_dense(risa_vm_string_create(vm, buffer, size));
+        RisaValue addr = risa_value_from_dense((RisaDenseValue*) risa_vm_string_create(vm, buffer, size));
         RISA_MEM_FREE(buffer);
 
         return addr;
