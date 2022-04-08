@@ -33,7 +33,7 @@ void risa_std_register_io(RisaVM* vm) {
     risa_vm_global_set_native(vm, STD_IO_ENTRY(print));
     risa_vm_global_set_native(vm, STD_IO_ENTRY(println));
 
-    risa_vm_global_set(vm, "read", sizeof("read") - 1, RISA_DENSE_VALUE((RisaDenseValue *) objRead));
+    risa_vm_global_set(vm, "read", sizeof("read") - 1, risa_value_from_dense((RisaDenseValue *) objRead));
 
     #undef STD_IO_OBJ_ENTRY
     #undef STD_IO_ENTRY
@@ -43,7 +43,7 @@ static RisaValue risa_std_io_print(void* vm, uint8_t argc, RisaValue* args) {
     for(uint16_t i = 0; i < argc; ++i)
         risa_value_print(&((RisaVM *) vm)->io, args[i]);
 
-    return RISA_NULL_VALUE;
+    return risa_value_from_null();
 }
 
 static RisaValue risa_std_io_println(void* vm, uint8_t argc, RisaValue* args) {
@@ -56,16 +56,16 @@ static RisaValue risa_std_io_println(void* vm, uint8_t argc, RisaValue* args) {
         }
     }
 
-    return RISA_NULL_VALUE;
+    return risa_value_from_null();
 }
 
 static RisaValue risa_std_io_read_char(void* vm, uint8_t argc, RisaValue* args) {
     char* chr = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_CHAR);
 
     if(chr == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, chr, 1));
+    RisaValue result = risa_value_from_dense((RisaDenseString*) risa_vm_string_create(vm, chr, 1));
 
     if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(chr);
@@ -77,11 +77,11 @@ static RisaValue risa_std_io_read_string(void* vm, uint8_t argc, RisaValue* args
     char* str = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_WORD);
 
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     uint32_t size = (uint32_t) strlen(str);
 
-    RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, str, size));
+    RisaValue result = risa_value_from_dense((RisaDenseString*) risa_vm_string_create(vm, str, size));
 
     if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(str);
@@ -93,18 +93,18 @@ static RisaValue risa_std_io_read_line(void* vm, uint8_t argc, RisaValue* args) 
     char* line = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_LINE);
 
     if(line == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     // If there is a line ending left from a previous read operation, ignore and read again.
     if(*line == '\0')
         line = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_LINE);
 
     if(line == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     uint32_t size = (uint32_t) strlen(line);
 
-    RisaValue result = RISA_DENSE_VALUE((RisaDenseString*) risa_vm_string_create(vm, line, size));
+    RisaValue result = risa_value_from_dense((RisaDenseString*) risa_vm_string_create(vm, line, size));
 
     if(risa_io_should_free_input(&((RisaVM*) vm)->io))
         RISA_MEM_FREE(line);
@@ -116,7 +116,7 @@ static RisaValue risa_std_io_read_int(void* vm, uint8_t argc, RisaValue* args) {
     char* str = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_WORD);
 
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     uint32_t length = (uint32_t) strlen(str);
 
@@ -132,7 +132,7 @@ static RisaValue risa_std_io_read_byte(void* vm, uint8_t argc, RisaValue* args) 
     char* str = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_WORD);
 
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     uint32_t length = (uint32_t) strlen(str);
 
@@ -148,7 +148,7 @@ static RisaValue risa_std_io_read_float(void* vm, uint8_t argc, RisaValue* args)
     char* str = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_WORD);
 
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaValue result = risa_value_float_from_string(str);
 
@@ -162,7 +162,7 @@ static RisaValue risa_std_io_read_bool(void* vm, uint8_t argc, RisaValue* args) 
     char* str = risa_io_in(&((RisaVM*) vm)->io, RISA_INPUT_MODE_WORD);
 
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaValue result = risa_value_bool_from_string(str);
 

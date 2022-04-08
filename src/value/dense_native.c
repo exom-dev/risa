@@ -12,7 +12,7 @@ RisaDenseNative* risa_dense_native_create(RisaNativeFunction function) {
 }
 
 RisaValue risa_dense_native_value(RisaNativeFunction function) {
-    return RISA_DENSE_VALUE(risa_dense_native_create(function));
+    return risa_value_from_dense(risa_dense_native_create(function));
 }
 
 RisaValue risa_dense_native_get_arg(RisaValue* args, uint8_t index) {

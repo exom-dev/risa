@@ -19,22 +19,22 @@ static RisaValue risa_std_reflect_reflect(void* vm, uint8_t argc, RisaValue* arg
 
             risa_map_copy(&obj->data, &((RisaVM*) vm)->globals);
 
-            return RISA_DENSE_VALUE(obj);
+            return risa_value_from_dense(obj);
         }
         case 1: {
             if(!risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING))
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
 
             RisaValue val;
 
             if(!risa_map_get(&((RisaVM*) vm)->globals, RISA_AS_STRING(args[0]), &val))
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
 
             return val;
         }
         default: {
             if(!risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING))
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
 
             risa_map_set(&((RisaVM*) vm)->globals, RISA_AS_STRING(args[0]), args[1]);
 

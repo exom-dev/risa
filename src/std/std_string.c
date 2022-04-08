@@ -22,7 +22,7 @@ void risa_std_register_string(RisaVM* vm) {
 
 static RisaValue risa_std_string_substr(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(argc == 1)
         return args[0];
@@ -33,20 +33,20 @@ static RisaValue risa_std_string_substr(void* vm, uint8_t argc, RisaValue* args)
     if(argc >= 2) {
         switch(args[1].type) {
             case RISA_VAL_BYTE:
-                index = (int64_t) RISA_AS_BYTE(args[1]);
+                index = (int64_t) risa_value_as_byte(args[1]);
                 break;
             case RISA_VAL_INT:
-                index = RISA_AS_INT(args[1]);
+                index = risa_value_as_int(args[1]);
                 break;
             case RISA_VAL_FLOAT:
-                index = (int64_t) RISA_AS_FLOAT(args[1]);
+                index = (int64_t) risa_value_as_float(args[1]);
                 break;
             default:
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
         }
 
         if(index < 0 || index >= RISA_AS_STRING(args[0])->length)
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     } else {
         index = 0;
     }
@@ -54,30 +54,30 @@ static RisaValue risa_std_string_substr(void* vm, uint8_t argc, RisaValue* args)
     if(argc >= 3) {
         switch(args[2].type) {
             case RISA_VAL_BYTE:
-                length = (int64_t) RISA_AS_BYTE(args[2]);
+                length = (int64_t) risa_value_as_byte(args[2]);
                 break;
             case RISA_VAL_INT:
-                length = RISA_AS_INT(args[2]);
+                length = risa_value_as_int(args[2]);
                 break;
             case RISA_VAL_FLOAT:
-                length = (int64_t) RISA_AS_FLOAT(args[2]);
+                length = (int64_t) risa_value_as_float(args[2]);
                 break;
             default:
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
         }
 
         if(length <= 0 || (index + length) > RISA_AS_STRING(args[0])->length)
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     } else {
         length = RISA_AS_STRING(args[0])->length - index;
     }
 
-    return RISA_DENSE_VALUE(risa_vm_string_create(vm, RISA_AS_STRING(args[0])->chars + (uint32_t) index, (uint32_t) length));
+    return risa_value_from_dense((RisaDenseValue*) risa_vm_string_create(vm, RISA_AS_STRING(args[0])->chars + (uint32_t) index, (uint32_t) length));
 }
 
 static RisaValue risa_std_string_to_upper(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* result = risa_dense_string_prepare(str->chars, str->length);
@@ -89,12 +89,12 @@ static RisaValue risa_std_string_to_upper(void* vm, uint8_t argc, RisaValue* arg
 
     risa_dense_string_hash_inplace(result);
 
-    return RISA_DENSE_VALUE(risa_vm_string_internalize(vm, result));
+    return risa_value_from_dense((RisaDenseValue*) risa_vm_string_internalize(vm, result));
 }
 
 static RisaValue risa_std_string_to_lower(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* result = risa_dense_string_prepare(str->chars, str->length);
@@ -106,49 +106,49 @@ static RisaValue risa_std_string_to_lower(void* vm, uint8_t argc, RisaValue* arg
 
     risa_dense_string_hash_inplace(result);
 
-    return RISA_DENSE_VALUE(risa_vm_string_internalize(vm, result));
+    return risa_value_from_dense((RisaDenseValue*) risa_vm_string_internalize(vm, result));
 }
 
 static RisaValue risa_std_string_begins_with(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 2 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING)
                 || !risa_value_is_dense_of_type(args[1], RISA_DVAL_STRING))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* substr = RISA_AS_STRING(args[1]);
 
     if(substr->length > str->length)
-        return RISA_BOOL_VALUE(false);
+        return risa_value_from_bool(false);
 
     if(substr->length == str->length)
-        return RISA_BOOL_VALUE(substr == str);
+        return risa_value_from_bool(substr == str);
 
     for(uint32_t i = 0; i < substr->length; ++i) {
         if(substr->chars[i] != str->chars[i])
-            return RISA_BOOL_VALUE(false);
+            return risa_value_from_bool(false);
     }
 
-    return RISA_BOOL_VALUE(true);
+    return risa_value_from_bool(true);
 }
 
 static RisaValue risa_std_string_ends_with(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 2 || !risa_value_is_dense_of_type(args[0], RISA_DVAL_STRING)
                 || !risa_value_is_dense_of_type(args[1], RISA_DVAL_STRING))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     RisaDenseString* str = RISA_AS_STRING(args[0]);
     RisaDenseString* substr = RISA_AS_STRING(args[1]);
 
     if(substr->length > str->length)
-        return RISA_BOOL_VALUE(false);
+        return risa_value_from_bool(false);
 
     if(substr->length == str->length)
-        return RISA_BOOL_VALUE(substr == str);
+        return risa_value_from_bool(substr == str);
 
     for(int64_t i = (int64_t) substr->length - 1; i >= 0; --i) {
         if(substr->chars[i] != str->chars[str->length + i - substr->length])
-            return RISA_BOOL_VALUE(false);
+            return risa_value_from_bool(false);
     }
 
-    return RISA_BOOL_VALUE(true);
+    return risa_value_from_bool(true);
 }

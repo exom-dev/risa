@@ -7,7 +7,7 @@ RisaDenseUpvalue* risa_dense_upvalue_create(RisaValue* value) {
     upvalue->dense.marked = false;
 
     upvalue->ref = value;
-    upvalue->closed = RISA_NULL_VALUE;
+    upvalue->closed = risa_value_from_null();
 
     return upvalue;
 }

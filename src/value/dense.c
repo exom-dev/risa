@@ -200,7 +200,7 @@ bool risa_dense_is_truthy(RisaDenseValue* dense) {
 RisaValue risa_dense_clone(RisaDenseValue* dense) {
     switch(dense->type) {
         case RISA_DVAL_STRING:
-            return RISA_DENSE_VALUE(dense);
+            return risa_value_from_dense(dense);
         case RISA_DVAL_ARRAY: {
             RisaDenseArray* array = (RisaDenseArray*) dense;
             RisaDenseArray* clone = risa_dense_array_create();
@@ -208,7 +208,7 @@ RisaValue risa_dense_clone(RisaDenseValue* dense) {
             for(size_t i = 0; i < array->data.size; ++i)
                 risa_value_array_write(&clone->data, risa_value_clone(array->data.values[i]));
 
-            return RISA_DENSE_VALUE(((RisaDenseValue*) clone));
+            return risa_value_from_dense(((RisaDenseValue*) clone));
         }
         case RISA_DVAL_OBJECT: {
             RisaDenseObject* object = (RisaDenseObject*) dense;
@@ -221,7 +221,7 @@ RisaValue risa_dense_clone(RisaDenseValue* dense) {
                     risa_dense_object_set(clone, entry.key, risa_value_clone(entry.value));
             }
 
-            return RISA_DENSE_VALUE(((RisaDenseValue*) clone));
+            return risa_value_from_dense(((RisaDenseValue*) clone));
         }
         case RISA_DVAL_UPVALUE: {
             RisaDenseUpvalue* upvalue = (RisaDenseUpvalue*) dense;
@@ -230,21 +230,21 @@ RisaValue risa_dense_clone(RisaDenseValue* dense) {
             if(upvalue->closed.type != RISA_VAL_NULL)
                 clone->closed = risa_value_clone(upvalue->closed);
 
-            return RISA_DENSE_VALUE(((RisaDenseValue*) clone));
+            return risa_value_from_dense(((RisaDenseValue*) clone));
         }
         case RISA_DVAL_FUNCTION:
         case RISA_DVAL_CLOSURE:
         case RISA_DVAL_NATIVE:
-            return RISA_DENSE_VALUE(dense);
+            return risa_value_from_dense(dense);
         default:
-            return RISA_NULL_VALUE; // Never reached; written to suppress warnings.
+            return risa_value_from_null(); // Never reached; written to suppress warnings.
     }
 }
 
 RisaValue risa_dense_clone_under(void* vm, RisaDenseValue* dense) {
     switch(dense->type) {
         case RISA_DVAL_STRING:
-            return RISA_DENSE_VALUE(dense);
+            return risa_value_from_dense(dense);
         case RISA_DVAL_ARRAY: {
             RisaDenseArray* array = (RisaDenseArray*) dense;
             RisaDenseArray* clone = risa_dense_array_create();
@@ -256,7 +256,7 @@ RisaValue risa_dense_clone_under(void* vm, RisaDenseValue* dense) {
             RisaDenseValue* result = ((RisaDenseValue*) clone);
             risa_vm_register_dense_unchecked((RisaVM *) vm, result);
 
-            return RISA_DENSE_VALUE(result);
+            return risa_value_from_dense(result);
         }
         case RISA_DVAL_OBJECT: {
             RisaDenseObject* object = (RisaDenseObject*) dense;
@@ -273,7 +273,7 @@ RisaValue risa_dense_clone_under(void* vm, RisaDenseValue* dense) {
             RisaDenseValue* result = ((RisaDenseValue*) clone);
             risa_vm_register_dense_unchecked((RisaVM *) vm, result);
 
-            return RISA_DENSE_VALUE(result);
+            return risa_value_from_dense(result);
         }
         case RISA_DVAL_UPVALUE: {
             RisaDenseUpvalue* upvalue = (RisaDenseUpvalue*) dense;
@@ -286,14 +286,14 @@ RisaValue risa_dense_clone_under(void* vm, RisaDenseValue* dense) {
             RisaDenseValue* result = ((RisaDenseValue*) clone);
             risa_vm_register_dense_unchecked((RisaVM *) vm, result);
 
-            return RISA_DENSE_VALUE(result);
+            return risa_value_from_dense(result);
         }
         case RISA_DVAL_FUNCTION:
         case RISA_DVAL_CLOSURE:
         case RISA_DVAL_NATIVE:
-            return RISA_DENSE_VALUE(dense);
+            return risa_value_from_dense(dense);
         default:
-            return RISA_NULL_VALUE; // Never reached; written to suppress warnings.
+            return risa_value_from_null(); // Never reached; written to suppress warnings.
     }
 }
 

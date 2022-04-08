@@ -55,7 +55,7 @@ bool risa_map_set(RisaMap* map, RisaDenseStringPtr key, RisaValue value) {
     RisaMapEntry* entry = risa_map_find_bucket(map->entries, map->capacity, key);
 
     bool isNewKey = entry->key == NULL;
-    if(isNewKey && RISA_IS_NULL(entry->value))
+    if(isNewKey && risa_value_is_null(entry->value))
         ++map->count;
 
     entry->key = key;
@@ -73,7 +73,7 @@ bool risa_map_erase(RisaMap* map, RisaDenseStringPtr key) {
         return false;
 
     entry->key = NULL;
-    entry->value = RISA_BOOL_VALUE(false);
+    entry->value = risa_value_from_bool(false);
 
     return true;
 }
@@ -97,7 +97,7 @@ RisaDenseStringPtr risa_map_find(RisaMap* map, const char* chars, int length, ui
         RisaMapEntry* entry = &map->entries[index];
 
         if(entry->key == NULL) {
-            if(RISA_IS_NULL(entry->value))
+            if(risa_value_is_null(entry->value))
                 return NULL;
         } else if(((RisaDenseString*) (entry->key))->length == length
                && ((RisaDenseString*) (entry->key))->hash == hash
@@ -119,7 +119,7 @@ RisaMapEntry* risa_map_find_entry(RisaMap* map, const char* chars, int length, u
         RisaMapEntry* entry = &map->entries[index];
 
         if(entry->key == NULL) {
-            if(RISA_IS_NULL(entry->value))
+            if(risa_value_is_null(entry->value))
                 return NULL;
         } else if(((RisaDenseString*) (entry->key))->length == length
                   && ((RisaDenseString*) (entry->key))->hash == hash
@@ -139,7 +139,7 @@ static RisaMapEntry* risa_map_find_bucket(RisaMapEntry* entries, int capacity, R
         RisaMapEntry* entry = &entries[index];
 
         if(entry->key == NULL) {
-            if(RISA_IS_NULL(entry->value)) {
+            if(risa_value_is_null(entry->value)) {
                 return tombstone != NULL ? tombstone : entry;
             } else {
                 if(tombstone == NULL)
@@ -160,7 +160,7 @@ static void risa_map_adjust_capacity(RisaMap* map) {
 
         for(uint32_t i = 0; i < capacity; ++i) {
             entries[i].key = NULL;
-            entries[i].value = RISA_NULL_VALUE;
+            entries[i].value = risa_value_from_null();
         }
 
         map->count = 0;

@@ -73,25 +73,25 @@ static void risa_cluster_serialize_value_array(RisaClusterSerializer* serializer
 
 static void risa_cluster_serialize_value(RisaClusterSerializer* serializer, RisaValue value) {
     // dd dd tt tt -> d - dense type, t - value type
-    risa_buffer_write_nibbles(&serializer->output, RISA_IS_DENSE(value) ? (uint8_t) (RISA_AS_DENSE(value)->type) : 0, value.type);
+    risa_buffer_write_nibbles(&serializer->output, value_is_dense(value) ? (uint8_t) (risa_value_as_dense(value)->type) : 0, value.type);
 
     switch(value.type) {
         case RISA_VAL_NULL:
             break;
         case RISA_VAL_BOOL:
-            risa_buffer_write_uint8(&serializer->output, (uint8_t) RISA_AS_BOOL(value));
+            risa_buffer_write_uint8(&serializer->output, (uint8_t) risa_value_as_bool(value));
             break;
         case RISA_VAL_BYTE:
-            risa_buffer_write_uint8(&serializer->output, RISA_AS_BYTE(value));
+            risa_buffer_write_uint8(&serializer->output, risa_value_as_byte(value));
             break;
         case RISA_VAL_INT:
-            risa_buffer_write_int64(&serializer->output, RISA_AS_INT(value));
+            risa_buffer_write_int64(&serializer->output, risa_value_as_int(value));
             break;
         case RISA_VAL_FLOAT:
-            risa_buffer_write_double(&serializer->output, RISA_AS_FLOAT(value));
+            risa_buffer_write_double(&serializer->output, risa_value_as_float(value));
             break;
         case RISA_VAL_DENSE: {
-            switch(RISA_AS_DENSE(value)->type) {
+            switch(risa_value_as_dense(value)->type) {
                 case RISA_DVAL_STRING: {
                     RisaDenseString* str = RISA_AS_STRING(value);
 
@@ -102,10 +102,10 @@ static void risa_cluster_serialize_value(RisaClusterSerializer* serializer, Risa
 
                         uint32_t index = serializer->strings.count;
 
-                        risa_map_set(&serializer->strings, str, RISA_INT_VALUE(index));
+                        risa_map_set(&serializer->strings, str, risa_value_from_int(index));
                         risa_buffer_write_uint32(&serializer->output, index);
                     } else {
-                        risa_buffer_write_uint32(&serializer->output, (uint32_t) RISA_AS_INT(strIndex));
+                        risa_buffer_write_uint32(&serializer->output, (uint32_t) risa_value_as_int(strIndex));
                     }
                     break;
                 }
@@ -121,7 +121,7 @@ static void risa_cluster_serialize_value(RisaClusterSerializer* serializer, Risa
                     risa_buffer_write_uint32(&serializer->output, obj->data.count);
 
                     for(int i = 0; i < obj->data.count; ++i) {
-                        risa_cluster_serialize_value(serializer, RISA_DENSE_VALUE((RisaDenseString*) obj->data.entries[i].key));
+                        risa_cluster_serialize_value(serializer, risa_value_from_dense((RisaDenseValue*) (RisaDenseString*) obj->data.entries[i].key));
                         risa_cluster_serialize_value(serializer, obj->data.entries[i].value);
                     }
                     break;
@@ -133,7 +133,7 @@ static void risa_cluster_serialize_value(RisaClusterSerializer* serializer, Risa
                 case RISA_DVAL_FUNCTION: {
                     RisaDenseFunction * fn = RISA_AS_FUNCTION(value);
 
-                    risa_cluster_serialize_value(serializer, RISA_DENSE_VALUE(fn->name));
+                    risa_cluster_serialize_value(serializer, risa_value_from_dense((RisaDenseValue*) fn->name));
                     risa_buffer_write_uint8(&serializer->output, fn->arity);
                     risa_cluster_serialize(serializer, &fn->cluster);
 

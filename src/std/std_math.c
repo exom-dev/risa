@@ -51,10 +51,10 @@ void risa_std_register_math(RisaVM* vm) {
                                                               STD_MATH_OBJ_FN_ENTRY(sqrt)
                                                               STD_MATH_OBJ_FN_ENTRY(deg)
                                                               STD_MATH_OBJ_FN_ENTRY(rad)
-                                                              STD_MATH_OBJ_FLOAT_ENTRY(pi, RISA_FLOAT_VALUE(RISA_MATH_PI))
-                                                              STD_MATH_OBJ_FLOAT_ENTRY(e, RISA_FLOAT_VALUE(RISA_MATH_E)));
+                                                              STD_MATH_OBJ_FLOAT_ENTRY(pi, risa_value_from_float(RISA_MATH_PI))
+                                                              STD_MATH_OBJ_FLOAT_ENTRY(e, risa_value_from_float(RISA_MATH_E)));
 
-    risa_vm_global_set(vm, "math", sizeof("math") - 1, RISA_DENSE_VALUE((RisaDenseValue *) objMath));
+    risa_vm_global_set(vm, "math", sizeof("math") - 1, risa_value_from_dense((RisaDenseValue *) objMath));
 
     #undef STD_STRING_FLOATENTRY
 }
@@ -63,7 +63,7 @@ void risa_std_register_math(RisaVM* vm) {
 
 static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     struct {
         RisaValueType type;
@@ -78,18 +78,18 @@ static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
     switch(args[0].type) {
         case RISA_VAL_BYTE:
             min.type = RISA_VAL_BYTE;
-            min.as.byte = RISA_AS_BYTE(args[0]);
+            min.as.byte = risa_value_as_byte(args[0]);
             break;
         case RISA_VAL_INT:
             min.type = RISA_VAL_INT;
-            min.as.integer = RISA_AS_INT(args[0]);
+            min.as.integer = risa_value_as_int(args[0]);
             break;
         case RISA_VAL_FLOAT:
             min.type = RISA_VAL_FLOAT;
-            min.as.floating = RISA_AS_FLOAT(args[0]);
+            min.as.floating = risa_value_as_float(args[0]);
             break;
         default:
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     }
 
     for(uint8_t i = 1; i < argc; ++i) {
@@ -97,20 +97,20 @@ static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_BYTE:
                 switch(min.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_BYTE(args[i]) < min.as.byte) {
-                            min.as.byte = RISA_AS_BYTE(args[i]);
+                        if(risa_value_as_byte(args[i]) < min.as.byte) {
+                            min.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_BYTE(args[i]) < min.as.integer) {
+                        if(risa_value_as_byte(args[i]) < min.as.integer) {
                             min.type = RISA_VAL_BYTE;
-                            min.as.byte = RISA_AS_BYTE(args[i]);
+                            min.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_BYTE(args[i]) < min.as.floating) {
+                        if(risa_value_as_byte(args[i]) < min.as.floating) {
                             min.type = RISA_VAL_BYTE;
-                            min.as.byte = RISA_AS_BYTE(args[i]);
+                            min.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     default:
@@ -120,20 +120,20 @@ static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_INT:
                 switch(min.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_INT(args[i]) < min.as.byte) {
+                        if(risa_value_as_int(args[i]) < min.as.byte) {
                             min.type = RISA_VAL_INT;
-                            min.as.integer = RISA_AS_INT(args[i]);
+                            min.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_INT(args[i]) < min.as.integer) {
-                            min.as.integer = RISA_AS_INT(args[i]);
+                        if(risa_value_as_int(args[i]) < min.as.integer) {
+                            min.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_INT(args[i]) < min.as.floating) {
+                        if(risa_value_as_int(args[i]) < min.as.floating) {
                             min.type = RISA_VAL_INT;
-                            min.as.integer = RISA_AS_INT(args[i]);
+                            min.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     default:
@@ -143,20 +143,20 @@ static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_FLOAT:
                 switch(min.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_FLOAT(args[i]) < min.as.byte) {
+                        if(risa_value_as_float(args[i]) < min.as.byte) {
                             min.type = RISA_VAL_FLOAT;
-                            min.as.floating = RISA_AS_FLOAT(args[i]);
+                            min.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_FLOAT(args[i]) < min.as.integer) {
+                        if(risa_value_as_float(args[i]) < min.as.integer) {
                             min.type = RISA_VAL_FLOAT;
-                            min.as.floating = RISA_AS_FLOAT(args[i]);
+                            min.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_FLOAT(args[i]) < min.as.floating) {
-                            min.as.floating = RISA_AS_FLOAT(args[i]);
+                        if(risa_value_as_float(args[i]) < min.as.floating) {
+                            min.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     default:
@@ -164,25 +164,25 @@ static RisaValue risa_std_math_min(void* vm, uint8_t argc, RisaValue* args) {
                 }
                 break;
             default:
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
         }
     }
 
     switch(min.type) {
         case RISA_VAL_BYTE:
-            return RISA_BYTE_VALUE(min.as.byte);
+            return risa_value_from_byte(min.as.byte);
         case RISA_VAL_INT:
-            return RISA_INT_VALUE(min.as.integer);
+            return risa_value_from_int(min.as.integer);
         case RISA_VAL_FLOAT:
-            return RISA_FLOAT_VALUE(min.as.floating);
+            return risa_value_from_float(min.as.floating);
         default:
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     }
 }
 
 static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     struct {
         RisaValueType type;
@@ -197,18 +197,18 @@ static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
     switch(args[0].type) {
         case RISA_VAL_BYTE:
             max.type = RISA_VAL_BYTE;
-            max.as.byte = RISA_AS_BYTE(args[0]);
+            max.as.byte = risa_value_as_byte(args[0]);
             break;
         case RISA_VAL_INT:
             max.type = RISA_VAL_INT;
-            max.as.integer = RISA_AS_INT(args[0]);
+            max.as.integer = risa_value_as_int(args[0]);
             break;
         case RISA_VAL_FLOAT:
             max.type = RISA_VAL_FLOAT;
-            max.as.floating = RISA_AS_FLOAT(args[0]);
+            max.as.floating = risa_value_as_float(args[0]);
             break;
         default:
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     }
 
     for(uint8_t i = 1; i < argc; ++i) {
@@ -216,20 +216,20 @@ static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_BYTE:
                 switch(max.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_BYTE(args[i]) > max.as.byte) {
-                            max.as.byte = RISA_AS_BYTE(args[i]);
+                        if(risa_value_as_byte(args[i]) > max.as.byte) {
+                            max.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_BYTE(args[i]) > max.as.integer) {
+                        if(risa_value_as_byte(args[i]) > max.as.integer) {
                             max.type = RISA_VAL_BYTE;
-                            max.as.byte = RISA_AS_BYTE(args[i]);
+                            max.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_BYTE(args[i]) > max.as.floating) {
+                        if(risa_value_as_byte(args[i]) > max.as.floating) {
                             max.type = RISA_VAL_BYTE;
-                            max.as.byte = RISA_AS_BYTE(args[i]);
+                            max.as.byte = risa_value_as_byte(args[i]);
                         }
                         break;
                     default:
@@ -239,20 +239,20 @@ static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_INT:
                 switch(max.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_INT(args[i]) > max.as.byte) {
+                        if(risa_value_as_int(args[i]) > max.as.byte) {
                             max.type = RISA_VAL_INT;
-                            max.as.integer = RISA_AS_INT(args[i]);
+                            max.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_INT(args[i]) > max.as.integer) {
-                            max.as.integer = RISA_AS_INT(args[i]);
+                        if(risa_value_as_int(args[i]) > max.as.integer) {
+                            max.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_INT(args[i]) > max.as.floating) {
+                        if(risa_value_as_int(args[i]) > max.as.floating) {
                             max.type = RISA_VAL_INT;
-                            max.as.integer = RISA_AS_INT(args[i]);
+                            max.as.integer = risa_value_as_int(args[i]);
                         }
                         break;
                     default:
@@ -262,20 +262,20 @@ static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
             case RISA_VAL_FLOAT:
                 switch(max.type) {
                     case RISA_VAL_BYTE:
-                        if(RISA_AS_FLOAT(args[i]) > max.as.byte) {
+                        if(risa_value_as_float(args[i]) > max.as.byte) {
                             max.type = RISA_VAL_FLOAT;
-                            max.as.floating = RISA_AS_FLOAT(args[i]);
+                            max.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     case RISA_VAL_INT:
-                        if(RISA_AS_FLOAT(args[i]) > max.as.integer) {
+                        if(risa_value_as_float(args[i]) > max.as.integer) {
                             max.type = RISA_VAL_FLOAT;
-                            max.as.floating = RISA_AS_FLOAT(args[i]);
+                            max.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     case RISA_VAL_FLOAT:
-                        if(RISA_AS_FLOAT(args[i]) > max.as.floating) {
-                            max.as.floating = RISA_AS_FLOAT(args[i]);
+                        if(risa_value_as_float(args[i]) > max.as.floating) {
+                            max.as.floating = risa_value_as_float(args[i]);
                         }
                         break;
                     default:
@@ -283,77 +283,77 @@ static RisaValue risa_std_math_max(void* vm, uint8_t argc, RisaValue* args) {
                 }
                 break;
             default:
-                return RISA_NULL_VALUE;
+                return risa_value_from_null();
         }
     }
 
     switch(max.type) {
         case RISA_VAL_BYTE:
-            return RISA_BYTE_VALUE(max.as.byte);
+            return risa_value_from_byte(max.as.byte);
         case RISA_VAL_INT:
-            return RISA_INT_VALUE(max.as.integer);
+            return risa_value_from_int(max.as.integer);
         case RISA_VAL_FLOAT:
-            return RISA_FLOAT_VALUE(max.as.floating);
+            return risa_value_from_float(max.as.floating);
         default:
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
     }
 }
 
 static RisaValue risa_std_math_floor(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = floor(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+        return risa_value_from_null();
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_ceil(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = ceil(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+        return risa_value_from_null();
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_abs(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = fabs(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+        return risa_value_from_null();
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_map(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 5)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     for(uint8_t i = 0; i < 5; ++i)
         if(!risa_value_is_num(args[i]))
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
 
     double x = risa_value_as_float(args[0]);
     double start = risa_value_as_float(args[1]);
@@ -362,137 +362,137 @@ static RisaValue risa_std_math_map(void* vm, uint8_t argc, RisaValue* args) {
     double newEnd = risa_value_as_float(args[4]);
 
     if(end == start)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double result = ((x - start) / (end - start)) * (newEnd - newStart) + newStart;
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_sin(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = sin(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_cos(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = cos(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_tan(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = tan(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_asin(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double x = risa_value_as_float(args[0]);
 
     if(x < -1 || x > 1)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = asin(x);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_acos(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double x = risa_value_as_float(args[0]);
 
     if(x < -1 || x > 1)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = acos(x);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_atan(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = atan(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_atan2(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 2)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]) || !risa_value_is_num(args[1]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double y = risa_value_as_float(args[0]);
     double x = risa_value_as_float(args[1]);
 
     if(y == 0 && x == 0) {
-        return RISA_FLOAT_VALUE(0);
+        return risa_value_from_float(0);
     }
 
     errno = 0;
@@ -500,130 +500,130 @@ static RisaValue risa_std_math_atan2(void* vm, uint8_t argc, RisaValue* args) {
     double result = atan2(y, x);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_log(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(argc == 1) {
         double x = risa_value_as_float(args[0]);
 
         if(x <= 0)
-            return RISA_NULL_VALUE;
+            return risa_value_from_null();
 
-        return RISA_FLOAT_VALUE(log(x));
+        return risa_value_from_float(log(x));
     }
 
     if(!risa_value_is_num(args[1]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double base = risa_value_as_float(args[0]);
     double x = risa_value_as_float(args[1]);
 
     if(base <= 0 || base == 1 || x <= 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = log(x) / log(base);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_pow(void* vm, uint8_t argc, RisaValue* args) {
     if(argc < 2)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]) || !risa_value_is_num(args[1]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double base = risa_value_as_float(args[0]);
     double exponent = risa_value_as_float(args[1]);
 
     if(base < 0 && (exponent > 0 && exponent < 1))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = pow(base, exponent);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_exp(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = exp(risa_value_as_float(args[0]));
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_sqrt(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double arg = risa_value_as_float(args[0]);
 
     if(arg < 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     errno = 0;
 
     double result = sqrt(arg);
 
     if(errno != 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_deg(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double result = risa_value_as_float(args[0]) * RISA_MATH_RAD2DEG;
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static RisaValue risa_std_math_rad(void* vm, uint8_t argc, RisaValue* args) {
     if(argc == 0)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     if(!risa_value_is_num(args[0]))
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     double result = risa_value_as_float(args[0]) * RISA_MATH_DEG2RAD;
 
-    return RISA_FLOAT_VALUE(risa_std_math_internal_adjust_result(result));
+    return risa_value_from_float(risa_std_math_internal_adjust_result(result));
 }
 
 static double risa_std_math_internal_adjust_result(double result) {

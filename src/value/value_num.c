@@ -5,7 +5,7 @@
 
 static RisaValue value_num_from_string(char* str, uint32_t length) {
     if(str == NULL)
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
 
     // 0xF -> skip the first 2 chars, parse in base 16.
     // 230 -> don't skip any chars, parse in base 10.
@@ -31,10 +31,10 @@ static RisaValue value_num_from_string(char* str, uint32_t length) {
     int64_t num;
 
     if (!risa_lib_charlib_strtoll(str + offset, base, &num)) {
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
     }
 
-    return RISA_INT_VALUE(num);
+    return risa_value_from_int(num);
 }
 
 bool risa_value_is_num(RisaValue value) {
@@ -55,24 +55,24 @@ RisaValue risa_value_int_from_string(char* str, uint32_t length) {
 RisaValue risa_value_byte_from_string(char* str, uint32_t length) {
     RisaValue result = value_num_from_string(str, length);
 
-    return result.type == RISA_VAL_NULL ? result : RISA_BYTE_VALUE((uint8_t) RISA_AS_INT(result));
+    return result.type == RISA_VAL_NULL ? result : risa_value_from_byte((uint8_t) risa_value_as_int(result));
 }
 
 RisaValue risa_value_float_from_string(char* str) {
     double num;
 
     if(!risa_lib_charlib_strtod(str, &num)) {
-        return RISA_NULL_VALUE;
+        return risa_value_from_null();
     }
 
-    return RISA_FLOAT_VALUE(num);
+    return risa_value_from_float(num);
 }
 
 RisaValue risa_value_bool_from_string(char* str) {
     if(risa_lib_charlib_stricmp(str, "true") || risa_lib_charlib_stricmp(str, "1"))
-        return RISA_BOOL_VALUE(true);
+        return risa_value_from_bool(true);
     if(risa_lib_charlib_stricmp(str, "false") || risa_lib_charlib_stricmp(str, "0"))
-        return RISA_BOOL_VALUE(false);
+        return risa_value_from_bool(false);
 
-    return RISA_NULL_VALUE;
+    return risa_value_from_null();
 }

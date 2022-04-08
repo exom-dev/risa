@@ -201,7 +201,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
 
     switch((RisaValueType) type) {
         case RISA_VAL_NULL:
-            *value = RISA_NULL_VALUE;
+            *value = risa_value_from_null();
             return true;
         case RISA_VAL_BOOL: {
             uint8_t val;
@@ -210,7 +210,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                 return false;
             }
 
-            *value = RISA_BOOL_VALUE((bool) val);
+            *value = risa_value_from_bool((bool) val);
             return true;
         }
         case RISA_VAL_BYTE: {
@@ -220,7 +220,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                 return false;
             }
 
-            *value = RISA_BYTE_VALUE(val);
+            *value = risa_value_from_byte(val);
             return true;
         }
         case RISA_VAL_INT: {
@@ -230,7 +230,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                 return false;
             }
 
-            *value = RISA_INT_VALUE(val);
+            *value = risa_value_from_int(val);
             return true;
         }
         case RISA_VAL_FLOAT: {
@@ -240,7 +240,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                 return false;
             }
 
-            *value = RISA_FLOAT_VALUE(val);
+            *value = risa_value_from_float(val);
             return true;
         }
         case RISA_VAL_DENSE: {
@@ -256,7 +256,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                         return false;
                     }
 
-                    *value = RISA_DENSE_VALUE(deserializer->strings.data[index]);
+                    *value = risa_value_from_dense(deserializer->strings.data[index]);
                     return true;
                 }
                 case RISA_DVAL_ARRAY: {
@@ -266,7 +266,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                         return false;
                     }
 
-                    *value = RISA_DENSE_VALUE(risa_dense_array_create());
+                    *value = risa_value_from_dense((RisaDenseValue*) risa_dense_array_create());
                     RISA_AS_ARRAY(*value)->data = array;
                     return true;
                 }
@@ -277,7 +277,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                         return false;
                     }
 
-                    *value = RISA_DENSE_VALUE(risa_dense_object_create());
+                    *value = risa_value_from_dense((RisaDenseValue*) risa_dense_object_create());
 
                     while(count > 0) {
                         RisaValue key;
@@ -320,7 +320,7 @@ static bool risa_cluster_deserialize_value(RisaClusterDeserializer* deserializer
                         return false;
                     }
 
-                    *value = RISA_DENSE_VALUE(risa_dense_function_create());
+                    *value = risa_value_from_dense((RisaDenseValue*) risa_dense_function_create());
                     RISA_AS_FUNCTION(*value)->name = RISA_AS_STRING(name);
                     RISA_AS_FUNCTION(*value)->arity = arity;
 
