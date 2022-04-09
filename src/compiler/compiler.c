@@ -938,7 +938,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
             return;
 
         risa_compiler_emit_byte(compiler, RISA_OP_NULL);
-        risa_compiler_emit_byte(compiler, compiler->regIndex - 1);
+        risa_compiler_emit_byte(compiler, compiler->locals[compiler->localCount - 1].reg - 1);
         risa_compiler_emit_byte(compiler, 0);
         risa_compiler_emit_byte(compiler, 0);
 
@@ -957,7 +957,7 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
         || (clusterSize + 4 == cluster.size               // Only one OP.
           && (cluster.bytecode[clusterSize] == RISA_OP_INC     // OP is INC.
           || (cluster.bytecode[clusterSize] == RISA_OP_DEC)))) // OP is DEC.
-            risa_compiler_emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the origin.
+            risa_compiler_emit_mov(compiler, compiler->locals[compiler->localCount - 1].reg, compiler->last.reg); // MOV the origin.
 
         else if(compiler->last.isPostIncrement) {
             int32_t incOffset = 4;
@@ -975,8 +975,8 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
                 return;
             }
 
-            if(cluster.bytecode[cluster.size - incOffset + 1] == compiler->localCount - 1) { // The INC target interferes with the local register.
-                uint8_t dest = compiler->localCount - 1;
+            if(cluster.bytecode[cluster.size - incOffset + 1] == compiler->locals[compiler->localCount - 1].reg) { // The INC target interferes with the local register.
+                uint8_t dest = compiler->locals[compiler->localCount - 1].reg;
                 uint8_t tmp = cluster.bytecode[cluster.size - incOffset - 4 + 1]; // Original MOV target.
 
                 cluster.bytecode[cluster.size - incOffset - 4 + 2] = tmp;  // MOV source.
@@ -1015,18 +1015,18 @@ static void risa_compiler_compile_variable_declaration(RisaCompiler* compiler) {
 
                     cluster.bytecode[cluster.size - incOffset + 2] = tmp;
                 }
-            } else cluster.bytecode[cluster.size - incOffset - 4 + 1] = compiler->localCount - 1; // Directly MOV to local.
+            } else cluster.bytecode[cluster.size - incOffset - 4 + 1] = compiler->locals[compiler->localCount - 1].reg; // Directly MOV to local.
         } else if(risa_op_has_direct_dest(cluster.bytecode[cluster.size - 4] & RISA_TODLR_INSTRUCTION_MASK) && !compiler->last.isEqualOp) { // Can directly assign to local.
-            cluster.bytecode[cluster.size - 4 + 1] = compiler->localCount - 1;  // Do it.
+            cluster.bytecode[cluster.size - 4 + 1] = compiler->locals[compiler->localCount - 1].reg;  // Do it.
             compiler->last.reg = index;
-        } else risa_compiler_emit_mov(compiler, compiler->localCount - 1, compiler->last.reg); // MOV the result.
+        } else risa_compiler_emit_mov(compiler, compiler->locals[compiler->localCount - 1].reg, compiler->last.reg); // MOV the result.
 
         if(compiler->last.isNew)
             risa_compiler_register_free(compiler);
 
         compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
 
-        compiler->last.reg = compiler->localCount - 1;
+        compiler->last.reg = compiler->locals[compiler->localCount - 1].reg;
         compiler->last.isConstOptimized = false;
         compiler->regs[compiler->last.reg] = (RisaRegInfo) {RISA_REG_LOCAL, lastRegToken };
         compiler->last.isNew = true;
